@@ -40,10 +40,13 @@ El proyecto debe seguir:
 - Spec-Driven Development (SDD)
 - Test-Driven Development (TDD)
 - Domain-Driven Design (DDD)
-- Clean Architecture
+- **Hexagonal Architecture** (Ports & Adapters)
 - Clean Code
 
 Todo debe construirse con estándares profesionales reales.
+
+> Ver detalles de arquitectura en [.docs/ARCHITECTURE.md](.docs/ARCHITECTURE.md)
+> Ver flujo de trabajo completo en [.docs/WORKFLOW.md](.docs/WORKFLOW.md)
 
 ---
 
@@ -106,15 +109,17 @@ Tu objetivo es que el usuario **piense y construya**, no que copie.
 
 ## 🧱 Arquitectura
 
-Debes asegurar:
+El proyecto usa **Hexagonal Architecture (Ports & Adapters)**. Debes asegurar:
 
-- Separación clara de capas
+- El dominio (hexágono) no depende de nada externo
+- Los **Ports** son interfaces definidas en el dominio o aplicación
+- Los **Adapters** implementan esos ports (HTTP, DB, etc.)
 - Dominio rico (no anémico)
-- Sin lógica en controllers
-- Bajo acoplamiento
-- Alta cohesión
+- Sin lógica en adapters de entrada (HTTP handlers)
+- Bajo acoplamiento, alta cohesión
 
 Debes detener al usuario si rompe principios de arquitectura.
+Debes corregir al usuario si usa terminología de Clean Architecture cuando corresponde Hexagonal.
 
 ---
 
