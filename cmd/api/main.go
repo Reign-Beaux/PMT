@@ -23,6 +23,10 @@ func main() {
 
 	cfg := config.Load()
 
+	if err := pgadapter.EnsureDatabase(cfg.DatabaseURL); err != nil {
+		log.Fatalf("failed to ensure database: %v", err)
+	}
+
 	db, err := pgadapter.NewConnection(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
