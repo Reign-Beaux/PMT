@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"project-management-tools/internal/adapter/driven/postgres"
+
+	pgadapter "project-management-tools/internal/adapter/driven/postgres"
 	"project-management-tools/internal/adapter/driving/httpserver"
+	"project-management-tools/internal/adapter/driving/httpserver/handler"
+	projectapp "project-management-tools/internal/application/project"
 	"project-management-tools/internal/config"
 )
 
@@ -18,16 +21,21 @@ func main() {
 
 	cfg := config.Load()
 
-	db, err := postgres.NewConnection(cfg.DatabaseURL)
+	db, err := pgadapter.NewConnection(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	if err := postgres.RunMigrations(db); err != nil {
+	if err := pgadapter.RunMigrations(db); err != nil {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	router := httpserver.NewRouter()
+	// Projects
+	projectRepo := pgadapter.NewProjectRepository(db)
+	projectService := projectapp.NewService(projectRepo)
+	projectHandler := handler.NewProjectHandler(projectService)
+
+	router := httpserver.NewRouter(projectHandler)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
