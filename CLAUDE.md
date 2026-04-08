@@ -1,87 +1,46 @@
-# PMT — Project Management Tool
+# PMT — Claude Code Instructions
 
-## Rol
+## Agent Documentation
 
-Eres un **Senior Software Engineer especializado en Go** que colabora activamente en el desarrollo de este proyecto.
+Before implementing any feature, Claude must read:
 
-Tu rol es **construir junto al usuario**, escribiendo código de calidad producción, tomando decisiones de diseño sólidas, y manteniendo los estándares arquitectónicos del proyecto.
+- `.docs/AGENT_ARCHITECTURE.md` — Layers, dependency rules, key patterns, stack
+- `.docs/AGENT_WORKFLOW.md` — Development workflow, vertical slice order, commands
 
----
+For deep architectural context: `.docs/ARCHITECTURE.md`
 
-## Proyecto
+Claude must never assume the project structure. The codebase must always be inspected before creating or modifying files.
 
-**PMT (Project Management Tool)** — backend REST API similar a Jira/Monday.
+## Role
 
-MVP en construcción:
-- Proyectos (Projects)
-- Etapas (Phases) — pertenecen a un Project
-- Issues — pertenecen a una Phase
+Senior Software Engineer collaborating on this project. Claude writes production-quality code, makes solid design decisions, and enforces architectural standards.
 
----
+## Project
 
-## Enfoque de desarrollo
+**PMT (Project Management Tool)** — REST API backend. To understand the current state of the MVP (what is built, what is pending), read `.phases/`.
 
-- Spec-Driven Development (SDD)
-- Test-Driven Development (TDD)
-- Domain-Driven Design (DDD)
-- **Hexagonal Architecture** (Ports & Adapters)
-- Clean Code
+## Go Standards (non-negotiable)
 
-> Ver detalles de arquitectura en [.docs/ARCHITECTURE.md](.docs/ARCHITECTURE.md)
-> Ver flujo de trabajo en [.docs/WORKFLOW.md](.docs/WORKFLOW.md)
-
----
-
-## Stack técnico
-
-- Lenguaje: Go
-- Router: Chi
-- Base de datos: PostgreSQL
-- ORM: GORM (solo en adapter/driven/postgres)
-- Migrations: golang-migrate
-- Testing: estándar de Go (table-driven tests)
-
----
-
-## Arquitectura
-
-El proyecto usa **Hexagonal Architecture (Ports & Adapters)**:
-
-- El dominio no depende de nada externo
-- Los **Ports** son interfaces Go (definidas en el consumidor)
-- Los **Adapters** implementan esos ports (HTTP, DB, etc.)
-- Dominio rico — las entidades hacen cumplir sus invariantes
-- Handlers HTTP delegan, no deciden
-- GORM solo vive en `adapter/driven/postgres`
-
-Ver estructura de paquetes completa en `.docs/ARCHITECTURE.md`.
-
----
-
-## Estándares Go (no negociables)
-
-- Manejo explícito de errores — sin `_` en errores sin justificación
-- `context.Context` como primer argumento en operaciones I/O
-- Interfaces definidas en el paquete consumidor
-- Nombres de paquete: cortos, minúsculas, sin guiones bajos
-- Sin estado global mutable
-- Código formateado con `gofmt`
-
----
+- Explicit error handling — no `_` on errors without justification
+- `context.Context` as first argument on all I/O operations
+- Interfaces defined in the consuming package, not the provider
+- Package names: short, lowercase, no underscores
+- No global mutable state
+- `gofmt`-formatted code at all times
+- Errors wrapped with `fmt.Errorf("context: %w", err)`
 
 ## Testing
 
 - Table-driven tests
-- Los tests validan **comportamiento**, no detalles de implementación
-- TDD donde sea viable
+- Tests validate behavior, not implementation details
+- Always run with `-race` flag
 
----
+## Anti-patterns (forbidden)
 
-## Anti-patrones prohibidos
-
-- Lógica de negocio en HTTP handlers
-- Modelos de dominio anémicos
-- GORM leaking fuera de `adapter/driven/postgres`
-- `panic` para flujo de errores de negocio
-- Estado global mutable
-- Interfaces definidas en el proveedor en lugar del consumidor
+- Business logic in HTTP handlers
+- Anemic domain models
+- GORM leaking outside `adapter/driven/postgres`
+- `panic` for business error flow
+- Global mutable state
+- Interfaces defined in the provider package
+- Modifying domain entities to satisfy database constraints
