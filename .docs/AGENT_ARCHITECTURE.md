@@ -64,6 +64,10 @@ Orchestration. Use cases that sequence domain operations. One package per aggreg
 
 Application imports domain. Application defines the repository interface it needs — not the other way around.
 
+One non-aggregate package also lives here:
+
+- `uow/` — shared types for multi-aggregate transactions. Not an aggregate. Contains `Repositories`, a struct grouping all driven port interfaces, used as the callback parameter in `UnitOfWork.Execute`. See [Unit of Work](#unit-of-work) below.
+
 ### `internal/adapter/driving/httpserver/`
 
 HTTP adapter (Chi router). Handlers parse requests, call the application service, and write responses. Zero business logic.
@@ -77,6 +81,7 @@ PostgreSQL adapter (GORM). Contains:
 - GORM model structs (struct tags stay here — never leak to domain)
 - Repository implementations
 - `toXModel()` / `toXDomain()` mapping functions
+- `uow.go` — concrete `UnitOfWork` implementation
 - SQL migration files (`migrations/*.sql`)
 
 ## Dependency Rule
@@ -106,6 +111,35 @@ GORM is confined to `adapter/driven/postgres`. GORM struct tags, `gorm.Model`, a
 ### Error Mapping
 
 Domain errors are sentinel values (`errors.Is`). HTTP handlers map domain errors to status codes — the domain never knows about HTTP.
+
+### Unit of Work
+
+The `UnitOfWork` is a **surgical coordinator** — only use cases that require atomicity across multiple aggregates use it. Use cases that touch a single aggregate inject their repository directly, as always.
+
+**Concrete implementation:** `internal/adapter/driven/postgres/uow.go`
+**Shared callback type:** `internal/application/uow/uow.go`
+
+The driven port interface is **not defined globally**. Each consuming use case declares only the interface it needs:
+
+```go
+// In application/somefeature/service.go — only when multi-aggregate atomicity is needed:
+type unitOfWork interface {
+    Execute(ctx context.Context, fn func(uow.Repositories) error) error
+}
+```
+
+`*postgres.UnitOfWork` satisfies this implicitly via Go's structural typing.
+
+**Transaction behavior:** GORM commits automatically when `fn` returns `nil`, rolls back on any error. The error propagates to the HTTP handler.
+
+**What to inject in each use case:**
+
+| Use case touches | Inject |
+|---|---|
+| One aggregate | Its `Repository` directly |
+| Multiple aggregates atomically | `unitOfWork` interface |
+
+Do not route single-aggregate use cases through the UoW. The asymmetry is intentional.
 
 ## Golden Rules
 

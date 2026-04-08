@@ -4,9 +4,16 @@ Registro de decisiones técnicas tomadas o diferidas, con su contexto y razonami
 
 ---
 
-## [PENDING] Unit of Work
+## [PARTIAL] Unit of Work
 
-**Estado:** Diferido — implementar en una fase próxima post-MVP
+**Estado:** Infraestructura implementada — driven port diferido hasta el primer use case consumidor
+
+**Implementado:**
+- `internal/adapter/driven/postgres/uow.go` — `UnitOfWork` concreto con `Execute`
+- `internal/application/uow/repositories.go` — tipo `Repositories` compartido para el callback
+
+**Pendiente:**
+- La interfaz driven port (`unitOfWork`) se define en cada use case que la consuma, no de forma global. Ningún use case la necesita aún.
 
 **Contexto:**
 El MVP actual maneja cada aggregate de forma independiente. Cada use case toca un solo aggregate, por lo que no hay necesidad de coordinación transaccional entre repos.

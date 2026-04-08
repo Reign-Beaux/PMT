@@ -16,9 +16,10 @@ Guía práctica para desarrollar en este proyecto. Cubre cómo agregar nuevas fu
    - [Paso 5 — Handler HTTP](#paso-5--handler-http)
    - [Paso 6 — Router](#paso-6--router)
    - [Paso 7 — Wiring en main.go](#paso-7--wiring-en-maingo)
-4. [Migraciones](#4-migraciones)
-5. [Testing](#5-testing)
-6. [Comandos de referencia](#6-comandos-de-referencia)
+4. [Cuándo usar Unit of Work](#4-cuándo-usar-unit-of-work)
+5. [Migraciones](#5-migraciones)
+6. [Testing](#6-testing)
+7. [Comandos de referencia](#7-comandos-de-referencia)
 
 ---
 
@@ -62,8 +63,13 @@ internal/
     service.go                     ← use cases (Create, GetByID, List, Update, Delete)
     repository.go                  ← interface del repositorio (driven port)
 
+  application/uow/
+    repositories.go                ← tipo Repositories para callback del UnitOfWork
+                                     (NO es un aggregate — es infraestructura de la capa application)
+
   adapter/driven/postgres/
     {aggregate}_repo.go            ← implementación GORM del repositorio
+    uow.go                         ← implementación concreta del UnitOfWork
     migrations/
       000NNN_{descripcion}.up.sql  ← migración forward
       000NNN_{descripcion}.down.sql← migración rollback
@@ -622,7 +628,63 @@ router := httpserver.NewRouter(projectHandler, phaseHandler, issueHandler, tagHa
 
 ---
 
-## 4. Migraciones
+## 4. Cuándo usar Unit of Work
+
+La mayoría de use cases **no** usan el UoW — inyectan su repositorio directamente. El UoW solo entra cuando un use case necesita atomicidad entre múltiples aggregates.
+
+**Regla práctica:**
+
+| El use case toca… | Inyecta |
+|---|---|
+| Un solo aggregate | Su `Repository` directamente |
+| Múltiples aggregates en la misma operación | `unitOfWork` |
+
+**Cómo integrarlo cuando sea necesario:**
+
+1. Declara la interfaz en el use case que la consume (no de forma global):
+
+```go
+// internal/application/somefeature/service.go
+type unitOfWork interface {
+    Execute(ctx context.Context, fn func(uow.Repositories) error) error
+}
+```
+
+2. Inyéctalo en el servicio junto a los repositorios que necesites:
+
+```go
+type Service struct {
+    uow  unitOfWork
+    repo Repository // si también necesita acceso fuera de transacción
+}
+```
+
+3. Úsalo solo en el método que requiere la transacción:
+
+```go
+func (s *Service) DeleteWithCascade(ctx context.Context, id shared.ID) error {
+    return s.uow.Execute(ctx, func(repos uow.Repositories) error {
+        if err := repos.Phases.DeleteByProject(ctx, id); err != nil {
+            return err
+        }
+        return repos.Projects.Delete(ctx, id)
+    })
+}
+```
+
+4. En `main.go`, instancia el UoW y pásalo al servicio:
+
+```go
+uow := pgadapter.NewUnitOfWork(db)
+someService := somefeatureapp.NewService(uow, projectRepo)
+```
+
+`*postgres.UnitOfWork` satisface la interfaz implícitamente — no hay registro ni cast explícito.
+
+---
+
+## 5. Migraciones
+
 
 Las migraciones son archivos SQL versionados en `internal/adapter/driven/postgres/migrations/`.
 
@@ -649,7 +711,7 @@ Las migraciones son archivos SQL versionados en `internal/adapter/driven/postgre
 
 ---
 
-## 5. Testing
+## 6. Testing
 
 Los tests del dominio viven junto al código que prueban: `internal/domain/{aggregate}/{aggregate}_test.go`.
 
@@ -672,7 +734,7 @@ go test -cover ./...
 
 ---
 
-## 6. Comandos de referencia
+## 7. Comandos de referencia
 
 ```bash
 # Levantar servidor
