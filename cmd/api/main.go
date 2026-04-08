@@ -5,12 +5,17 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/joho/godotenv"
 	"project-management-tools/internal/adapter/driven/postgres"
 	"project-management-tools/internal/adapter/driving/httpserver"
 	"project-management-tools/internal/config"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("no .env file found, reading from environment")
+	}
+
 	cfg := config.Load()
 
 	db, err := postgres.NewConnection(cfg.DatabaseURL)
