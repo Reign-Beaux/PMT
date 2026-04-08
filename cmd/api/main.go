@@ -10,6 +10,8 @@ import (
 	pgadapter "project-management-tools/internal/adapter/driven/postgres"
 	"project-management-tools/internal/adapter/driving/httpserver"
 	"project-management-tools/internal/adapter/driving/httpserver/handler"
+	issueapp "project-management-tools/internal/application/issue"
+	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
 	"project-management-tools/internal/config"
 )
@@ -30,12 +32,22 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	// Projects
+	// Repositories
 	projectRepo := pgadapter.NewProjectRepository(db)
-	projectService := projectapp.NewService(projectRepo)
-	projectHandler := handler.NewProjectHandler(projectService)
+	phaseRepo := pgadapter.NewPhaseRepository(db)
+	issueRepo := pgadapter.NewIssueRepository(db)
 
-	router := httpserver.NewRouter(projectHandler)
+	// Services
+	projectService := projectapp.NewService(projectRepo)
+	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
+	issueService := issueapp.NewService(issueRepo, phaseRepo)
+
+	// Handlers
+	projectHandler := handler.NewProjectHandler(projectService)
+	phaseHandler := handler.NewPhaseHandler(phaseService)
+	issueHandler := handler.NewIssueHandler(issueService)
+
+	router := httpserver.NewRouter(projectHandler, phaseHandler, issueHandler)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
