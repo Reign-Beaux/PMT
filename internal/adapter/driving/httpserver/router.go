@@ -12,6 +12,8 @@ func NewRouter(
 	projectHandler *handler.ProjectHandler,
 	phaseHandler *handler.PhaseHandler,
 	issueHandler *handler.IssueHandler,
+	labelHandler *handler.LabelHandler,
+	commentHandler *handler.CommentHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -25,11 +27,35 @@ func NewRouter(
 		r.Patch("/{id}", projectHandler.Update)
 		r.Delete("/{id}", projectHandler.Delete)
 
+		// Labels for a project
+		r.Route("/{projectId}/labels", func(r chi.Router) {
+			r.Post("/", labelHandler.Create)
+			r.Get("/", labelHandler.ListByProject)
+			r.Patch("/{labelId}", labelHandler.Update)
+			r.Delete("/{labelId}", labelHandler.Delete)
+		})
+
+		// Backlog issues (not assigned to any phase)
 		r.Route("/{projectId}/issues", func(r chi.Router) {
 			r.Post("/", issueHandler.BacklogCreate)
 			r.Get("/", issueHandler.BacklogList)
+
+			r.Route("/{issueId}", func(r chi.Router) {
+				r.Get("/", issueHandler.GetByID)
+				r.Patch("/", issueHandler.Update)
+				r.Patch("/transition", issueHandler.Transition)
+				r.Delete("/", issueHandler.Delete)
+
+				r.Post("/labels", labelHandler.AssignToIssue)
+				r.Delete("/labels/{labelId}", labelHandler.RemoveFromIssue)
+
+				r.Post("/comments", commentHandler.Create)
+				r.Get("/comments", commentHandler.ListByIssue)
+				r.Delete("/comments/{commentId}", commentHandler.Delete)
+			})
 		})
 
+		// Phase issues
 		r.Route("/{projectId}/phases", func(r chi.Router) {
 			r.Post("/", phaseHandler.Create)
 			r.Get("/", phaseHandler.ListByProject)
@@ -40,10 +66,20 @@ func NewRouter(
 			r.Route("/{phaseId}/issues", func(r chi.Router) {
 				r.Post("/", issueHandler.Create)
 				r.Get("/", issueHandler.ListByPhase)
-				r.Get("/{id}", issueHandler.GetByID)
-				r.Patch("/{id}", issueHandler.Update)
-				r.Patch("/{id}/transition", issueHandler.Transition)
-				r.Delete("/{id}", issueHandler.Delete)
+
+				r.Route("/{issueId}", func(r chi.Router) {
+					r.Get("/", issueHandler.GetByID)
+					r.Patch("/", issueHandler.Update)
+					r.Patch("/transition", issueHandler.Transition)
+					r.Delete("/", issueHandler.Delete)
+
+					r.Post("/labels", labelHandler.AssignToIssue)
+					r.Delete("/labels/{labelId}", labelHandler.RemoveFromIssue)
+
+					r.Post("/comments", commentHandler.Create)
+					r.Get("/comments", commentHandler.ListByIssue)
+					r.Delete("/comments/{commentId}", commentHandler.Delete)
+				})
 			})
 		})
 	})

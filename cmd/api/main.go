@@ -10,7 +10,9 @@ import (
 	pgadapter "project-management-tools/internal/adapter/driven/postgres"
 	"project-management-tools/internal/adapter/driving/httpserver"
 	"project-management-tools/internal/adapter/driving/httpserver/handler"
+	commentapp "project-management-tools/internal/application/comment"
 	issueapp "project-management-tools/internal/application/issue"
+	labelapp "project-management-tools/internal/application/label"
 	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
 	"project-management-tools/internal/config"
@@ -40,18 +42,24 @@ func main() {
 	projectRepo := pgadapter.NewProjectRepository(db)
 	phaseRepo := pgadapter.NewPhaseRepository(db)
 	issueRepo := pgadapter.NewIssueRepository(db)
+	labelRepo := pgadapter.NewLabelRepository(db)
+	commentRepo := pgadapter.NewCommentRepository(db)
 
 	// Services
 	projectService := projectapp.NewService(projectRepo)
 	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
-	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo)
+	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo)
+	labelService := labelapp.NewService(labelRepo, projectRepo)
+	commentService := commentapp.NewService(commentRepo, issueRepo)
 
 	// Handlers
 	projectHandler := handler.NewProjectHandler(projectService)
 	phaseHandler := handler.NewPhaseHandler(phaseService)
 	issueHandler := handler.NewIssueHandler(issueService)
+	labelHandler := handler.NewLabelHandler(labelService, issueService)
+	commentHandler := handler.NewCommentHandler(commentService)
 
-	router := httpserver.NewRouter(projectHandler, phaseHandler, issueHandler)
+	router := httpserver.NewRouter(projectHandler, phaseHandler, issueHandler, labelHandler, commentHandler)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,

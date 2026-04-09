@@ -2,6 +2,7 @@ package issue
 
 import (
 	"context"
+	"time"
 
 	"project-management-tools/internal/domain/issue"
 	"project-management-tools/internal/domain/shared"
@@ -13,22 +14,28 @@ type CreateInput struct {
 	Title     string
 	Spec      string
 	Priority  string
+	Type      string
+	DueDate   *time.Time
 }
 
 type UpdateInput struct {
-	Title    *string
-	Spec     *string
-	Priority *string
+	Title        *string
+	Spec         *string
+	Priority     *string
+	Type         *string
+	DueDate      *time.Time // set to this value when non-nil
+	ClearDueDate bool       // if true, clears the due date regardless of DueDate
 }
 
 type Service struct {
 	repo        Repository
 	phaseRepo   PhaseRepository
 	projectRepo ProjectRepository
+	labelRepo   LabelRepository
 }
 
-func NewService(repo Repository, phaseRepo PhaseRepository, projectRepo ProjectRepository) *Service {
-	return &Service{repo: repo, phaseRepo: phaseRepo, projectRepo: projectRepo}
+func NewService(repo Repository, phaseRepo PhaseRepository, projectRepo ProjectRepository, labelRepo LabelRepository) *Service {
+	return &Service{repo: repo, phaseRepo: phaseRepo, projectRepo: projectRepo, labelRepo: labelRepo}
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, error) {
@@ -73,6 +80,18 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, e
 			return issue.Issue{}, err
 		}
 		iss.SetPriority(priority)
+	}
+
+	if input.Type != "" {
+		issueType, err := issue.ParseIssueType(input.Type)
+		if err != nil {
+			return issue.Issue{}, err
+		}
+		iss.SetType(issueType)
+	}
+
+	if input.DueDate != nil {
+		iss.SetDueDate(input.DueDate)
 	}
 
 	if err := s.repo.Save(ctx, iss); err != nil {
@@ -122,6 +141,20 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 		iss.SetPriority(priority)
 	}
 
+	if input.Type != nil {
+		issueType, err := issue.ParseIssueType(*input.Type)
+		if err != nil {
+			return issue.Issue{}, err
+		}
+		iss.SetType(issueType)
+	}
+
+	if input.ClearDueDate {
+		iss.SetDueDate(nil)
+	} else if input.DueDate != nil {
+		iss.SetDueDate(input.DueDate)
+	}
+
 	if err := s.repo.Update(ctx, iss); err != nil {
 		return issue.Issue{}, err
 	}
@@ -156,4 +189,18 @@ func (s *Service) Delete(ctx context.Context, id shared.ID) error {
 		return err
 	}
 	return s.repo.Delete(ctx, id)
+}
+
+func (s *Service) AddLabel(ctx context.Context, issueID, labelID shared.ID) error {
+	if _, err := s.repo.FindByID(ctx, issueID); err != nil {
+		return err
+	}
+	if _, err := s.labelRepo.FindByID(ctx, labelID); err != nil {
+		return err
+	}
+	return s.repo.AddLabel(ctx, issueID, labelID)
+}
+
+func (s *Service) RemoveLabel(ctx context.Context, issueID, labelID shared.ID) error {
+	return s.repo.RemoveLabel(ctx, issueID, labelID)
 }

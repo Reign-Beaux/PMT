@@ -3,6 +3,7 @@ package issue_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"project-management-tools/internal/domain/issue"
 	"project-management-tools/internal/domain/shared"
@@ -25,6 +26,28 @@ func TestNewTitle(t *testing.T) {
 			_, err := issue.NewTitle(tt.input)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("got err %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestParseIssueType(t *testing.T) {
+	tests := []struct {
+		input   string
+		wantErr error
+	}{
+		{input: "task", wantErr: nil},
+		{input: "bug", wantErr: nil},
+		{input: "feature", wantErr: nil},
+		{input: "improvement", wantErr: nil},
+		{input: "unknown", wantErr: issue.ErrInvalidType},
+		{input: "", wantErr: issue.ErrInvalidType},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			_, err := issue.ParseIssueType(tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("got %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -75,11 +98,17 @@ func TestNew(t *testing.T) {
 				if iss.ID().IsZero() {
 					t.Error("expected non-zero ID")
 				}
+				if iss.Type() != issue.IssueTypeTask {
+					t.Errorf("expected default type %q, got %q", issue.IssueTypeTask, iss.Type())
+				}
 				if iss.Status() != issue.StatusOpen {
 					t.Errorf("expected status %q, got %q", issue.StatusOpen, iss.Status())
 				}
 				if iss.Priority() != issue.PriorityMedium {
 					t.Errorf("expected priority %q, got %q", issue.PriorityMedium, iss.Priority())
+				}
+				if iss.DueDate() != nil {
+					t.Error("expected nil due date by default")
 				}
 				if tt.phaseID == nil && !iss.IsBacklog() {
 					t.Error("expected issue to be in backlog")
@@ -89,6 +118,23 @@ func TestNew(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIssue_SetDueDate(t *testing.T) {
+	projectID := shared.NewID()
+	title, _ := issue.NewTitle("Some issue")
+	iss, _ := issue.New(projectID, nil, title)
+
+	due := time.Now().Add(24 * time.Hour)
+	iss.SetDueDate(&due)
+	if iss.DueDate() == nil {
+		t.Fatal("expected due date to be set")
+	}
+
+	iss.SetDueDate(nil)
+	if iss.DueDate() != nil {
+		t.Fatal("expected due date to be cleared")
 	}
 }
 
@@ -116,10 +162,10 @@ func TestIssue_Transition(t *testing.T) {
 			title, _ := issue.NewTitle("Some issue")
 			iss, _ := issue.New(projectID, &phaseID, title)
 
-			// Force initial status via reconstitution
 			iss = issue.Reconstitute(
-				iss.ID(), projectID, &phaseID, title, "", tt.from, issue.PriorityMedium,
-				iss.CreatedAt(), iss.UpdatedAt(),
+				iss.ID(), projectID, &phaseID, issue.IssueTypeTask,
+				title, "", tt.from, issue.PriorityMedium,
+				nil, nil, iss.CreatedAt(), iss.UpdatedAt(),
 			)
 
 			err := iss.Transition(tt.to)

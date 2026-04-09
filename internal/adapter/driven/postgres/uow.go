@@ -36,6 +36,8 @@ func (u *UnitOfWork) Execute(ctx context.Context, fn func(repos uow.Repositories
 			Projects: NewProjectRepository(tx),
 			Phases:   NewPhaseRepository(tx),
 			Issues:   NewIssueRepository(tx),
+			Labels:   NewLabelRepository(tx),
+			Comments: NewCommentRepository(tx),
 		})
 	})
 }

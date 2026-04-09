@@ -12,13 +12,16 @@ import (
 )
 
 type issueModel struct {
-	ID        string    `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
-	ProjectID string    `gorm:"not null;type:uuid;index"`
-	PhaseID   *string   `gorm:"type:uuid;index"`
-	Title     string    `gorm:"not null"`
-	Spec      string    `gorm:"not null;default:''"`
-	Status    string    `gorm:"not null;default:'open'"`
-	Priority  string    `gorm:"not null;default:'medium'"`
+	ID        string       `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	ProjectID string       `gorm:"not null;type:uuid;index"`
+	PhaseID   *string      `gorm:"type:uuid;index"`
+	Type      string       `gorm:"column:type;not null;default:'task'"`
+	Title     string       `gorm:"not null"`
+	Spec      string       `gorm:"not null;default:''"`
+	Status    string       `gorm:"not null;default:'open'"`
+	Priority  string       `gorm:"not null;default:'medium'"`
+	DueDate   *time.Time   `gorm:"type:timestamptz"`
+	Labels    []labelModel `gorm:"many2many:issue_labels;"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -40,7 +43,9 @@ func (r *IssueRepository) Save(ctx context.Context, i issue.Issue) error {
 
 func (r *IssueRepository) FindByID(ctx context.Context, id shared.ID) (issue.Issue, error) {
 	var model issueModel
-	err := r.db.WithContext(ctx).First(&model, "id = ?", id.String()).Error
+	err := r.db.WithContext(ctx).
+		Preload("Labels").
+		First(&model, "id = ?", id.String()).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return issue.Issue{}, issue.ErrNotFound
 	}
@@ -53,6 +58,7 @@ func (r *IssueRepository) FindByID(ctx context.Context, id shared.ID) (issue.Iss
 func (r *IssueRepository) FindByPhase(ctx context.Context, phaseID shared.ID) ([]issue.Issue, error) {
 	var models []issueModel
 	err := r.db.WithContext(ctx).
+		Preload("Labels").
 		Where("phase_id = ?", phaseID.String()).
 		Order("created_at ASC").
 		Find(&models).Error
@@ -65,6 +71,7 @@ func (r *IssueRepository) FindByPhase(ctx context.Context, phaseID shared.ID) ([
 func (r *IssueRepository) FindBacklog(ctx context.Context, projectID shared.ID) ([]issue.Issue, error) {
 	var models []issueModel
 	err := r.db.WithContext(ctx).
+		Preload("Labels").
 		Where("project_id = ? AND phase_id IS NULL", projectID.String()).
 		Order("created_at ASC").
 		Find(&models).Error
@@ -83,6 +90,20 @@ func (r *IssueRepository) Delete(ctx context.Context, id shared.ID) error {
 	return r.db.WithContext(ctx).Delete(&issueModel{}, "id = ?", id.String()).Error
 }
 
+func (r *IssueRepository) AddLabel(ctx context.Context, issueID, labelID shared.ID) error {
+	return r.db.WithContext(ctx).Exec(
+		"INSERT INTO issue_labels (issue_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+		issueID.String(), labelID.String(),
+	).Error
+}
+
+func (r *IssueRepository) RemoveLabel(ctx context.Context, issueID, labelID shared.ID) error {
+	return r.db.WithContext(ctx).Exec(
+		"DELETE FROM issue_labels WHERE issue_id = ? AND label_id = ?",
+		issueID.String(), labelID.String(),
+	).Error
+}
+
 func toIssueModel(i issue.Issue) issueModel {
 	var phaseID *string
 	if i.PhaseID() != nil {
@@ -93,10 +114,12 @@ func toIssueModel(i issue.Issue) issueModel {
 		ID:        i.ID().String(),
 		ProjectID: i.ProjectID().String(),
 		PhaseID:   phaseID,
+		Type:      string(i.Type()),
 		Title:     i.Title().String(),
 		Spec:      i.Spec(),
 		Status:    string(i.Status()),
 		Priority:  string(i.Priority()),
+		DueDate:   i.DueDate(),
 		CreatedAt: i.CreatedAt(),
 		UpdatedAt: i.UpdatedAt(),
 	}
@@ -119,6 +142,10 @@ func toIssueDomain(m issueModel) (issue.Issue, error) {
 		}
 		phaseID = &pid
 	}
+	issueType, err := issue.ParseIssueType(m.Type)
+	if err != nil {
+		return issue.Issue{}, err
+	}
 	title, err := issue.NewTitle(m.Title)
 	if err != nil {
 		return issue.Issue{}, err
@@ -131,7 +158,15 @@ func toIssueDomain(m issueModel) (issue.Issue, error) {
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	return issue.Reconstitute(id, projectID, phaseID, title, m.Spec, status, priority, m.CreatedAt, m.UpdatedAt), nil
+	labelIDs := make([]shared.ID, 0, len(m.Labels))
+	for _, lm := range m.Labels {
+		lid, err := shared.ParseID(lm.ID)
+		if err != nil {
+			return issue.Issue{}, err
+		}
+		labelIDs = append(labelIDs, lid)
+	}
+	return issue.Reconstitute(id, projectID, phaseID, issueType, title, m.Spec, status, priority, m.DueDate, labelIDs, m.CreatedAt, m.UpdatedAt), nil
 }
 
 func mapIssueModels(models []issueModel) ([]issue.Issue, error) {

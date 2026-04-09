@@ -64,3 +64,25 @@ func ParsePriority(s string) (Priority, error) {
 		return "", ErrInvalidPriority
 	}
 }
+
+// IssueType
+
+type IssueType string
+
+const (
+	IssueTypeTask        IssueType = "task"
+	IssueTypeBug         IssueType = "bug"
+	IssueTypeFeature     IssueType = "feature"
+	IssueTypeImprovement IssueType = "improvement"
+)
+
+var ErrInvalidType = errors.New("invalid issue type")
+
+func ParseIssueType(s string) (IssueType, error) {
+	switch IssueType(s) {
+	case IssueTypeTask, IssueTypeBug, IssueTypeFeature, IssueTypeImprovement:
+		return IssueType(s), nil
+	default:
+		return "", ErrInvalidType
+	}
+}

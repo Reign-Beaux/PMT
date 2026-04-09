@@ -25,6 +25,8 @@ type IssueService interface {
 	Update(ctx context.Context, id shared.ID, input issueapp.UpdateInput) (issue.Issue, error)
 	Transition(ctx context.Context, id shared.ID, status string) (issue.Issue, error)
 	Delete(ctx context.Context, id shared.ID) error
+	AddLabel(ctx context.Context, issueID, labelID shared.ID) error
+	RemoveLabel(ctx context.Context, issueID, labelID shared.ID) error
 }
 
 type IssueHandler struct {
@@ -39,10 +41,13 @@ type issueResponse struct {
 	ID        string    `json:"id"`
 	ProjectID string    `json:"project_id"`
 	PhaseID   *string   `json:"phase_id"`
+	Type      string    `json:"type"`
 	Title     string    `json:"title"`
 	Spec      string    `json:"spec"`
 	Status    string    `json:"status"`
 	Priority  string    `json:"priority"`
+	DueDate   *string   `json:"due_date"`
+	LabelIDs  []string  `json:"label_ids"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -53,28 +58,62 @@ func toIssueResponse(i issue.Issue) issueResponse {
 		s := i.PhaseID().String()
 		phaseID = &s
 	}
+	var dueDate *string
+	if i.DueDate() != nil {
+		s := i.DueDate().Format(time.RFC3339)
+		dueDate = &s
+	}
+	labelIDs := make([]string, 0, len(i.LabelIDs()))
+	for _, id := range i.LabelIDs() {
+		labelIDs = append(labelIDs, id.String())
+	}
 	return issueResponse{
 		ID:        i.ID().String(),
 		ProjectID: i.ProjectID().String(),
 		PhaseID:   phaseID,
+		Type:      string(i.Type()),
 		Title:     i.Title().String(),
 		Spec:      i.Spec(),
 		Status:    string(i.Status()),
 		Priority:  string(i.Priority()),
+		DueDate:   dueDate,
+		LabelIDs:  labelIDs,
 		CreatedAt: i.CreatedAt(),
 		UpdatedAt: i.UpdatedAt(),
 	}
 }
 
+// issueCreateBody is the shared request body for issue creation.
+type issueCreateBody struct {
+	Title    string  `json:"title"`
+	Spec     string  `json:"spec"`
+	Priority string  `json:"priority"`
+	Type     string  `json:"type"`
+	DueDate  *string `json:"due_date"`
+}
+
+func parseDueDate(s *string) (*time.Time, error) {
+	if s == nil {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 // POST /projects/{projectId}/phases/{phaseId}/issues
 func (h *IssueHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Title    string `json:"title"`
-		Spec     string `json:"spec"`
-		Priority string `json:"priority"`
-	}
+	var body issueCreateBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	dueDate, err := parseDueDate(body.DueDate)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "due_date must be RFC3339 format")
 		return
 	}
 
@@ -85,6 +124,8 @@ func (h *IssueHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Title:     body.Title,
 		Spec:      body.Spec,
 		Priority:  body.Priority,
+		Type:      body.Type,
+		DueDate:   dueDate,
 	})
 	if err != nil {
 		writeIssueError(w, err)
@@ -96,13 +137,15 @@ func (h *IssueHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // POST /projects/{projectId}/issues
 func (h *IssueHandler) BacklogCreate(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Title    string `json:"title"`
-		Spec     string `json:"spec"`
-		Priority string `json:"priority"`
-	}
+	var body issueCreateBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	dueDate, err := parseDueDate(body.DueDate)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "due_date must be RFC3339 format")
 		return
 	}
 
@@ -112,6 +155,8 @@ func (h *IssueHandler) BacklogCreate(w http.ResponseWriter, r *http.Request) {
 		Title:     body.Title,
 		Spec:      body.Spec,
 		Priority:  body.Priority,
+		Type:      body.Type,
+		DueDate:   dueDate,
 	})
 	if err != nil {
 		writeIssueError(w, err)
@@ -165,9 +210,9 @@ func (h *IssueHandler) ListByPhase(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// GET /projects/{projectId}/phases/{phaseId}/issues/{id}
+// GET .../issues/{issueId}
 func (h *IssueHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	id, err := shared.ParseID(chi.URLParam(r, "id"))
+	id, err := shared.ParseID(chi.URLParam(r, "issueId"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid issue id")
 		return
@@ -182,29 +227,53 @@ func (h *IssueHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toIssueResponse(iss))
 }
 
-// PATCH /projects/{projectId}/phases/{phaseId}/issues/{id}
+// PATCH .../issues/{issueId}
 func (h *IssueHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, err := shared.ParseID(chi.URLParam(r, "id"))
+	id, err := shared.ParseID(chi.URLParam(r, "issueId"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid issue id")
 		return
 	}
 
 	var body struct {
-		Title    *string `json:"title"`
-		Spec     *string `json:"spec"`
-		Priority *string `json:"priority"`
+		Title        *string         `json:"title"`
+		Spec         *string         `json:"spec"`
+		Priority     *string         `json:"priority"`
+		Type         *string         `json:"type"`
+		DueDate      json.RawMessage `json:"due_date"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	iss, err := h.svc.Update(r.Context(), id, issueapp.UpdateInput{
+	input := issueapp.UpdateInput{
 		Title:    body.Title,
 		Spec:     body.Spec,
 		Priority: body.Priority,
-	})
+		Type:     body.Type,
+	}
+
+	// due_date: absent = no change; null = clear; "..." = set
+	if body.DueDate != nil {
+		if string(body.DueDate) == "null" {
+			input.ClearDueDate = true
+		} else {
+			var dueDateStr string
+			if err := json.Unmarshal(body.DueDate, &dueDateStr); err != nil {
+				writeError(w, http.StatusBadRequest, "due_date must be RFC3339 format or null")
+				return
+			}
+			t, err := time.Parse(time.RFC3339, dueDateStr)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "due_date must be RFC3339 format or null")
+				return
+			}
+			input.DueDate = &t
+		}
+	}
+
+	iss, err := h.svc.Update(r.Context(), id, input)
 	if err != nil {
 		writeIssueError(w, err)
 		return
@@ -213,9 +282,9 @@ func (h *IssueHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toIssueResponse(iss))
 }
 
-// PATCH /projects/{projectId}/phases/{phaseId}/issues/{id}/transition
+// PATCH .../issues/{issueId}/transition
 func (h *IssueHandler) Transition(w http.ResponseWriter, r *http.Request) {
-	id, err := shared.ParseID(chi.URLParam(r, "id"))
+	id, err := shared.ParseID(chi.URLParam(r, "issueId"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid issue id")
 		return
@@ -238,9 +307,9 @@ func (h *IssueHandler) Transition(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toIssueResponse(iss))
 }
 
-// DELETE /projects/{projectId}/phases/{phaseId}/issues/{id}
+// DELETE .../issues/{issueId}
 func (h *IssueHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := shared.ParseID(chi.URLParam(r, "id"))
+	id, err := shared.ParseID(chi.URLParam(r, "issueId"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid issue id")
 		return
@@ -269,6 +338,8 @@ func writeIssueError(w http.ResponseWriter, err error) {
 	case errors.Is(err, issue.ErrInvalidStatus):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, issue.ErrInvalidPriority):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, issue.ErrInvalidType):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, shared.ErrInvalidID):
 		writeError(w, http.StatusBadRequest, err.Error())

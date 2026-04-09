@@ -3,7 +3,9 @@
 package uow
 
 import (
+	"project-management-tools/internal/application/comment"
 	"project-management-tools/internal/application/issue"
+	"project-management-tools/internal/application/label"
 	"project-management-tools/internal/application/phase"
 	"project-management-tools/internal/application/project"
 )
@@ -16,4 +18,6 @@ type Repositories struct {
 	Projects project.Repository
 	Phases   phase.Repository
 	Issues   issue.Repository
+	Labels   label.Repository
+	Comments comment.Repository
 }
