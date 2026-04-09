@@ -13,7 +13,8 @@ import (
 
 type issueModel struct {
 	ID        string    `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
-	PhaseID   string    `gorm:"not null;type:uuid;index"`
+	ProjectID string    `gorm:"not null;type:uuid;index"`
+	PhaseID   *string   `gorm:"type:uuid;index"`
 	Title     string    `gorm:"not null"`
 	Spec      string    `gorm:"not null;default:''"`
 	Status    string    `gorm:"not null;default:'open'"`
@@ -58,16 +59,19 @@ func (r *IssueRepository) FindByPhase(ctx context.Context, phaseID shared.ID) ([
 	if err != nil {
 		return nil, err
 	}
+	return mapIssueModels(models)
+}
 
-	issues := make([]issue.Issue, 0, len(models))
-	for _, m := range models {
-		iss, err := toIssueDomain(m)
-		if err != nil {
-			return nil, err
-		}
-		issues = append(issues, iss)
+func (r *IssueRepository) FindBacklog(ctx context.Context, projectID shared.ID) ([]issue.Issue, error) {
+	var models []issueModel
+	err := r.db.WithContext(ctx).
+		Where("project_id = ? AND phase_id IS NULL", projectID.String()).
+		Order("created_at ASC").
+		Find(&models).Error
+	if err != nil {
+		return nil, err
 	}
-	return issues, nil
+	return mapIssueModels(models)
 }
 
 func (r *IssueRepository) Update(ctx context.Context, i issue.Issue) error {
@@ -80,9 +84,15 @@ func (r *IssueRepository) Delete(ctx context.Context, id shared.ID) error {
 }
 
 func toIssueModel(i issue.Issue) issueModel {
+	var phaseID *string
+	if i.PhaseID() != nil {
+		s := i.PhaseID().String()
+		phaseID = &s
+	}
 	return issueModel{
 		ID:        i.ID().String(),
-		PhaseID:   i.PhaseID().String(),
+		ProjectID: i.ProjectID().String(),
+		PhaseID:   phaseID,
 		Title:     i.Title().String(),
 		Spec:      i.Spec(),
 		Status:    string(i.Status()),
@@ -97,9 +107,17 @@ func toIssueDomain(m issueModel) (issue.Issue, error) {
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	phaseID, err := shared.ParseID(m.PhaseID)
+	projectID, err := shared.ParseID(m.ProjectID)
 	if err != nil {
 		return issue.Issue{}, err
+	}
+	var phaseID *shared.ID
+	if m.PhaseID != nil {
+		pid, err := shared.ParseID(*m.PhaseID)
+		if err != nil {
+			return issue.Issue{}, err
+		}
+		phaseID = &pid
 	}
 	title, err := issue.NewTitle(m.Title)
 	if err != nil {
@@ -113,5 +131,17 @@ func toIssueDomain(m issueModel) (issue.Issue, error) {
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	return issue.Reconstitute(id, phaseID, title, m.Spec, status, priority, m.CreatedAt, m.UpdatedAt), nil
+	return issue.Reconstitute(id, projectID, phaseID, title, m.Spec, status, priority, m.CreatedAt, m.UpdatedAt), nil
+}
+
+func mapIssueModels(models []issueModel) ([]issue.Issue, error) {
+	issues := make([]issue.Issue, 0, len(models))
+	for _, m := range models {
+		iss, err := toIssueDomain(m)
+		if err != nil {
+			return nil, err
+		}
+		issues = append(issues, iss)
+	}
+	return issues, nil
 }

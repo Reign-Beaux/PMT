@@ -44,7 +44,7 @@ func main() {
 	// Services
 	projectService := projectapp.NewService(projectRepo)
 	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
-	issueService := issueapp.NewService(issueRepo, phaseRepo)
+	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo)
 
 	// Handlers
 	projectHandler := handler.NewProjectHandler(projectService)

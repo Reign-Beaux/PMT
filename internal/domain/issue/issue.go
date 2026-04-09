@@ -7,19 +7,22 @@ import (
 )
 
 type Issue struct {
-	id       shared.ID
-	phaseID  shared.ID
-	title    Title
-	spec     string
-	status   Status
-	priority Priority
+	id        shared.ID
+	projectID shared.ID
+	phaseID   *shared.ID // nil = backlog (not assigned to any phase)
+	title     Title
+	spec      string
+	status    Status
+	priority  Priority
 	createdAt time.Time
 	updatedAt time.Time
 }
 
-func New(phaseID shared.ID, title Title) (Issue, error) {
-	if phaseID.IsZero() {
-		return Issue{}, ErrInvalidPhaseID
+// New creates a new Issue owned by projectID. phaseID is optional — nil means the
+// issue lives in the project backlog and is not yet assigned to any phase.
+func New(projectID shared.ID, phaseID *shared.ID, title Title) (Issue, error) {
+	if projectID.IsZero() {
+		return Issue{}, ErrInvalidProjectID
 	}
 	if !title.isValid() {
 		return Issue{}, ErrInvalidTitle
@@ -27,6 +30,7 @@ func New(phaseID shared.ID, title Title) (Issue, error) {
 	now := time.Now()
 	return Issue{
 		id:        shared.NewID(),
+		projectID: projectID,
 		phaseID:   phaseID,
 		title:     title,
 		status:    StatusOpen,
@@ -38,9 +42,10 @@ func New(phaseID shared.ID, title Title) (Issue, error) {
 
 // Reconstitute rebuilds an Issue from persisted data.
 // Bypasses constructor validation — callers must ensure data integrity.
-func Reconstitute(id, phaseID shared.ID, title Title, spec string, status Status, priority Priority, createdAt, updatedAt time.Time) Issue {
+func Reconstitute(id, projectID shared.ID, phaseID *shared.ID, title Title, spec string, status Status, priority Priority, createdAt, updatedAt time.Time) Issue {
 	return Issue{
 		id:        id,
+		projectID: projectID,
 		phaseID:   phaseID,
 		title:     title,
 		spec:      spec,
@@ -51,14 +56,16 @@ func Reconstitute(id, phaseID shared.ID, title Title, spec string, status Status
 	}
 }
 
-func (i Issue) ID() shared.ID        { return i.id }
-func (i Issue) PhaseID() shared.ID   { return i.phaseID }
-func (i Issue) Title() Title         { return i.title }
-func (i Issue) Spec() string         { return i.spec }
-func (i Issue) Status() Status       { return i.status }
-func (i Issue) Priority() Priority   { return i.priority }
-func (i Issue) CreatedAt() time.Time { return i.createdAt }
-func (i Issue) UpdatedAt() time.Time { return i.updatedAt }
+func (i Issue) ID() shared.ID         { return i.id }
+func (i Issue) ProjectID() shared.ID  { return i.projectID }
+func (i Issue) PhaseID() *shared.ID   { return i.phaseID }
+func (i Issue) Title() Title          { return i.title }
+func (i Issue) Spec() string          { return i.spec }
+func (i Issue) Status() Status        { return i.status }
+func (i Issue) Priority() Priority    { return i.priority }
+func (i Issue) CreatedAt() time.Time  { return i.createdAt }
+func (i Issue) UpdatedAt() time.Time  { return i.updatedAt }
+func (i Issue) IsBacklog() bool       { return i.phaseID == nil }
 
 func (i *Issue) UpdateTitle(title Title) error {
 	if !title.isValid() {

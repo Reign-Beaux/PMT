@@ -31,32 +31,43 @@ func TestNewTitle(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
+	validProjectID := shared.NewID()
 	validPhaseID := shared.NewID()
 	validTitle, _ := issue.NewTitle("Fix login bug")
 
 	tests := []struct {
-		name    string
-		phaseID shared.ID
-		title   issue.Title
-		wantErr error
+		name      string
+		projectID shared.ID
+		phaseID   *shared.ID
+		title     issue.Title
+		wantErr   error
 	}{
 		{
-			name:    "valid issue",
-			phaseID: validPhaseID,
-			title:   validTitle,
-			wantErr: nil,
+			name:      "phase-scoped issue",
+			projectID: validProjectID,
+			phaseID:   &validPhaseID,
+			title:     validTitle,
+			wantErr:   nil,
 		},
 		{
-			name:    "zero phase id rejected",
-			phaseID: shared.ID{},
-			title:   validTitle,
-			wantErr: issue.ErrInvalidPhaseID,
+			name:      "backlog issue (nil phase)",
+			projectID: validProjectID,
+			phaseID:   nil,
+			title:     validTitle,
+			wantErr:   nil,
+		},
+		{
+			name:      "zero project id rejected",
+			projectID: shared.ID{},
+			phaseID:   nil,
+			title:     validTitle,
+			wantErr:   issue.ErrInvalidProjectID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			iss, err := issue.New(tt.phaseID, tt.title)
+			iss, err := issue.New(tt.projectID, tt.phaseID, tt.title)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("got err %v, want %v", err, tt.wantErr)
 			}
@@ -69,6 +80,12 @@ func TestNew(t *testing.T) {
 				}
 				if iss.Priority() != issue.PriorityMedium {
 					t.Errorf("expected priority %q, got %q", issue.PriorityMedium, iss.Priority())
+				}
+				if tt.phaseID == nil && !iss.IsBacklog() {
+					t.Error("expected issue to be in backlog")
+				}
+				if tt.phaseID != nil && iss.IsBacklog() {
+					t.Error("expected issue to not be in backlog")
 				}
 			}
 		})
@@ -94,14 +111,15 @@ func TestIssue_Transition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			projectID := shared.NewID()
 			phaseID := shared.NewID()
 			title, _ := issue.NewTitle("Some issue")
-			iss, _ := issue.New(phaseID, title)
+			iss, _ := issue.New(projectID, &phaseID, title)
 
 			// Force initial status via reconstitution
 			iss = issue.Reconstitute(
-				iss.ID(), phaseID, title, "", tt.from, issue.PriorityMedium,
-				iss.CreatedAt(), iss.UpdatedAt(), // spec is empty — not relevant to this test
+				iss.ID(), projectID, &phaseID, title, "", tt.from, issue.PriorityMedium,
+				iss.CreatedAt(), iss.UpdatedAt(),
 			)
 
 			err := iss.Transition(tt.to)

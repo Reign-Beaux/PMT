@@ -25,6 +25,11 @@ func NewRouter(
 		r.Patch("/{id}", projectHandler.Update)
 		r.Delete("/{id}", projectHandler.Delete)
 
+		r.Route("/{projectId}/issues", func(r chi.Router) {
+			r.Post("/", issueHandler.BacklogCreate)
+			r.Get("/", issueHandler.BacklogList)
+		})
+
 		r.Route("/{projectId}/phases", func(r chi.Router) {
 			r.Post("/", phaseHandler.Create)
 			r.Get("/", phaseHandler.ListByProject)

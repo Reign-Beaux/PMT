@@ -8,10 +8,11 @@ import (
 )
 
 type CreateInput struct {
-	PhaseID  string
-	Title    string
-	Spec     string
-	Priority string
+	ProjectID string
+	PhaseID   *string // nil = backlog
+	Title     string
+	Spec      string
+	Priority  string
 }
 
 type UpdateInput struct {
@@ -21,22 +22,35 @@ type UpdateInput struct {
 }
 
 type Service struct {
-	repo      Repository
-	phaseRepo PhaseRepository
+	repo        Repository
+	phaseRepo   PhaseRepository
+	projectRepo ProjectRepository
 }
 
-func NewService(repo Repository, phaseRepo PhaseRepository) *Service {
-	return &Service{repo: repo, phaseRepo: phaseRepo}
+func NewService(repo Repository, phaseRepo PhaseRepository, projectRepo ProjectRepository) *Service {
+	return &Service{repo: repo, phaseRepo: phaseRepo, projectRepo: projectRepo}
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, error) {
-	phaseID, err := shared.ParseID(input.PhaseID)
+	projectID, err := shared.ParseID(input.ProjectID)
 	if err != nil {
 		return issue.Issue{}, err
 	}
 
-	if _, err := s.phaseRepo.FindByID(ctx, phaseID); err != nil {
+	if _, err := s.projectRepo.FindByID(ctx, projectID); err != nil {
 		return issue.Issue{}, err
+	}
+
+	var phaseID *shared.ID
+	if input.PhaseID != nil {
+		pid, err := shared.ParseID(*input.PhaseID)
+		if err != nil {
+			return issue.Issue{}, err
+		}
+		if _, err := s.phaseRepo.FindByID(ctx, pid); err != nil {
+			return issue.Issue{}, err
+		}
+		phaseID = &pid
 	}
 
 	title, err := issue.NewTitle(input.Title)
@@ -44,7 +58,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, e
 		return issue.Issue{}, err
 	}
 
-	iss, err := issue.New(phaseID, title)
+	iss, err := issue.New(projectID, phaseID, title)
 	if err != nil {
 		return issue.Issue{}, err
 	}
@@ -74,6 +88,10 @@ func (s *Service) GetByID(ctx context.Context, id shared.ID) (issue.Issue, error
 
 func (s *Service) ListByPhase(ctx context.Context, phaseID shared.ID) ([]issue.Issue, error) {
 	return s.repo.FindByPhase(ctx, phaseID)
+}
+
+func (s *Service) ListBacklog(ctx context.Context, projectID shared.ID) ([]issue.Issue, error) {
+	return s.repo.FindBacklog(ctx, projectID)
 }
 
 func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (issue.Issue, error) {
