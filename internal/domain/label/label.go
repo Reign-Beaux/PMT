@@ -17,7 +17,7 @@ type Label struct {
 
 func New(projectID shared.ID, name Name, color Color) (Label, error) {
 	if projectID.IsZero() {
-		return Label{}, ErrInvalidName // project is required; name error is reused here for simplicity
+		return Label{}, ErrInvalidProjectID
 	}
 	if !name.isValid() {
 		return Label{}, ErrInvalidName

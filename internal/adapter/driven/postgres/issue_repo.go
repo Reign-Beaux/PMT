@@ -21,7 +21,7 @@ type issueModel struct {
 	Status    string       `gorm:"not null;default:'open'"`
 	Priority  string       `gorm:"not null;default:'medium'"`
 	DueDate   *time.Time   `gorm:"type:timestamptz"`
-	Labels    []labelModel `gorm:"many2many:issue_labels;"`
+	Labels    []labelModel `gorm:"many2many:issue_labels;joinForeignKey:issue_id;joinReferences:label_id"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
