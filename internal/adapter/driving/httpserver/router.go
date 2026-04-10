@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 
 	"project-management-tools/internal/adapter/driving/httpserver/handler"
 )
@@ -16,6 +17,13 @@ func NewRouter(
 	commentHandler *handler.CommentHandler,
 ) http.Handler {
 	r := chi.NewRouter()
+
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowCredentials: false,
+	}))
 
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/health", healthHandler.Handle)
