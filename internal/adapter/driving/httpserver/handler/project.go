@@ -119,16 +119,27 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name        *string `json:"name"`
 		Description *string `json:"description"`
+		Status      *string `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	p, err := h.svc.Update(r.Context(), id, projectapp.UpdateInput{
+	input := projectapp.UpdateInput{
 		Name:        body.Name,
 		Description: body.Description,
-	})
+	}
+	if body.Status != nil {
+		s, err := project.ParseStatus(*body.Status)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		input.Status = &s
+	}
+
+	p, err := h.svc.Update(r.Context(), id, input)
 	if err != nil {
 		writeProjectError(w, err)
 		return
@@ -157,7 +168,8 @@ func writeProjectError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, project.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, project.ErrInvalidName):
+	case errors.Is(err, project.ErrInvalidName),
+		errors.Is(err, project.ErrInvalidStatus):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal server error")

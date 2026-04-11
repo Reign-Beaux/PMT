@@ -63,6 +63,16 @@ func (p *Project) SetDescription(desc string) {
 	p.updatedAt = time.Now()
 }
 
+func (p *Project) ChangeStatus(s Status) error {
+	_, err := ParseStatus(string(s))
+	if err != nil {
+		return err
+	}
+	p.status = s
+	p.updatedAt = time.Now()
+	return nil
+}
+
 func (p *Project) Archive() {
 	p.status = StatusArchived
 	p.updatedAt = time.Now()

@@ -15,6 +15,7 @@ type CreateInput struct {
 type UpdateInput struct {
 	Name        *string
 	Description *string
+	Status      *project.Status
 }
 
 type Service struct {
@@ -73,6 +74,12 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 
 	if input.Description != nil {
 		p.SetDescription(*input.Description)
+	}
+
+	if input.Status != nil {
+		if err := p.ChangeStatus(*input.Status); err != nil {
+			return project.Project{}, err
+		}
 	}
 
 	if err := s.repo.Update(ctx, p); err != nil {
