@@ -12,7 +12,7 @@ import (
 type Repository interface {
 	Save(ctx context.Context, p project.Project) error
 	FindByID(ctx context.Context, id shared.ID) (project.Project, error)
-	FindAll(ctx context.Context) ([]project.Project, error)
+	FindByOwnerID(ctx context.Context, ownerID shared.ID) ([]project.Project, error)
 	Update(ctx context.Context, p project.Project) error
 	Delete(ctx context.Context, id shared.ID) error
 }

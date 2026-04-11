@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"project-management-tools/internal/adapter/driving/httpserver/middleware"
 	projectapp "project-management-tools/internal/application/project"
 	"project-management-tools/internal/domain/project"
 	"project-management-tools/internal/domain/shared"
@@ -18,7 +19,7 @@ import (
 type ProjectService interface {
 	Create(ctx context.Context, input projectapp.CreateInput) (project.Project, error)
 	GetByID(ctx context.Context, id shared.ID) (project.Project, error)
-	List(ctx context.Context) ([]project.Project, error)
+	List(ctx context.Context, ownerID shared.ID) ([]project.Project, error)
 	Update(ctx context.Context, id shared.ID, input projectapp.UpdateInput) (project.Project, error)
 	Delete(ctx context.Context, id shared.ID) error
 }
@@ -54,6 +55,12 @@ func toProjectResponse(p project.Project) projectResponse {
 
 // POST /projects
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	var body struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -64,6 +71,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p, err := h.svc.Create(r.Context(), projectapp.CreateInput{
+		OwnerID:     userID,
 		Name:        body.Name,
 		Description: body.Description,
 	})
@@ -77,7 +85,13 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // GET /projects
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
-	projects, err := h.svc.List(r.Context())
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	projects, err := h.svc.List(r.Context(), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list projects")
 		return

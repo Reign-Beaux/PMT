@@ -15,6 +15,7 @@ import (
 	labelapp "project-management-tools/internal/application/label"
 	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
+	userapp "project-management-tools/internal/application/user"
 	"project-management-tools/internal/config"
 )
 
@@ -38,7 +39,11 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
+	jwtSecret := []byte(cfg.JWTSecret)
+
 	// Repositories
+	userRepo := pgadapter.NewUserRepository(db)
+	tokenRepo := pgadapter.NewTokenRepository(db)
 	projectRepo := pgadapter.NewProjectRepository(db)
 	phaseRepo := pgadapter.NewPhaseRepository(db)
 	issueRepo := pgadapter.NewIssueRepository(db)
@@ -46,6 +51,7 @@ func main() {
 	commentRepo := pgadapter.NewCommentRepository(db)
 
 	// Services
+	userService := userapp.NewService(userRepo, tokenRepo)
 	projectService := projectapp.NewService(projectRepo)
 	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
 	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo)
@@ -53,13 +59,22 @@ func main() {
 	commentService := commentapp.NewService(commentRepo, issueRepo)
 
 	// Handlers
+	authHandler := handler.NewAuthHandler(userService, jwtSecret)
 	projectHandler := handler.NewProjectHandler(projectService)
 	phaseHandler := handler.NewPhaseHandler(phaseService)
 	issueHandler := handler.NewIssueHandler(issueService)
 	labelHandler := handler.NewLabelHandler(labelService, issueService)
 	commentHandler := handler.NewCommentHandler(commentService)
 
-	router := httpserver.NewRouter(projectHandler, phaseHandler, issueHandler, labelHandler, commentHandler)
+	router := httpserver.NewRouter(
+		authHandler,
+		projectHandler,
+		phaseHandler,
+		issueHandler,
+		labelHandler,
+		commentHandler,
+		jwtSecret,
+	)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,

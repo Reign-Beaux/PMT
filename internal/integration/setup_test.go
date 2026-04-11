@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -37,12 +38,15 @@ import (
 	labelapp "project-management-tools/internal/application/label"
 	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
+	userapp "project-management-tools/internal/application/user"
 )
 
 var (
-	testServer  *httptest.Server
-	testDB      *gorm.DB
-	dbAvailable bool
+	testServer    *httptest.Server
+	testDB        *gorm.DB
+	testClient    *http.Client // authenticated client; used by all helper functions
+	dbAvailable   bool
+	testJWTSecret = []byte("test-secret")
 )
 
 func TestMain(m *testing.M) {
@@ -73,27 +77,47 @@ func TestMain(m *testing.M) {
 	dbAvailable = true
 
 	// Wire the full stack
+	userRepo := pgadapter.NewUserRepository(db)
+	tokenRepo := pgadapter.NewTokenRepository(db)
 	projectRepo := pgadapter.NewProjectRepository(db)
 	phaseRepo := pgadapter.NewPhaseRepository(db)
 	issueRepo := pgadapter.NewIssueRepository(db)
 	labelRepo := pgadapter.NewLabelRepository(db)
 	commentRepo := pgadapter.NewCommentRepository(db)
 
+	userService := userapp.NewService(userRepo, tokenRepo)
 	projectService := projectapp.NewService(projectRepo)
 	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
 	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo)
 	labelService := labelapp.NewService(labelRepo, projectRepo)
 	commentService := commentapp.NewService(commentRepo, issueRepo)
 
+	authHandler := handler.NewAuthHandler(userService, testJWTSecret)
 	projectHandler := handler.NewProjectHandler(projectService)
 	phaseHandler := handler.NewPhaseHandler(phaseService)
 	issueHandler := handler.NewIssueHandler(issueService)
 	labelHandler := handler.NewLabelHandler(labelService, issueService)
 	commentHandler := handler.NewCommentHandler(commentService)
 
-	router := httpserver.NewRouter(projectHandler, phaseHandler, issueHandler, labelHandler, commentHandler)
+	router := httpserver.NewRouter(
+		authHandler,
+		projectHandler,
+		phaseHandler,
+		issueHandler,
+		labelHandler,
+		commentHandler,
+		testJWTSecret,
+	)
 	testServer = httptest.NewServer(router)
 	defer testServer.Close()
+
+	// Build a client with a cookie jar so auth cookies persist across requests.
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		fmt.Println("integration: failed to create cookie jar:", err)
+		os.Exit(1)
+	}
+	testClient = &http.Client{Jar: jar}
 
 	os.Exit(m.Run())
 }
@@ -106,20 +130,41 @@ func skipIfNoDB(t *testing.T) {
 	}
 }
 
-// cleanup truncates all tables between tests to guarantee isolation.
+// cleanup truncates all tables and re-registers the test user so auth
+// cookies in testClient remain valid across tests.
 func cleanup(t *testing.T) {
 	t.Helper()
 	sqlDB, err := testDB.DB()
 	if err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
-	_, err = sqlDB.Exec(`TRUNCATE comments, issue_labels, issues, labels, phases, projects CASCADE`)
+	_, err = sqlDB.Exec(`TRUNCATE refresh_tokens, comments, issue_labels, issues, labels, phases, projects, users CASCADE`)
 	if err != nil {
 		t.Fatalf("cleanup truncate: %v", err)
 	}
+
+	// Re-create the test user and refresh the auth cookies.
+	body, _ := json.Marshal(map[string]any{
+		"email":    "test@example.com",
+		"password": "password123",
+	})
+	req, err := http.NewRequest(http.MethodPost, url("/auth/register"), bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("cleanup register request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := testClient.Do(req)
+	if err != nil {
+		t.Fatalf("cleanup register: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("cleanup register failed: status %d body %s", resp.StatusCode, b)
+	}
 }
 
-// ── HTTP helpers ─────────────────────────────────────────────────────────────
+// ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 func url(path string) string {
 	return testServer.URL + path
@@ -162,7 +207,7 @@ func request(t *testing.T, method, path string, body any) *http.Response {
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := testClient.Do(req)
 	if err != nil {
 		t.Fatalf("do request %s %s: %v", method, path, err)
 	}

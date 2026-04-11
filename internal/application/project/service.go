@@ -8,6 +8,7 @@ import (
 )
 
 type CreateInput struct {
+	OwnerID     shared.ID
 	Name        string
 	Description string
 }
@@ -32,7 +33,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (project.Projec
 		return project.Project{}, err
 	}
 
-	p, err := project.New(name)
+	p, err := project.New(input.OwnerID, name)
 	if err != nil {
 		return project.Project{}, err
 	}
@@ -52,8 +53,8 @@ func (s *Service) GetByID(ctx context.Context, id shared.ID) (project.Project, e
 	return s.repo.FindByID(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]project.Project, error) {
-	return s.repo.FindAll(ctx)
+func (s *Service) List(ctx context.Context, ownerID shared.ID) ([]project.Project, error) {
+	return s.repo.FindByOwnerID(ctx, ownerID)
 }
 
 func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (project.Project, error) {

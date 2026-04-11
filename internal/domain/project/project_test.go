@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"project-management-tools/internal/domain/project"
+	"project-management-tools/internal/domain/shared"
 )
 
 func TestNewName(t *testing.T) {
@@ -32,7 +33,7 @@ func TestNewName(t *testing.T) {
 func TestNew(t *testing.T) {
 	t.Run("valid project is created with active status", func(t *testing.T) {
 		name, _ := project.NewName("My Project")
-		p, err := project.New(name)
+		p, err := project.New(shared.NewID(), name)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -62,7 +63,7 @@ func TestProject_Rename(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			name, _ := project.NewName("Original")
-			p, _ := project.New(name)
+			p, _ := project.New(shared.NewID(), name)
 
 			newName, _ := project.NewName(tt.newName)
 			err := p.Rename(newName)
@@ -80,7 +81,7 @@ func TestProject_Rename(t *testing.T) {
 func TestProject_Archive(t *testing.T) {
 	t.Run("archiving changes status to archived", func(t *testing.T) {
 		name, _ := project.NewName("My Project")
-		p, _ := project.New(name)
+		p, _ := project.New(shared.NewID(), name)
 
 		p.Archive()
 

@@ -8,6 +8,7 @@ import (
 
 type Project struct {
 	id          shared.ID
+	ownerID     shared.ID
 	name        Name
 	description string
 	status      Status
@@ -15,13 +16,14 @@ type Project struct {
 	updatedAt   time.Time
 }
 
-func New(name Name) (Project, error) {
+func New(ownerID shared.ID, name Name) (Project, error) {
 	if !name.isValid() {
 		return Project{}, ErrInvalidName
 	}
 	now := time.Now()
 	return Project{
 		id:        shared.NewID(),
+		ownerID:   ownerID,
 		name:      name,
 		status:    StatusActive,
 		createdAt: now,
@@ -31,9 +33,10 @@ func New(name Name) (Project, error) {
 
 // Reconstitute rebuilds a Project from persisted data.
 // Bypasses constructor validation — callers must ensure data integrity.
-func Reconstitute(id shared.ID, name Name, description string, status Status, createdAt, updatedAt time.Time) Project {
+func Reconstitute(id, ownerID shared.ID, name Name, description string, status Status, createdAt, updatedAt time.Time) Project {
 	return Project{
 		id:          id,
+		ownerID:     ownerID,
 		name:        name,
 		description: description,
 		status:      status,
@@ -42,10 +45,11 @@ func Reconstitute(id shared.ID, name Name, description string, status Status, cr
 	}
 }
 
-func (p Project) ID() shared.ID       { return p.id }
-func (p Project) Name() Name          { return p.name }
-func (p Project) Description() string { return p.description }
-func (p Project) Status() Status      { return p.status }
+func (p Project) ID() shared.ID        { return p.id }
+func (p Project) OwnerID() shared.ID   { return p.ownerID }
+func (p Project) Name() Name           { return p.name }
+func (p Project) Description() string  { return p.description }
+func (p Project) Status() Status       { return p.status }
 func (p Project) CreatedAt() time.Time { return p.createdAt }
 func (p Project) UpdatedAt() time.Time { return p.updatedAt }
 

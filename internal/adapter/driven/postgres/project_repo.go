@@ -13,6 +13,7 @@ import (
 
 type projectModel struct {
 	ID          string    `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
+	UserID      string    `gorm:"not null;index"`
 	Name        string    `gorm:"not null"`
 	Description string    `gorm:"not null;default:''"`
 	Status      string    `gorm:"not null;default:'active'"`
@@ -47,9 +48,9 @@ func (r *ProjectRepository) FindByID(ctx context.Context, id shared.ID) (project
 	return toProjectDomain(model)
 }
 
-func (r *ProjectRepository) FindAll(ctx context.Context) ([]project.Project, error) {
+func (r *ProjectRepository) FindByOwnerID(ctx context.Context, ownerID shared.ID) ([]project.Project, error) {
 	var models []projectModel
-	if err := r.db.WithContext(ctx).Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("user_id = ?", ownerID.String()).Find(&models).Error; err != nil {
 		return nil, err
 	}
 
@@ -76,6 +77,7 @@ func (r *ProjectRepository) Delete(ctx context.Context, id shared.ID) error {
 func toProjectModel(p project.Project) projectModel {
 	return projectModel{
 		ID:          p.ID().String(),
+		UserID:      p.OwnerID().String(),
 		Name:        p.Name().String(),
 		Description: p.Description(),
 		Status:      string(p.Status()),
@@ -89,6 +91,10 @@ func toProjectDomain(m projectModel) (project.Project, error) {
 	if err != nil {
 		return project.Project{}, err
 	}
+	ownerID, err := shared.ParseID(m.UserID)
+	if err != nil {
+		return project.Project{}, err
+	}
 	name, err := project.NewName(m.Name)
 	if err != nil {
 		return project.Project{}, err
@@ -97,5 +103,5 @@ func toProjectDomain(m projectModel) (project.Project, error) {
 	if err != nil {
 		return project.Project{}, err
 	}
-	return project.Reconstitute(id, name, m.Description, status, m.CreatedAt, m.UpdatedAt), nil
+	return project.Reconstitute(id, ownerID, name, m.Description, status, m.CreatedAt, m.UpdatedAt), nil
 }
