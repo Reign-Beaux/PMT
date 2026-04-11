@@ -14,44 +14,66 @@ import (
 
 func (s *Server) registerProjectTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("list_projects",
-			mcp.WithDescription("List all projects owned by the current user. Returns an array of project objects."),
+		mcp.NewTool("pmt_list_projects",
+			mcp.WithDescription("List all projects owned by the current user. Returns a paginated array of project objects."),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
+			mcp.WithNumber("offset", mcp.Description("Number of results to skip (default: 0)")),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleListProjects,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("get_project",
+		mcp.NewTool("pmt_get_project",
 			mcp.WithDescription("Get a project by its ID. Returns the project object with id, name, description, status, created_at, and updated_at."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project")),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleGetProject,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("create_project",
+		mcp.NewTool("pmt_create_project",
 			mcp.WithDescription("Create a new project. The project is owned by the current user. Name must be non-empty."),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Project name (required, non-empty)")),
 			mcp.WithString("description", mcp.Description("Project description (optional)")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleCreateProject,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("update_project",
+		mcp.NewTool("pmt_update_project",
 			mcp.WithDescription("Update an existing project. Only provided fields are changed. Valid status values: active, archived."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project to update")),
 			mcp.WithString("name", mcp.Description("New project name")),
 			mcp.WithString("description", mcp.Description("New description")),
 			mcp.WithString("status", mcp.Description("New status"), mcp.Enum("active", "archived")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleUpdateProject,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("delete_project",
+		mcp.NewTool("pmt_delete_project",
 			mcp.WithDescription("Delete a project by its ID. This is irreversible."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project to delete")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleDeleteProject,
 	)
@@ -63,11 +85,11 @@ func (s *Server) handleListProjects(ctx context.Context, _ mcp.CallToolRequest) 
 		return mcp.NewToolResultError(fmt.Sprintf("failed to list projects: %v", err)), nil
 	}
 
-	out := make([]map[string]any, len(projects))
+	all := make([]map[string]any, len(projects))
 	for i, p := range projects {
-		out[i] = marshalProject(p)
+		all[i] = marshalProject(p)
 	}
-	return jsonResult(out)
+	return jsonResult(paginate(all, 0, 50))
 }
 
 func (s *Server) handleGetProject(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -161,4 +183,39 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 		return nil, fmt.Errorf("marshal result: %w", err)
 	}
 	return mcp.NewToolResultText(string(data)), nil
+}
+
+// paginate applies limit/offset to a slice and returns a standard pagination envelope.
+func paginate(items []map[string]any, offset, limit int) map[string]any {
+	total := len(items)
+	if offset >= total {
+		items = []map[string]any{}
+	} else {
+		items = items[offset:]
+	}
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	count := len(items)
+	nextOffset := offset + count
+	return map[string]any{
+		"items":       items,
+		"total":       total,
+		"count":       count,
+		"offset":      offset,
+		"has_more":    nextOffset < total,
+		"next_offset": nextOffset,
+	}
+}
+
+// paginationArgs extracts limit and offset from tool arguments with defaults.
+func paginationArgs(args map[string]any, defaultLimit int) (offset, limit int) {
+	limit = defaultLimit
+	if v, ok := args["limit"].(float64); ok && v > 0 {
+		limit = int(v)
+	}
+	if v, ok := args["offset"].(float64); ok && v >= 0 {
+		offset = int(v)
+	}
+	return offset, limit
 }

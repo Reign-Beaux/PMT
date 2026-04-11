@@ -13,45 +13,67 @@ import (
 
 func (s *Server) registerLabelTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("list_labels",
-			mcp.WithDescription("List all labels in a project."),
+		mcp.NewTool("pmt_list_labels",
+			mcp.WithDescription("List all labels in a project. Returns a paginated array of label objects."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
+			mcp.WithNumber("offset", mcp.Description("Number of results to skip (default: 0)")),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleListLabels,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("get_label",
+		mcp.NewTool("pmt_get_label",
 			mcp.WithDescription("Get a label by its ID."),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label")),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleGetLabel,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("create_label",
+		mcp.NewTool("pmt_create_label",
 			mcp.WithDescription("Create a label in a project. Requires name and color (hex format, e.g. #FF0000)."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the parent project")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Label name (required)")),
 			mcp.WithString("color", mcp.Required(), mcp.Description("Hex color, e.g. #FF0000 (required)")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleCreateLabel,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("update_label",
+		mcp.NewTool("pmt_update_label",
 			mcp.WithDescription("Update an existing label. Only provided fields are changed."),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label to update")),
 			mcp.WithString("name", mcp.Description("New label name")),
 			mcp.WithString("color", mcp.Description("New hex color")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleUpdateLabel,
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("delete_label",
+		mcp.NewTool("pmt_delete_label",
 			mcp.WithDescription("Delete a label by its ID."),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label to delete")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		s.handleDeleteLabel,
 	)
@@ -69,11 +91,12 @@ func (s *Server) handleListLabels(ctx context.Context, req mcp.CallToolRequest) 
 		return mcp.NewToolResultError(fmt.Sprintf("failed to list labels: %v", err)), nil
 	}
 
-	out := make([]map[string]any, len(labels))
+	all := make([]map[string]any, len(labels))
 	for i, l := range labels {
-		out[i] = marshalLabel(l)
+		all[i] = marshalLabel(l)
 	}
-	return jsonResult(out)
+	offset, limit := paginationArgs(args, 50)
+	return jsonResult(paginate(all, offset, limit))
 }
 
 func (s *Server) handleGetLabel(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
