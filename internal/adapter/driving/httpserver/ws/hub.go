@@ -140,12 +140,10 @@ func (h *Hub) Run() {
 			}
 			h.mu.RUnlock()
 
-			log.Printf("Hub: broadcasting event to %d clients for owner %s", len(targets), msg.ownerID)
 			for _, c := range targets {
 				select {
 				case c.send <- msg.data:
 				default:
-					log.Printf("Hub: client slow, disconnecting")
 					c.conn.Close()
 				}
 			}
@@ -164,6 +162,11 @@ func (h *Hub) Notify(ownerID shared.ID, event notification.Event) {
 	}
 	select {
 	case h.broadcast <- broadcastMsg{ownerID: ownerID, data: data}:
+	default:
+		// Hub backpressure: drop the event to avoid blocking the caller.
+	}
+}
+roadcast <- broadcastMsg{ownerID: ownerID, data: data}:
 	default:
 		// Hub backpressure: drop the event to avoid blocking the caller.
 	}

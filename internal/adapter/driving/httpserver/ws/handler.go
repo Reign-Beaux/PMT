@@ -42,7 +42,6 @@ func NewHandler(hub *Hub, jwtSecret []byte) *Handler {
 func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.authenticate(r)
 	if !ok {
-		log.Printf("WS: connection rejected: unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
@@ -51,11 +50,9 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WS: upgrade error: %v", err)
 		return
 	}
 
-	log.Printf("WS: client connected (owner: %s)", ownerID)
 	c := &client{
 		ownerID: ownerID,
 		conn:    conn,
@@ -98,6 +95,17 @@ func (h *Handler) authenticate(r *http.Request) (shared.ID, bool) {
 		return h.jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
+		return shared.ID{}, false
+	}
+
+	id, err := shared.ParseID(claims.Subject)
+	if err != nil {
+		return shared.ID{}, false
+	}
+
+	return id, true
+}
+d {
 		return shared.ID{}, false
 	}
 
