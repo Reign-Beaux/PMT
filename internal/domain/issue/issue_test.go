@@ -145,14 +145,31 @@ func TestIssue_Transition(t *testing.T) {
 		to      issue.Status
 		wantErr error
 	}{
-		{name: "open → in_progress allowed", from: issue.StatusOpen, to: issue.StatusInProgress, wantErr: nil},
-		{name: "open → closed allowed", from: issue.StatusOpen, to: issue.StatusClosed, wantErr: nil},
-		{name: "in_progress → done allowed", from: issue.StatusInProgress, to: issue.StatusDone, wantErr: nil},
-		{name: "in_progress → open allowed", from: issue.StatusInProgress, to: issue.StatusOpen, wantErr: nil},
-		{name: "done → closed allowed", from: issue.StatusDone, to: issue.StatusClosed, wantErr: nil},
+		// Valid transitions
+		{name: "open → in_progress", from: issue.StatusOpen, to: issue.StatusInProgress, wantErr: nil},
+		{name: "open → canceled", from: issue.StatusOpen, to: issue.StatusCanceled, wantErr: nil},
+		{name: "in_progress → done", from: issue.StatusInProgress, to: issue.StatusDone, wantErr: nil},
+		{name: "in_progress → stopped", from: issue.StatusInProgress, to: issue.StatusStopped, wantErr: nil},
+		{name: "in_progress → canceled", from: issue.StatusInProgress, to: issue.StatusCanceled, wantErr: nil},
+		{name: "stopped → in_progress", from: issue.StatusStopped, to: issue.StatusInProgress, wantErr: nil},
+		{name: "stopped → canceled", from: issue.StatusStopped, to: issue.StatusCanceled, wantErr: nil},
+		{name: "done → in_progress (QA reject)", from: issue.StatusDone, to: issue.StatusInProgress, wantErr: nil},
+		{name: "done → closed (QA approve)", from: issue.StatusDone, to: issue.StatusClosed, wantErr: nil},
+		// Invalid transitions
+		{name: "open → closed not allowed", from: issue.StatusOpen, to: issue.StatusClosed, wantErr: issue.ErrInvalidTransition},
 		{name: "open → done not allowed", from: issue.StatusOpen, to: issue.StatusDone, wantErr: issue.ErrInvalidTransition},
-		{name: "closed → any not allowed", from: issue.StatusClosed, to: issue.StatusOpen, wantErr: issue.ErrInvalidTransition},
+		{name: "open → stopped not allowed", from: issue.StatusOpen, to: issue.StatusStopped, wantErr: issue.ErrInvalidTransition},
+		{name: "in_progress → open not allowed", from: issue.StatusInProgress, to: issue.StatusOpen, wantErr: issue.ErrInvalidTransition},
+		{name: "in_progress → closed not allowed", from: issue.StatusInProgress, to: issue.StatusClosed, wantErr: issue.ErrInvalidTransition},
+		{name: "stopped → done not allowed", from: issue.StatusStopped, to: issue.StatusDone, wantErr: issue.ErrInvalidTransition},
+		{name: "stopped → closed not allowed", from: issue.StatusStopped, to: issue.StatusClosed, wantErr: issue.ErrInvalidTransition},
 		{name: "done → open not allowed", from: issue.StatusDone, to: issue.StatusOpen, wantErr: issue.ErrInvalidTransition},
+		{name: "done → stopped not allowed", from: issue.StatusDone, to: issue.StatusStopped, wantErr: issue.ErrInvalidTransition},
+		{name: "done → canceled not allowed", from: issue.StatusDone, to: issue.StatusCanceled, wantErr: issue.ErrInvalidTransition},
+		{name: "closed → any not allowed", from: issue.StatusClosed, to: issue.StatusOpen, wantErr: issue.ErrInvalidTransition},
+		{name: "closed → in_progress not allowed", from: issue.StatusClosed, to: issue.StatusInProgress, wantErr: issue.ErrInvalidTransition},
+		{name: "canceled → any not allowed", from: issue.StatusCanceled, to: issue.StatusOpen, wantErr: issue.ErrInvalidTransition},
+		{name: "canceled → in_progress not allowed", from: issue.StatusCanceled, to: issue.StatusInProgress, wantErr: issue.ErrInvalidTransition},
 	}
 
 	for _, tt := range tests {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"project-management-tools/internal/application/notification"
 	"project-management-tools/internal/domain/issue"
 	"project-management-tools/internal/domain/shared"
 )
@@ -32,10 +33,11 @@ type Service struct {
 	phaseRepo   PhaseRepository
 	projectRepo ProjectRepository
 	labelRepo   LabelRepository
+	notifier    notification.Notifier
 }
 
-func NewService(repo Repository, phaseRepo PhaseRepository, projectRepo ProjectRepository, labelRepo LabelRepository) *Service {
-	return &Service{repo: repo, phaseRepo: phaseRepo, projectRepo: projectRepo, labelRepo: labelRepo}
+func NewService(repo Repository, phaseRepo PhaseRepository, projectRepo ProjectRepository, labelRepo LabelRepository, notifier notification.Notifier) *Service {
+	return &Service{repo: repo, phaseRepo: phaseRepo, projectRepo: projectRepo, labelRepo: labelRepo, notifier: notifier}
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, error) {
@@ -98,6 +100,15 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, e
 		return issue.Issue{}, err
 	}
 
+	proj, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return issue.Issue{}, err
+	}
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "issue.created",
+		Payload: iss,
+	})
+
 	return iss, nil
 }
 
@@ -159,6 +170,15 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 		return issue.Issue{}, err
 	}
 
+	proj, err := s.projectRepo.FindByID(ctx, iss.ProjectID())
+	if err != nil {
+		return issue.Issue{}, err
+	}
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "issue.updated",
+		Payload: iss,
+	})
+
 	return iss, nil
 }
 
@@ -181,14 +201,35 @@ func (s *Service) Transition(ctx context.Context, id shared.ID, status string) (
 		return issue.Issue{}, err
 	}
 
+	proj, err := s.projectRepo.FindByID(ctx, iss.ProjectID())
+	if err != nil {
+		return issue.Issue{}, err
+	}
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "issue.updated",
+		Payload: iss,
+	})
+
 	return iss, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id shared.ID) error {
-	if _, err := s.repo.FindByID(ctx, id); err != nil {
+	iss, err := s.repo.FindByID(ctx, id)
+	if err != nil {
 		return err
 	}
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	proj, err := s.projectRepo.FindByID(ctx, iss.ProjectID())
+	if err != nil {
+		return err
+	}
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "issue.deleted",
+		Payload: map[string]string{"id": id.String(), "project_id": iss.ProjectID().String()},
+	})
+	return nil
 }
 
 func (s *Service) AddLabel(ctx context.Context, issueID, labelID shared.ID) error {

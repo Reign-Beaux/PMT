@@ -113,10 +113,12 @@ func (i *Issue) SetDueDate(t *time.Time) {
 // Transition moves the issue to the given status.
 // Valid transitions:
 //
-//	open        → in_progress, closed
-//	in_progress → done, open
-//	done        → closed
+//	open        → in_progress, canceled
+//	in_progress → done, stopped, canceled
+//	stopped     → in_progress, canceled
+//	done        → in_progress, closed
 //	closed      → (terminal)
+//	canceled    → (terminal)
 func (i *Issue) Transition(next Status) error {
 	if !i.canTransitionTo(next) {
 		return ErrInvalidTransition
@@ -128,10 +130,12 @@ func (i *Issue) Transition(next Status) error {
 
 func (i Issue) canTransitionTo(next Status) bool {
 	allowed := map[Status][]Status{
-		StatusOpen:       {StatusInProgress, StatusClosed},
-		StatusInProgress: {StatusDone, StatusOpen},
-		StatusDone:       {StatusClosed},
+		StatusOpen:       {StatusInProgress, StatusCanceled},
+		StatusInProgress: {StatusDone, StatusStopped, StatusCanceled},
+		StatusStopped:    {StatusInProgress, StatusCanceled},
+		StatusDone:       {StatusInProgress, StatusClosed},
 		StatusClosed:     {},
+		StatusCanceled:   {},
 	}
 	for _, s := range allowed[i.status] {
 		if s == next {

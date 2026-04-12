@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 
+	"project-management-tools/internal/application/notification"
 	"project-management-tools/internal/domain/project"
 	"project-management-tools/internal/domain/shared"
 )
@@ -20,11 +21,12 @@ type UpdateInput struct {
 }
 
 type Service struct {
-	repo Repository
+	repo     Repository
+	notifier notification.Notifier
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, notifier notification.Notifier) *Service {
+	return &Service{repo: repo, notifier: notifier}
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (project.Project, error) {
@@ -45,6 +47,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (project.Projec
 	if err := s.repo.Save(ctx, p); err != nil {
 		return project.Project{}, err
 	}
+
+	s.notifier.Notify(p.OwnerID(), notification.Event{
+		Event:   "project.created",
+		Payload: p,
+	})
 
 	return p, nil
 }
@@ -87,12 +94,25 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 		return project.Project{}, err
 	}
 
+	s.notifier.Notify(p.OwnerID(), notification.Event{
+		Event:   "project.updated",
+		Payload: p,
+	})
+
 	return p, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id shared.ID) error {
-	if _, err := s.repo.FindByID(ctx, id); err != nil {
+	p, err := s.repo.FindByID(ctx, id)
+	if err != nil {
 		return err
 	}
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	s.notifier.Notify(p.OwnerID(), notification.Event{
+		Event:   "project.deleted",
+		Payload: map[string]string{"id": id.String()},
+	})
+	return nil
 }

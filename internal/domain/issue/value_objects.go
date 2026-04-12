@@ -31,13 +31,15 @@ const (
 	StatusInProgress Status = "in_progress"
 	StatusDone       Status = "done"
 	StatusClosed     Status = "closed"
+	StatusStopped    Status = "stopped"
+	StatusCanceled   Status = "canceled"
 )
 
 var ErrInvalidStatus = errors.New("invalid issue status")
 
 func ParseStatus(s string) (Status, error) {
 	switch Status(s) {
-	case StatusOpen, StatusInProgress, StatusDone, StatusClosed:
+	case StatusOpen, StatusInProgress, StatusDone, StatusClosed, StatusStopped, StatusCanceled:
 		return Status(s), nil
 	default:
 		return "", ErrInvalidStatus

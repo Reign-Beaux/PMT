@@ -91,9 +91,9 @@ func (s *Server) registerIssueTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool("pmt_transition_issue",
-			mcp.WithDescription("Change the status of an issue. Valid transitions: open->in_progress, open->closed, in_progress->done, in_progress->open, done->closed. The 'closed' status is terminal."),
+			mcp.WithDescription("Change the status of an issue. Valid transitions: open->in_progress|canceled, in_progress->done|stopped|canceled, stopped->in_progress|canceled, done->in_progress|closed. Terminal states: closed, canceled."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
-			mcp.WithString("status", mcp.Required(), mcp.Description("Target status"), mcp.Enum("open", "in_progress", "done", "closed")),
+			mcp.WithString("status", mcp.Required(), mcp.Description("Target status"), mcp.Enum("open", "in_progress", "done", "closed", "stopped", "canceled")),
 			mcp.WithReadOnlyHintAnnotation(false),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(false),

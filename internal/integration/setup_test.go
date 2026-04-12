@@ -33,6 +33,7 @@ import (
 	pgadapter "project-management-tools/internal/adapter/driven/postgres"
 	"project-management-tools/internal/adapter/driving/httpserver"
 	"project-management-tools/internal/adapter/driving/httpserver/handler"
+	"project-management-tools/internal/adapter/driving/httpserver/ws"
 	commentapp "project-management-tools/internal/application/comment"
 	issueapp "project-management-tools/internal/application/issue"
 	labelapp "project-management-tools/internal/application/label"
@@ -77,6 +78,9 @@ func TestMain(m *testing.M) {
 	dbAvailable = true
 
 	// Wire the full stack
+	hub := ws.NewHub()
+	go hub.Run()
+
 	userRepo := pgadapter.NewUserRepository(db)
 	tokenRepo := pgadapter.NewTokenRepository(db)
 	projectRepo := pgadapter.NewProjectRepository(db)
@@ -86,9 +90,9 @@ func TestMain(m *testing.M) {
 	commentRepo := pgadapter.NewCommentRepository(db)
 
 	userService := userapp.NewService(userRepo, tokenRepo)
-	projectService := projectapp.NewService(projectRepo)
-	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
-	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo)
+	projectService := projectapp.NewService(projectRepo, hub)
+	phaseService := phaseapp.NewService(phaseRepo, projectRepo, hub)
+	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo, hub)
 	labelService := labelapp.NewService(labelRepo, projectRepo)
 	commentService := commentapp.NewService(commentRepo, issueRepo)
 
@@ -98,6 +102,7 @@ func TestMain(m *testing.M) {
 	issueHandler := handler.NewIssueHandler(issueService)
 	labelHandler := handler.NewLabelHandler(labelService, issueService)
 	commentHandler := handler.NewCommentHandler(commentService)
+	wsHandler := ws.NewHandler(hub, testJWTSecret)
 
 	router := httpserver.NewRouter(
 		authHandler,
@@ -106,6 +111,7 @@ func TestMain(m *testing.M) {
 		issueHandler,
 		labelHandler,
 		commentHandler,
+		wsHandler,
 		testJWTSecret,
 	)
 	testServer = httptest.NewServer(router)

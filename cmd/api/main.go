@@ -10,6 +10,7 @@ import (
 	pgadapter "project-management-tools/internal/adapter/driven/postgres"
 	"project-management-tools/internal/adapter/driving/httpserver"
 	"project-management-tools/internal/adapter/driving/httpserver/handler"
+	"project-management-tools/internal/adapter/driving/httpserver/ws"
 	commentapp "project-management-tools/internal/application/comment"
 	issueapp "project-management-tools/internal/application/issue"
 	labelapp "project-management-tools/internal/application/label"
@@ -41,6 +42,10 @@ func main() {
 
 	jwtSecret := []byte(cfg.JWTSecret)
 
+	// WebSocket Hub
+	hub := ws.NewHub()
+	go hub.Run()
+
 	// Repositories
 	userRepo := pgadapter.NewUserRepository(db)
 	tokenRepo := pgadapter.NewTokenRepository(db)
@@ -52,9 +57,9 @@ func main() {
 
 	// Services
 	userService := userapp.NewService(userRepo, tokenRepo)
-	projectService := projectapp.NewService(projectRepo)
-	phaseService := phaseapp.NewService(phaseRepo, projectRepo)
-	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo)
+	projectService := projectapp.NewService(projectRepo, hub)
+	phaseService := phaseapp.NewService(phaseRepo, projectRepo, hub)
+	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo, hub)
 	labelService := labelapp.NewService(labelRepo, projectRepo)
 	commentService := commentapp.NewService(commentRepo, issueRepo)
 
@@ -65,6 +70,7 @@ func main() {
 	issueHandler := handler.NewIssueHandler(issueService)
 	labelHandler := handler.NewLabelHandler(labelService, issueService)
 	commentHandler := handler.NewCommentHandler(commentService)
+	wsHandler := ws.NewHandler(hub, jwtSecret)
 
 	router := httpserver.NewRouter(
 		authHandler,
@@ -73,6 +79,7 @@ func main() {
 		issueHandler,
 		labelHandler,
 		commentHandler,
+		wsHandler,
 		jwtSecret,
 	)
 

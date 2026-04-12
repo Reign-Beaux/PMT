@@ -3,6 +3,7 @@ package phase
 import (
 	"context"
 
+	"project-management-tools/internal/application/notification"
 	"project-management-tools/internal/domain/phase"
 	"project-management-tools/internal/domain/shared"
 )
@@ -21,10 +22,11 @@ type UpdateInput struct {
 type Service struct {
 	repo        Repository
 	projectRepo ProjectRepository
+	notifier    notification.Notifier
 }
 
-func NewService(repo Repository, projectRepo ProjectRepository) *Service {
-	return &Service{repo: repo, projectRepo: projectRepo}
+func NewService(repo Repository, projectRepo ProjectRepository, notifier notification.Notifier) *Service {
+	return &Service{repo: repo, projectRepo: projectRepo, notifier: notifier}
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (phase.Phase, error) {
@@ -33,7 +35,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (phase.Phase, e
 		return phase.Phase{}, err
 	}
 
-	if _, err := s.projectRepo.FindByID(ctx, projectID); err != nil {
+	proj, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
 		return phase.Phase{}, err
 	}
 
@@ -64,6 +67,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (phase.Phase, e
 	if err := s.repo.Save(ctx, p); err != nil {
 		return phase.Phase{}, err
 	}
+
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "phase.created",
+		Payload: p,
+	})
 
 	return p, nil
 }
@@ -100,12 +108,33 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 		return phase.Phase{}, err
 	}
 
+	proj, err := s.projectRepo.FindByID(ctx, p.ProjectID())
+	if err != nil {
+		return phase.Phase{}, err
+	}
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "phase.updated",
+		Payload: p,
+	})
+
 	return p, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id shared.ID) error {
-	if _, err := s.repo.FindByID(ctx, id); err != nil {
+	p, err := s.repo.FindByID(ctx, id)
+	if err != nil {
 		return err
 	}
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	proj, err := s.projectRepo.FindByID(ctx, p.ProjectID())
+	if err != nil {
+		return err
+	}
+	s.notifier.Notify(proj.OwnerID(), notification.Event{
+		Event:   "phase.deleted",
+		Payload: map[string]string{"id": id.String(), "project_id": p.ProjectID().String()},
+	})
+	return nil
 }

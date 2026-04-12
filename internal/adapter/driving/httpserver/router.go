@@ -8,6 +8,7 @@ import (
 
 	"project-management-tools/internal/adapter/driving/httpserver/handler"
 	"project-management-tools/internal/adapter/driving/httpserver/middleware"
+	"project-management-tools/internal/adapter/driving/httpserver/ws"
 )
 
 func NewRouter(
@@ -17,6 +18,7 @@ func NewRouter(
 	issueHandler *handler.IssueHandler,
 	labelHandler *handler.LabelHandler,
 	commentHandler *handler.CommentHandler,
+	wsHandler *ws.Handler,
 	jwtSecret []byte,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -30,6 +32,9 @@ func NewRouter(
 
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/health", healthHandler.Handle)
+
+	// WebSocket — authenticated via ?token=<jwt> or access_token cookie
+	r.Get("/ws", wsHandler.ServeWS)
 
 	// Public auth routes
 	r.Route("/auth", func(r chi.Router) {
