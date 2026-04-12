@@ -16,6 +16,7 @@ package integration_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,8 +79,9 @@ func TestMain(m *testing.M) {
 	dbAvailable = true
 
 	// Wire the full stack
+	testOrigins := []string{"http://localhost:5173"}
 	hub := ws.NewHub()
-	go hub.Run()
+	go hub.Run(context.Background())
 
 	userRepo := pgadapter.NewUserRepository(db)
 	tokenRepo := pgadapter.NewTokenRepository(db)
@@ -102,7 +104,7 @@ func TestMain(m *testing.M) {
 	issueHandler := handler.NewIssueHandler(issueService)
 	labelHandler := handler.NewLabelHandler(labelService, issueService)
 	commentHandler := handler.NewCommentHandler(commentService)
-	wsHandler := ws.NewHandler(hub, testJWTSecret)
+	wsHandler := ws.NewHandler(hub, testJWTSecret, testOrigins)
 
 	router := httpserver.NewRouter(
 		authHandler,
@@ -113,6 +115,7 @@ func TestMain(m *testing.M) {
 		commentHandler,
 		wsHandler,
 		testJWTSecret,
+		testOrigins,
 	)
 	testServer = httptest.NewServer(router)
 	defer testServer.Close()

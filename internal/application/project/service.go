@@ -48,7 +48,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (project.Projec
 		return project.Project{}, err
 	}
 
-	s.notifier.Notify(p.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, p.OwnerID(), notification.Event{
 		Event:   "project.created",
 		Payload: toNotificationPayload(p),
 	})
@@ -94,7 +94,7 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 		return project.Project{}, err
 	}
 
-	s.notifier.Notify(p.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, p.OwnerID(), notification.Event{
 		Event:   "project.updated",
 		Payload: toNotificationPayload(p),
 	})
@@ -110,7 +110,7 @@ func (s *Service) Delete(ctx context.Context, id shared.ID) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return err
 	}
-	s.notifier.Notify(p.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, p.OwnerID(), notification.Event{
 		Event:   "project.deleted",
 		Payload: map[string]string{"id": id.String()},
 	})

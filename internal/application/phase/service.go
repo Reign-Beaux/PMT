@@ -69,7 +69,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (phase.Phase, e
 		return phase.Phase{}, err
 	}
 
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "phase.created",
 		Payload: toNotificationPayload(p),
 	})
@@ -113,7 +113,7 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 	if err != nil {
 		return phase.Phase{}, err
 	}
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "phase.updated",
 		Payload: toNotificationPayload(p),
 	})
@@ -133,7 +133,7 @@ func (s *Service) Delete(ctx context.Context, id shared.ID) error {
 	if err != nil {
 		return err
 	}
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "phase.deleted",
 		Payload: map[string]string{"id": id.String(), "project_id": p.ProjectID().String()},
 	})

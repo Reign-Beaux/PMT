@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 	"time"
@@ -94,9 +95,20 @@ func NewHub() *Hub {
 	}
 }
 
-func (h *Hub) Run() {
+func (h *Hub) Run(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			h.mu.Lock()
+			for _, set := range h.clients {
+				for c := range set {
+					close(c.send)
+				}
+			}
+			h.clients = make(map[shared.ID]map[*client]struct{})
+			h.mu.Unlock()
+			return
+
 		case c := <-h.register:
 			h.mu.Lock()
 			if h.clients[c.ownerID] == nil {
@@ -138,7 +150,7 @@ func (h *Hub) Run() {
 	}
 }
 
-func (h *Hub) Notify(ownerID shared.ID, event notification.Event) {
+func (h *Hub) Notify(_ context.Context, ownerID shared.ID, event notification.Event) {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return

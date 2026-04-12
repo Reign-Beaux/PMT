@@ -1,6 +1,10 @@
 package notification
 
-import "project-management-tools/internal/domain/shared"
+import (
+	"context"
+
+	"project-management-tools/internal/domain/shared"
+)
 
 // Event is the message emitted to connected clients after a write operation.
 type Event struct {
@@ -14,11 +18,11 @@ type Event struct {
 type Notifier interface {
 	// Notify emits an event to all clients connected as ownerID.
 	// It is fire-and-forget: errors are handled internally by the implementation.
-	Notify(ownerID shared.ID, event Event)
+	Notify(ctx context.Context, ownerID shared.ID, event Event)
 }
 
 // NoopNotifier is a Notifier that discards all events.
 // Use it when real-time delivery is not required (e.g. CLI tools, tests).
 type NoopNotifier struct{}
 
-func (NoopNotifier) Notify(_ shared.ID, _ Event) {}
+func (NoopNotifier) Notify(_ context.Context, _ shared.ID, _ Event) {}

@@ -43,15 +43,18 @@ func main() {
 
 	jwtSecret := []byte(cfg.JWTSecret)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// WebSocket Hub
 	hub := ws.NewHub()
-	go hub.Run()
+	go hub.Run(ctx)
 
 	// PgListener bridges the MCP process with the WebSocket hub:
 	// changes made by AI agents trigger pg_notify → PgListener → hub.Notify → WebSocket clients.
 	pgListener := pgadapter.NewPgListener(cfg.DatabaseURL, hub)
 	go func() {
-		if err := pgListener.Start(context.Background()); err != nil {
+		if err := pgListener.Start(ctx); err != nil {
 			log.Printf("pg_listener stopped: %v", err)
 		}
 	}()
@@ -80,7 +83,7 @@ func main() {
 	issueHandler := handler.NewIssueHandler(issueService)
 	labelHandler := handler.NewLabelHandler(labelService, issueService)
 	commentHandler := handler.NewCommentHandler(commentService)
-	wsHandler := ws.NewHandler(hub, jwtSecret)
+	wsHandler := ws.NewHandler(hub, jwtSecret, cfg.AllowedOrigins)
 
 	router := httpserver.NewRouter(
 		authHandler,
@@ -91,6 +94,7 @@ func main() {
 		commentHandler,
 		wsHandler,
 		jwtSecret,
+		cfg.AllowedOrigins,
 	)
 
 	server := &http.Server{

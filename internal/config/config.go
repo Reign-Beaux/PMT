@@ -1,11 +1,15 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
+	Port           string
+	DatabaseURL    string
+	JWTSecret      string
+	AllowedOrigins []string
 }
 
 func Load() Config {
@@ -19,9 +23,15 @@ func Load() Config {
 		jwtSecret = "change-me-in-production"
 	}
 
+	origins := os.Getenv("ALLOWED_ORIGINS")
+	if origins == "" {
+		origins = "http://localhost:5173"
+	}
+
 	return Config{
-		Port:        port,
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		JWTSecret:   jwtSecret,
+		Port:           port,
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		JWTSecret:      jwtSecret,
+		AllowedOrigins: strings.Split(origins, ","),
 	}
 }

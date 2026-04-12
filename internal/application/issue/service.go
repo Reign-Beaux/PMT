@@ -104,7 +104,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, e
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "issue.created",
 		Payload: toNotificationPayload(iss),
 	})
@@ -174,7 +174,7 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "issue.updated",
 		Payload: toNotificationPayload(iss),
 	})
@@ -205,7 +205,7 @@ func (s *Service) Transition(ctx context.Context, id shared.ID, status string) (
 	if err != nil {
 		return issue.Issue{}, err
 	}
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "issue.updated",
 		Payload: toNotificationPayload(iss),
 	})
@@ -225,7 +225,7 @@ func (s *Service) Delete(ctx context.Context, id shared.ID) error {
 	if err != nil {
 		return err
 	}
-	s.notifier.Notify(proj.OwnerID(), notification.Event{
+	s.notifier.Notify(ctx, proj.OwnerID(), notification.Event{
 		Event:   "issue.deleted",
 		Payload: map[string]string{"id": id.String(), "project_id": iss.ProjectID().String()},
 	})
