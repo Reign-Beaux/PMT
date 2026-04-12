@@ -106,7 +106,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (issue.Issue, e
 	}
 	s.notifier.Notify(proj.OwnerID(), notification.Event{
 		Event:   "issue.created",
-		Payload: iss,
+		Payload: toNotificationPayload(iss),
 	})
 
 	return iss, nil
@@ -176,7 +176,7 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 	}
 	s.notifier.Notify(proj.OwnerID(), notification.Event{
 		Event:   "issue.updated",
-		Payload: iss,
+		Payload: toNotificationPayload(iss),
 	})
 
 	return iss, nil
@@ -207,7 +207,7 @@ func (s *Service) Transition(ctx context.Context, id shared.ID, status string) (
 	}
 	s.notifier.Notify(proj.OwnerID(), notification.Event{
 		Event:   "issue.updated",
-		Payload: iss,
+		Payload: toNotificationPayload(iss),
 	})
 
 	return iss, nil
@@ -230,6 +230,22 @@ func (s *Service) Delete(ctx context.Context, id shared.ID) error {
 		Payload: map[string]string{"id": id.String(), "project_id": iss.ProjectID().String()},
 	})
 	return nil
+}
+
+func toNotificationPayload(i issue.Issue) map[string]string {
+	var phaseID string
+	if i.PhaseID() != nil {
+		phaseID = i.PhaseID().String()
+	}
+	return map[string]string{
+		"id":         i.ID().String(),
+		"project_id": i.ProjectID().String(),
+		"phase_id":   phaseID,
+		"title":      i.Title().String(),
+		"status":     string(i.Status()),
+		"priority":   string(i.Priority()),
+		"type":       string(i.Type()),
+	}
 }
 
 func (s *Service) AddLabel(ctx context.Context, issueID, labelID shared.ID) error {

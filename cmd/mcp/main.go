@@ -13,7 +13,6 @@ import (
 	commentapp "project-management-tools/internal/application/comment"
 	issueapp "project-management-tools/internal/application/issue"
 	labelapp "project-management-tools/internal/application/label"
-	"project-management-tools/internal/application/notification"
 	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
 	"project-management-tools/internal/domain/user"
@@ -66,11 +65,12 @@ func main() {
 		log.Fatalf("fatal: user not found for email %s", userEmail)
 	}
 
-	// Services (MCP server has no WebSocket clients; use no-op notifier)
-	noop := notification.NoopNotifier{}
-	projectService := projectapp.NewService(projectRepo, noop)
-	phaseService := phaseapp.NewService(phaseRepo, projectRepo, noop)
-	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo, noop)
+	// Services — use PgNotifier so mutations emit pg_notify events that the
+	// HTTP server's PgListener will receive and forward to connected WebSocket clients.
+	pgNotifier := pgadapter.NewPgNotifier(db)
+	projectService := projectapp.NewService(projectRepo, pgNotifier)
+	phaseService := phaseapp.NewService(phaseRepo, projectRepo, pgNotifier)
+	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo, pgNotifier)
 	labelService := labelapp.NewService(labelRepo, projectRepo)
 	commentService := commentapp.NewService(commentRepo, issueRepo)
 

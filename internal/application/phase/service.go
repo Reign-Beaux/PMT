@@ -2,6 +2,7 @@ package phase
 
 import (
 	"context"
+	"fmt"
 
 	"project-management-tools/internal/application/notification"
 	"project-management-tools/internal/domain/phase"
@@ -70,7 +71,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (phase.Phase, e
 
 	s.notifier.Notify(proj.OwnerID(), notification.Event{
 		Event:   "phase.created",
-		Payload: p,
+		Payload: toNotificationPayload(p),
 	})
 
 	return p, nil
@@ -114,7 +115,7 @@ func (s *Service) Update(ctx context.Context, id shared.ID, input UpdateInput) (
 	}
 	s.notifier.Notify(proj.OwnerID(), notification.Event{
 		Event:   "phase.updated",
-		Payload: p,
+		Payload: toNotificationPayload(p),
 	})
 
 	return p, nil
@@ -137,4 +138,15 @@ func (s *Service) Delete(ctx context.Context, id shared.ID) error {
 		Payload: map[string]string{"id": id.String(), "project_id": p.ProjectID().String()},
 	})
 	return nil
+}
+
+func toNotificationPayload(p phase.Phase) map[string]string {
+	return map[string]string{
+		"id":          p.ID().String(),
+		"project_id":   p.ProjectID().String(),
+		"name":        p.Name().String(),
+		"description": p.Description(),
+		"order":       fmt.Sprintf("%d", p.Order().Value()),
+		"status":      string(p.Status()),
+	}
 }

@@ -2,6 +2,7 @@ package ws
 
 import (
 	"encoding/json"
+	"log"
 	"sync"
 	"time"
 
@@ -139,12 +140,13 @@ func (h *Hub) Run() {
 			}
 			h.mu.RUnlock()
 
+			log.Printf("Hub: broadcasting event to %d clients for owner %s", len(targets), msg.ownerID)
 			for _, c := range targets {
 				select {
 				case c.send <- msg.data:
 				default:
-					// Slow client: drop and disconnect.
-					h.unregister <- c
+					log.Printf("Hub: client slow, disconnecting")
+					c.conn.Close()
 				}
 			}
 		}

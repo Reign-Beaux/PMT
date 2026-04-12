@@ -177,7 +177,7 @@ func setAccessTokenCookie(w http.ResponseWriter, token string) {
 		Path:     "/",
 		MaxAge:   int(accessTokenTTL.Seconds()),
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -188,7 +188,7 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string) {
 		Path:     "/auth/refresh",
 		MaxAge:   7 * 24 * 60 * 60, // 7 days
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 

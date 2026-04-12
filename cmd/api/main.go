@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -45,6 +46,15 @@ func main() {
 	// WebSocket Hub
 	hub := ws.NewHub()
 	go hub.Run()
+
+	// PgListener bridges the MCP process with the WebSocket hub:
+	// changes made by AI agents trigger pg_notify → PgListener → hub.Notify → WebSocket clients.
+	pgListener := pgadapter.NewPgListener(cfg.DatabaseURL, hub)
+	go func() {
+		if err := pgListener.Start(context.Background()); err != nil {
+			log.Printf("pg_listener stopped: %v", err)
+		}
+	}()
 
 	// Repositories
 	userRepo := pgadapter.NewUserRepository(db)

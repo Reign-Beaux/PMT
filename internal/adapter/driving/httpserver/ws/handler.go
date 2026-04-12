@@ -2,6 +2,7 @@ package ws
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -41,6 +42,7 @@ func NewHandler(hub *Hub, jwtSecret []byte) *Handler {
 func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.authenticate(r)
 	if !ok {
+		log.Printf("WS: connection rejected: unauthorized")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
@@ -49,10 +51,11 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		// upgrader already wrote the error response.
+		log.Printf("WS: upgrade error: %v", err)
 		return
 	}
 
+	log.Printf("WS: client connected (owner: %s)", ownerID)
 	c := &client{
 		ownerID: ownerID,
 		conn:    conn,
