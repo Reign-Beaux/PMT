@@ -2,7 +2,6 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,31 +13,20 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Allow same-origin connections only. The origin check must be configured
-	// per deployment; here we accept all origins so the dev frontend can connect.
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
 
-// Handler upgrades HTTP connections to WebSocket and registers them with the Hub.
 type Handler struct {
 	hub       *Hub
 	jwtSecret []byte
 }
 
-// NewHandler creates a WS handler backed by the provided hub.
 func NewHandler(hub *Hub, jwtSecret []byte) *Handler {
 	return &Handler{hub: hub, jwtSecret: jwtSecret}
 }
 
-// ServeWS authenticates the request and upgrades it to a WebSocket connection.
-//
-// Authentication order:
-//  1. Query parameter ?token=<jwt>
-//  2. Cookie "access_token"
-//
-// Returns 401 if no valid token is found.
 func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.authenticate(r)
 	if !ok {
@@ -66,11 +54,6 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	go c.readPump()
 }
 
-// authenticate extracts and validates the JWT from the request.
-// Token lookup order:
-//  1. Query parameter ?token=<jwt>
-//  2. Authorization header: Bearer <jwt>
-//  3. Cookie "access_token"
 func (h *Handler) authenticate(r *http.Request) (shared.ID, bool) {
 	tokenStr := r.URL.Query().Get("token")
 	if tokenStr == "" {
@@ -95,17 +78,6 @@ func (h *Handler) authenticate(r *http.Request) (shared.ID, bool) {
 		return h.jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
-		return shared.ID{}, false
-	}
-
-	id, err := shared.ParseID(claims.Subject)
-	if err != nil {
-		return shared.ID{}, false
-	}
-
-	return id, true
-}
-d {
 		return shared.ID{}, false
 	}
 

@@ -2,7 +2,6 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
@@ -19,7 +18,6 @@ const (
 	maxMessageSize = 512
 )
 
-// client represents a single WebSocket connection.
 type client struct {
 	ownerID shared.ID
 	conn    *websocket.Conn
@@ -27,8 +25,6 @@ type client struct {
 	hub     *Hub
 }
 
-// writePump pumps messages from the send channel to the WebSocket connection.
-// Runs in its own goroutine per client.
 func (c *client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -41,7 +37,6 @@ func (c *client) writePump() {
 		case msg, ok := <-c.send:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// Hub closed the channel.
 				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -57,8 +52,6 @@ func (c *client) writePump() {
 	}
 }
 
-// readPump reads incoming messages (discards them) and handles the connection lifecycle.
-// Runs in its own goroutine per client.
 func (c *client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
@@ -73,18 +66,15 @@ func (c *client) readPump() {
 	})
 
 	for {
-		// Clients are consumers-only; discard any incoming message.
 		if _, _, err := c.conn.ReadMessage(); err != nil {
 			break
 		}
 	}
 }
 
-// Hub maintains the set of active WebSocket connections and broadcasts events.
-// It implements notification.Notifier.
 type Hub struct {
 	mu         sync.RWMutex
-	clients    map[shared.ID]map[*client]struct{} // ownerID → connections
+	clients    map[shared.ID]map[*client]struct{}
 	register   chan *client
 	unregister chan *client
 	broadcast  chan broadcastMsg
@@ -95,7 +85,6 @@ type broadcastMsg struct {
 	data    []byte
 }
 
-// NewHub creates and returns a new Hub. Call Run in a goroutine before using it.
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[shared.ID]map[*client]struct{}),
@@ -105,8 +94,6 @@ func NewHub() *Hub {
 	}
 }
 
-// Run processes register/unregister/broadcast events.
-// Must be called in a dedicated goroutine before accepting connections.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -151,10 +138,6 @@ func (h *Hub) Run() {
 	}
 }
 
-// Notify implements notification.Notifier.
-// It serialises the event to JSON and enqueues it for all clients owned by ownerID.
-// Non-blocking: if the broadcast channel is full the event is dropped rather than
-// stalling the calling use case.
 func (h *Hub) Notify(ownerID shared.ID, event notification.Event) {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -163,11 +146,5 @@ func (h *Hub) Notify(ownerID shared.ID, event notification.Event) {
 	select {
 	case h.broadcast <- broadcastMsg{ownerID: ownerID, data: data}:
 	default:
-		// Hub backpressure: drop the event to avoid blocking the caller.
-	}
-}
-roadcast <- broadcastMsg{ownerID: ownerID, data: data}:
-	default:
-		// Hub backpressure: drop the event to avoid blocking the caller.
 	}
 }
