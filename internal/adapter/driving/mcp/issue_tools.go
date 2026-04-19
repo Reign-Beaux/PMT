@@ -332,6 +332,20 @@ func (s *Server) handleRemoveLabelFromIssue(ctx context.Context, req mcp.CallToo
 	return mcp.NewToolResultText("label removed from issue"), nil
 }
 
+func (s *Server) handleStartIssue(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	id, err := shared.ParseID(args["issue_id"].(string))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid issue_id: %v", err)), nil
+	}
+
+	iss, err := s.issues.Transition(ctx, id, "in_progress")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to start issue: %v", err)), nil
+	}
+	return jsonResult(marshalIssue(iss))
+}
+
 func marshalIssue(iss issue.Issue) map[string]any {
 	m := map[string]any{
 		"id":         iss.ID().String(),

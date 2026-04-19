@@ -65,4 +65,5 @@ func (s *Server) registerTools() {
 	s.registerIssueTools()
 	s.registerLabelTools()
 	s.registerCommentTools()
+	s.registerCompoundTools()
 }
