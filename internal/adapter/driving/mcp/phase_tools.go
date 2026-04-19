@@ -13,7 +13,7 @@ import (
 
 func (s *Server) registerPhaseTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_list_phases",
+		mcp.NewTool("list_phases",
 			mcp.WithDescription("List all phases in a project, ordered by phase order. Returns a paginated array of phase objects."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
@@ -27,7 +27,7 @@ func (s *Server) registerPhaseTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_get_phase",
+		mcp.NewTool("get_phase",
 			mcp.WithDescription("Get a phase by its ID. Returns the phase object."),
 			mcp.WithString("phase_id", mcp.Required(), mcp.Description("UUID of the phase")),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -39,7 +39,7 @@ func (s *Server) registerPhaseTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_create_phase",
+		mcp.NewTool("create_phase",
 			mcp.WithDescription("Create a new phase in a project. Order is assigned automatically. The project must exist."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the parent project")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Phase name (required, non-empty)")),
@@ -53,7 +53,7 @@ func (s *Server) registerPhaseTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_update_phase",
+		mcp.NewTool("update_phase",
 			mcp.WithDescription("Update an existing phase. Only provided fields are changed."),
 			mcp.WithString("phase_id", mcp.Required(), mcp.Description("UUID of the phase to update")),
 			mcp.WithString("name", mcp.Description("New phase name")),
@@ -67,7 +67,7 @@ func (s *Server) registerPhaseTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_delete_phase",
+		mcp.NewTool("delete_phase",
 			mcp.WithDescription("Delete a phase by its ID. Issues assigned to this phase may become orphaned — consider reassigning them first."),
 			mcp.WithString("phase_id", mcp.Required(), mcp.Description("UUID of the phase to delete")),
 			mcp.WithReadOnlyHintAnnotation(false),

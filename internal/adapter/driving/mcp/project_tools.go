@@ -14,7 +14,7 @@ import (
 
 func (s *Server) registerProjectTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_list_projects",
+		mcp.NewTool("list_projects",
 			mcp.WithDescription("List all projects owned by the current user. Returns a paginated array of project objects."),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
 			mcp.WithNumber("offset", mcp.Description("Number of results to skip (default: 0)")),
@@ -27,7 +27,7 @@ func (s *Server) registerProjectTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_get_project",
+		mcp.NewTool("get_project",
 			mcp.WithDescription("Get a project by its ID. Returns the project object with id, name, description, status, created_at, and updated_at."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project")),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -39,7 +39,7 @@ func (s *Server) registerProjectTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_create_project",
+		mcp.NewTool("create_project",
 			mcp.WithDescription("Create a new project. The project is owned by the current user. Name must be non-empty."),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Project name (required, non-empty)")),
 			mcp.WithString("description", mcp.Description("Project description (optional)")),
@@ -52,7 +52,7 @@ func (s *Server) registerProjectTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_update_project",
+		mcp.NewTool("update_project",
 			mcp.WithDescription("Update an existing project. Only provided fields are changed. Valid status values: active, archived."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project to update")),
 			mcp.WithString("name", mcp.Description("New project name")),
@@ -67,7 +67,7 @@ func (s *Server) registerProjectTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_delete_project",
+		mcp.NewTool("delete_project",
 			mcp.WithDescription("Delete a project by its ID. This is irreversible."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project to delete")),
 			mcp.WithReadOnlyHintAnnotation(false),

@@ -13,7 +13,7 @@ import (
 
 func (s *Server) registerLabelTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_list_labels",
+		mcp.NewTool("list_labels",
 			mcp.WithDescription("List all labels in a project. Returns a paginated array of label objects."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
@@ -27,7 +27,7 @@ func (s *Server) registerLabelTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_get_label",
+		mcp.NewTool("get_label",
 			mcp.WithDescription("Get a label by its ID."),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label")),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -39,7 +39,7 @@ func (s *Server) registerLabelTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_create_label",
+		mcp.NewTool("create_label",
 			mcp.WithDescription("Create a label in a project. Requires name and color (hex format, e.g. #FF0000)."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the parent project")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Label name (required)")),
@@ -53,7 +53,7 @@ func (s *Server) registerLabelTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_update_label",
+		mcp.NewTool("update_label",
 			mcp.WithDescription("Update an existing label. Only provided fields are changed."),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label to update")),
 			mcp.WithString("name", mcp.Description("New label name")),
@@ -67,7 +67,7 @@ func (s *Server) registerLabelTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_delete_label",
+		mcp.NewTool("delete_label",
 			mcp.WithDescription("Delete a label by its ID."),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label to delete")),
 			mcp.WithReadOnlyHintAnnotation(false),

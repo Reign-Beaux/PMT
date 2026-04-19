@@ -13,7 +13,7 @@ import (
 
 func (s *Server) registerCommentTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_list_comments",
+		mcp.NewTool("list_comments",
 			mcp.WithDescription("List all comments on an issue, ordered by creation date. Returns a paginated array."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
@@ -27,7 +27,7 @@ func (s *Server) registerCommentTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_create_comment",
+		mcp.NewTool("create_comment",
 			mcp.WithDescription("Add a comment to an issue. The issue must exist. Body must be non-empty."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue to comment on")),
 			mcp.WithString("body", mcp.Required(), mcp.Description("Comment text (required, non-empty)")),
@@ -40,7 +40,7 @@ func (s *Server) registerCommentTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_delete_comment",
+		mcp.NewTool("delete_comment",
 			mcp.WithDescription("Delete a comment by its ID."),
 			mcp.WithString("comment_id", mcp.Required(), mcp.Description("UUID of the comment to delete")),
 			mcp.WithReadOnlyHintAnnotation(false),

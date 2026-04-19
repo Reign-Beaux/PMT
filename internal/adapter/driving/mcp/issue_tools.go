@@ -14,7 +14,7 @@ import (
 
 func (s *Server) registerIssueTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_list_issues_by_phase",
+		mcp.NewTool("list_issues_by_phase",
 			mcp.WithDescription("List all issues assigned to a specific phase. Returns a paginated array of issue objects."),
 			mcp.WithString("phase_id", mcp.Required(), mcp.Description("UUID of the phase")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
@@ -28,7 +28,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_list_backlog",
+		mcp.NewTool("list_backlog",
 			mcp.WithDescription("List all backlog issues for a project (issues not assigned to any phase). Returns a paginated array."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the project")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 50)")),
@@ -42,7 +42,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_get_issue",
+		mcp.NewTool("get_issue",
 			mcp.WithDescription("Get an issue by its ID. Returns the full issue object including spec, labels, status, priority, and type."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -54,7 +54,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_create_issue",
+		mcp.NewTool("create_issue",
 			mcp.WithDescription("Create a new issue in a project. If phase_id is omitted, the issue goes to the backlog. Defaults: priority=medium, type=task, status=open. The spec field accepts full specification documents in markdown."),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("UUID of the parent project")),
 			mcp.WithString("title", mcp.Required(), mcp.Description("Issue title (required, non-empty)")),
@@ -72,7 +72,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_update_issue",
+		mcp.NewTool("update_issue",
 			mcp.WithDescription("Update an existing issue. Only provided fields are changed. To change status, use pmt_transition_issue instead. To clear the due date, set clear_due_date to true."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue to update")),
 			mcp.WithString("title", mcp.Description("New issue title")),
@@ -90,7 +90,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_transition_issue",
+		mcp.NewTool("transition_issue",
 			mcp.WithDescription("Change the status of an issue. Valid transitions: open->in_progress|canceled, in_progress->done|stopped|canceled, stopped->in_progress|canceled, done->in_progress|closed. Terminal states: closed, canceled."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithString("status", mcp.Required(), mcp.Description("Target status"), mcp.Enum("open", "in_progress", "done", "closed", "stopped", "canceled")),
@@ -103,7 +103,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_delete_issue",
+		mcp.NewTool("delete_issue",
 			mcp.WithDescription("Delete an issue by its ID. This is irreversible."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue to delete")),
 			mcp.WithReadOnlyHintAnnotation(false),
@@ -115,7 +115,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_add_label_to_issue",
+		mcp.NewTool("add_label_to_issue",
 			mcp.WithDescription("Attach a label to an issue. Both the issue and label must exist."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label to attach")),
@@ -128,7 +128,7 @@ func (s *Server) registerIssueTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_remove_label_from_issue",
+		mcp.NewTool("remove_label_from_issue",
 			mcp.WithDescription("Detach a label from an issue."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithString("label_id", mcp.Required(), mcp.Description("UUID of the label to detach")),
@@ -330,20 +330,6 @@ func (s *Server) handleRemoveLabelFromIssue(ctx context.Context, req mcp.CallToo
 		return mcp.NewToolResultError(fmt.Sprintf("failed to remove label: %v", err)), nil
 	}
 	return mcp.NewToolResultText("label removed from issue"), nil
-}
-
-func (s *Server) handleStartIssue(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := req.GetArguments()
-	id, err := shared.ParseID(args["issue_id"].(string))
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid issue_id: %v", err)), nil
-	}
-
-	iss, err := s.issues.Transition(ctx, id, "in_progress")
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to start issue: %v", err)), nil
-	}
-	return jsonResult(marshalIssue(iss))
 }
 
 func marshalIssue(iss issue.Issue) map[string]any {

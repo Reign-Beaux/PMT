@@ -14,7 +14,7 @@ import (
 
 func (s *Server) registerCompoundTools() {
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_submit_dev_handoff",
+		mcp.NewTool("submit_dev_handoff",
 			mcp.WithDescription("Submit a dev handoff brief and transition the issue to 'done' in a single step."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithString("handoff_brief", mcp.Required(), mcp.Description("The dev handoff brief text")),
@@ -27,7 +27,7 @@ func (s *Server) registerCompoundTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_qa_fail_with_findings",
+		mcp.NewTool("qa_fail_with_findings",
 			mcp.WithDescription("Reject an issue by transitioning it to 'in_progress' and creating multiple bug issues."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the original feature issue")),
 			mcp.WithString("findings", mcp.Required(), mcp.Description("JSON array of bug objects, e.g. [{\"title\":\"Bug 1\",\"spec\":\"Details\"}]")),
@@ -40,7 +40,7 @@ func (s *Server) registerCompoundTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_get_qa_batch_context",
+		mcp.NewTool("get_qa_batch_context",
 			mcp.WithDescription("Get the latest comment (usually handoff brief) for a batch of issues."),
 			mcp.WithString("issue_ids", mcp.Required(), mcp.Description("JSON array of issue UUIDs, e.g. [\"id1\", \"id2\"]")),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -52,7 +52,7 @@ func (s *Server) registerCompoundTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_qa_pass",
+		mcp.NewTool("qa_pass",
 			mcp.WithDescription("Add a QA summary comment and transition the issue to 'closed'."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue")),
 			mcp.WithString("summary", mcp.Required(), mcp.Description("Summary of QA testing performed")),
@@ -65,7 +65,7 @@ func (s *Server) registerCompoundTools() {
 	)
 
 	s.mcpServer.AddTool(
-		mcp.NewTool("pmt_resolve_investigation",
+		mcp.NewTool("resolve_investigation",
 			mcp.WithDescription("Close an investigation by adding a findings comment, creating follow-up issues, and transitioning the investigation to 'done'."),
 			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the investigation issue")),
 			mcp.WithString("findings", mcp.Required(), mcp.Description("Detailed findings from the investigation")),
@@ -77,6 +77,33 @@ func (s *Server) registerCompoundTools() {
 		),
 		s.handleResolveInvestigation,
 	)
+	s.mcpServer.AddTool(
+		mcp.NewTool("start_issue",
+			mcp.WithDescription("Moves an issue to 'in_progress' and returns its full details. Use this to start working on an issue in one step."),
+			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the issue to start")),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		s.handleStartIssue,
+	)
+}
+
+func (s *Server) handleStartIssue(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	id, err := shared.ParseID(args["issue_id"].(string))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid issue_id: %v", err)), nil
+	}
+
+	iss, err := s.issues.Transition(ctx, id, "in_progress")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to start issue: %v", err)), nil
+	}
+	// We use jsonResult and marshalIssue but marshalIssue is in issue_tools.go, which is part of the same package, so this works.
+	// However, jsonResult is unexported, let's make sure it works if we use it.
+	return jsonResult(marshalIssue(iss))
 }
 
 func (s *Server) handleSubmitDevHandoff(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
