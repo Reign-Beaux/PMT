@@ -63,7 +63,6 @@ func (s *Server) registerCompoundTools() {
 		),
 		s.handleQAPass,
 	)
-
 	s.mcpServer.AddTool(
 		mcp.NewTool("resolve_investigation",
 			mcp.WithDescription("Close an investigation by adding a findings comment, creating follow-up issues, and transitioning the investigation to 'done'."),
@@ -77,6 +76,20 @@ func (s *Server) registerCompoundTools() {
 		),
 		s.handleResolveInvestigation,
 	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool("get_fix_context",
+			mcp.WithDescription("Get context for fixing QA rejected issues. Returns the feature issue, its latest comments, and the full details of all associated finding/bug issues."),
+			mcp.WithString("feature_issue_id", mcp.Required(), mcp.Description("UUID of the original feature issue")),
+			mcp.WithString("finding_ids", mcp.Required(), mcp.Description("JSON array of finding/bug issue UUIDs, e.g. [\"id1\", \"id2\"]")),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		s.handleGetFixContext,
+	)
+
 	s.mcpServer.AddTool(
 		mcp.NewTool("start_issue",
 			mcp.WithDescription("Moves an issue to 'in_progress' and returns its full details. Use this to start working on an issue in one step."),
@@ -90,6 +103,66 @@ func (s *Server) registerCompoundTools() {
 	)
 }
 
+func (s *Server) handleGetFixContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	featureIssueIDStr, _ := args["feature_issue_id"].(string)
+	findingIDsJSON, _ := args["finding_ids"].(string)
+
+	featureIssueID, err := shared.ParseID(featureIssueIDStr)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid feature_issue_id: %v", err)), nil
+	}
+
+	featureIssue, err := s.issues.GetByID(ctx, featureIssueID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to get feature issue: %v", err)), nil
+	}
+
+	comments, err := s.comments.ListByIssue(ctx, featureIssueID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to get feature issue comments: %v", err)), nil
+	}
+
+	var findingIDsRaw []string
+	if err := json.Unmarshal([]byte(findingIDsJSON), &findingIDsRaw); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid finding_ids JSON: %v", err)), nil
+	}
+
+	var findings []map[string]any
+	for _, idStr := range findingIDsRaw {
+		id, err := shared.ParseID(idStr)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid finding_id '%s': %v", idStr, err)), nil
+		}
+		findingIss, err := s.issues.GetByID(ctx, id)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get finding issue '%s': %v", idStr, err)), nil
+		}
+		// marshalIssue is defined in issue_tools.go
+		findings = append(findings, marshalIssue(findingIss))
+	}
+
+	// Find the last dev handoff and last QA rejection if possible. We will just return the last 5 comments to be safe,
+	// or the raw list of comments so the agent has full context.
+	var commentsData []map[string]any
+	for _, c := range comments {
+		commentsData = append(commentsData, map[string]any{
+			"id":         c.ID().String(),
+			"body":       c.Body().String(),
+			"created_at": c.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	featureData := marshalIssue(featureIssue)
+	featureData["comments"] = commentsData
+
+	result := map[string]any{
+		"feature":  featureData,
+		"findings": findings,
+	}
+
+	return jsonResult(result)
+}
 func (s *Server) handleStartIssue(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 	id, err := shared.ParseID(args["issue_id"].(string))
