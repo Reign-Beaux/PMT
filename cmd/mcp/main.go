@@ -15,6 +15,7 @@ import (
 	labelapp "project-management-tools/internal/application/label"
 	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
+	workflowapp "project-management-tools/internal/application/workflow"
 	"project-management-tools/internal/domain/user"
 )
 
@@ -68,11 +69,14 @@ func main() {
 	// Services — use PgNotifier so mutations emit pg_notify events that the
 	// HTTP server's PgListener will receive and forward to connected WebSocket clients.
 	pgNotifier := pgadapter.NewPgNotifier(db)
+	uow := pgadapter.NewUnitOfWork(db)
+	
 	projectService := projectapp.NewService(projectRepo, pgNotifier)
 	phaseService := phaseapp.NewService(phaseRepo, projectRepo, pgNotifier)
 	issueService := issueapp.NewService(issueRepo, phaseRepo, projectRepo, labelRepo, pgNotifier)
 	labelService := labelapp.NewService(labelRepo, projectRepo)
 	commentService := commentapp.NewService(commentRepo, issueRepo)
+	workflowService := workflowapp.NewService(uow, pgNotifier)
 
 	srv := mcpadapter.NewServer(
 		owner.ID(),
@@ -81,6 +85,7 @@ func main() {
 		issueService,
 		labelService,
 		commentService,
+		workflowService,
 	)
 
 	fmt.Fprintln(os.Stderr, "pmt mcp server started")

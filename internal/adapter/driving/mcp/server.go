@@ -10,6 +10,7 @@ import (
 	labelapp "project-management-tools/internal/application/label"
 	phaseapp "project-management-tools/internal/application/phase"
 	projectapp "project-management-tools/internal/application/project"
+	workflowapp "project-management-tools/internal/application/workflow"
 )
 
 const (
@@ -27,6 +28,7 @@ type Server struct {
 	issues    *issueapp.Service
 	labels    *labelapp.Service
 	comments  *commentapp.Service
+	workflow  *workflowapp.Service
 }
 
 // NewServer creates a new MCP server with all application services.
@@ -37,6 +39,7 @@ func NewServer(
 	issues *issueapp.Service,
 	labels *labelapp.Service,
 	comments *commentapp.Service,
+	workflow *workflowapp.Service,
 ) *Server {
 	s := &Server{
 		mcpServer: server.NewMCPServer(serverName, serverVersion),
@@ -46,6 +49,7 @@ func NewServer(
 		issues:    issues,
 		labels:    labels,
 		comments:  comments,
+		workflow:  workflow,
 	}
 
 	s.registerTools()

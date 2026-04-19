@@ -8,7 +8,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	commentapp "project-management-tools/internal/application/comment"
-	issueapp "project-management-tools/internal/application/issue"
+	workflowapp "project-management-tools/internal/application/workflow"
 	"project-management-tools/internal/domain/shared"
 )
 
@@ -81,7 +81,7 @@ func (s *Server) registerCompoundTools() {
 		mcp.NewTool("get_fix_context",
 			mcp.WithDescription("Get context for fixing QA rejected issues. Returns the feature issue, its latest comments, and the full details of all associated finding/bug issues."),
 			mcp.WithString("feature_issue_id", mcp.Required(), mcp.Description("UUID of the original feature issue")),
-			mcp.WithString("finding_ids", mcp.Required(), mcp.Description("JSON array of finding/bug issue UUIDs, e.g. [\"id1\", \"id2\"]")),
+			mcp.WithArray("finding_ids", mcp.Required(), mcp.Description("Array of finding/bug issue UUIDs, e.g. [\"id1\", \"id2\"]"), mcp.WithStringItems()),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(true),
@@ -106,8 +106,7 @@ func (s *Server) registerCompoundTools() {
 func (s *Server) handleGetFixContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 	featureIssueIDStr, _ := args["feature_issue_id"].(string)
-	findingIDsJSON, _ := args["finding_ids"].(string)
-
+	
 	featureIssueID, err := shared.ParseID(featureIssueIDStr)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("invalid feature_issue_id: %v", err)), nil
@@ -123,13 +122,17 @@ func (s *Server) handleGetFixContext(ctx context.Context, req mcp.CallToolReques
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get feature issue comments: %v", err)), nil
 	}
 
-	var findingIDsRaw []string
-	if err := json.Unmarshal([]byte(findingIDsJSON), &findingIDsRaw); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid finding_ids JSON: %v", err)), nil
+	findingIDsRaw, ok := args["finding_ids"].([]interface{})
+	if !ok {
+		return mcp.NewToolResultError("invalid finding_ids: expected an array"), nil
 	}
 
 	var findings []map[string]any
-	for _, idStr := range findingIDsRaw {
+	for _, idAny := range findingIDsRaw {
+		idStr, ok := idAny.(string)
+		if !ok {
+			continue
+		}
 		id, err := shared.ParseID(idStr)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("invalid finding_id '%s': %v", idStr, err)), nil
@@ -205,81 +208,42 @@ func (s *Server) handleSubmitDevHandoff(ctx context.Context, req mcp.CallToolReq
 	return mcp.NewToolResultText(fmt.Sprintf("Handoff submitted and issue %s transitioned to done.", iss.ID().String())), nil
 }
 
-type findingInput struct {
-	Title string `json:"title"`
-	Spec  string `json:"spec"`
-}
-
 func (s *Server) handleQAFailWithFindings(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 	issueIDStr, _ := args["feature_issue_id"].(string)
 	findingsJSON, _ := args["findings"].(string)
 
-	issueID, err := shared.ParseID(issueIDStr)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid feature_issue_id: %v", err)), nil
-	}
-
-	parentIssue, err := s.issues.GetByID(ctx, issueID)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to get parent issue: %v", err)), nil
-	}
-
-	var findings []findingInput
+	var findings []workflowapp.FindingInput
 	if err := json.Unmarshal([]byte(findingsJSON), &findings); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("invalid findings JSON: %v", err)), nil
 	}
 
-	var createdBugIDs []string
-	for _, f := range findings {
-		input := issueapp.CreateInput{
-			ProjectID: parentIssue.ProjectID().String(),
-			Title:     f.Title,
-			Spec:      f.Spec,
-			Type:      "bug",
-			Priority:  "high",
-		}
-		if parentIssue.PhaseID() != nil {
-			pid := parentIssue.PhaseID().String()
-			input.PhaseID = &pid
-		}
-
-		newIss, err := s.issues.Create(ctx, input)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("failed to create bug issue '%s': %v", f.Title, err)), nil
-		}
-		createdBugIDs = append(createdBugIDs, newIss.ID().String())
-	}
-
-	commentBody := fmt.Sprintf("QA Rejected. Created bugs: %v", createdBugIDs)
-	_, err = s.comments.Create(ctx, commentapp.CreateInput{
-		IssueID: issueIDStr,
-		Body:    commentBody,
+	result, err := s.workflow.QAFailWithFindings(ctx, workflowapp.QAFailInput{
+		FeatureIssueID: issueIDStr,
+		Findings:       findings,
 	})
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to create comment: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("failed to execute qa fail workflow: %v", err)), nil
 	}
 
-	iss, err := s.issues.Transition(ctx, issueID, "in_progress")
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to transition parent issue: %v", err)), nil
-	}
-
-	return mcp.NewToolResultText(fmt.Sprintf("Issue %s rejected and moved to in_progress. Created bugs: %v", iss.ID().String(), createdBugIDs)), nil
+	return mcp.NewToolResultText(fmt.Sprintf("Issue %s rejected and moved to in_progress. Created bugs: %v", result.ParentIssueID, result.CreatedBugIDs)), nil
 }
 
 func (s *Server) handleGetQABatchContext(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
-	issueIDsJSON, _ := args["issue_ids"].(string)
-
-	var issueIDsRaw []string
-	if err := json.Unmarshal([]byte(issueIDsJSON), &issueIDsRaw); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid issue_ids JSON: %v", err)), nil
+	
+	issueIDsRaw, ok := args["issue_ids"].([]interface{})
+	if !ok {
+		return mcp.NewToolResultError("invalid issue_ids: expected an array"), nil
 	}
 
 	result := make(map[string]string)
 
-	for _, idStr := range issueIDsRaw {
+	for _, idAny := range issueIDsRaw {
+		idStr, ok := idAny.(string)
+		if !ok {
+			continue
+		}
 		id, err := shared.ParseID(idStr)
 		if err != nil {
 			result[idStr] = fmt.Sprintf("error: invalid id: %v", err)
@@ -330,75 +294,40 @@ func (s *Server) handleQAPass(ctx context.Context, req mcp.CallToolRequest) (*mc
 	return mcp.NewToolResultText(fmt.Sprintf("QA Passed. Issue %s closed.", iss.ID().String())), nil
 }
 
-type followUpInput struct {
-	Title string `json:"title"`
-	Spec  string `json:"spec"`
-	Type  string `json:"type"`
-}
-
 func (s *Server) handleResolveInvestigation(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
 	issueIDStr, _ := args["issue_id"].(string)
 	findings, _ := args["findings"].(string)
 	followUpJSON, _ := args["follow_up_issues"].(string)
 
-	issueID, err := shared.ParseID(issueIDStr)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid issue_id: %v", err)), nil
-	}
-
-	parentIssue, err := s.issues.GetByID(ctx, issueID)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to get investigation issue: %v", err)), nil
-	}
-
 	var createdIssues []string
 	if followUpJSON != "" {
-		var followUps []followUpInput
+		var followUps []workflowapp.FollowUpInput
 		if err := json.Unmarshal([]byte(followUpJSON), &followUps); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("invalid follow_up_issues JSON: %v", err)), nil
 		}
 
-		for _, f := range followUps {
-			t := f.Type
-			if t == "" {
-				t = "task"
-			}
-			input := issueapp.CreateInput{
-				ProjectID: parentIssue.ProjectID().String(),
-				Title:     f.Title,
-				Spec:      f.Spec,
-				Type:      t,
-			}
-			if parentIssue.PhaseID() != nil {
-				pid := parentIssue.PhaseID().String()
-				input.PhaseID = &pid
-			}
-			newIss, err := s.issues.Create(ctx, input)
-			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("failed to create follow-up issue '%s': %v", f.Title, err)), nil
-			}
-			createdIssues = append(createdIssues, newIss.ID().String())
+		result, err := s.workflow.ResolveInvestigation(ctx, workflowapp.ResolveInvestigationInput{
+			IssueID:        issueIDStr,
+			Findings:       findings,
+			FollowUpIssues: followUps,
+		})
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to execute resolve investigation workflow: %v", err)), nil
 		}
+		
+		createdIssues = result.CreatedIssues
+	} else {
+		result, err := s.workflow.ResolveInvestigation(ctx, workflowapp.ResolveInvestigationInput{
+			IssueID:        issueIDStr,
+			Findings:       findings,
+			FollowUpIssues: nil,
+		})
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to execute resolve investigation workflow: %v", err)), nil
+		}
+		createdIssues = result.CreatedIssues
 	}
 
-	commentBody := fmt.Sprintf("Investigation Findings:\n\n%s", findings)
-	if len(createdIssues) > 0 {
-		commentBody += fmt.Sprintf("\n\nFollow-up issues created: %v", createdIssues)
-	}
-
-	_, err = s.comments.Create(ctx, commentapp.CreateInput{
-		IssueID: issueIDStr,
-		Body:    commentBody,
-	})
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to create findings comment: %v", err)), nil
-	}
-
-	iss, err := s.issues.Transition(ctx, issueID, "done")
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to transition investigation issue: %v", err)), nil
-	}
-
-	return mcp.NewToolResultText(fmt.Sprintf("Investigation %s resolved. Follow-ups: %v", iss.ID().String(), createdIssues)), nil
+	return mcp.NewToolResultText(fmt.Sprintf("Investigation %s resolved. Follow-ups: %v", issueIDStr, createdIssues)), nil
 }
