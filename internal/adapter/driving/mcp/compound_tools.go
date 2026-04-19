@@ -29,7 +29,7 @@ func (s *Server) registerCompoundTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool("qa_fail_with_findings",
 			mcp.WithDescription("Reject an issue by transitioning it to 'in_progress' and creating multiple bug issues."),
-			mcp.WithString("issue_id", mcp.Required(), mcp.Description("UUID of the original feature issue")),
+			mcp.WithString("feature_issue_id", mcp.Required(), mcp.Description("UUID of the original feature issue (parent of the findings being created)")),
 			mcp.WithString("findings", mcp.Required(), mcp.Description("JSON array of bug objects, e.g. [{\"title\":\"Bug 1\",\"spec\":\"Details\"}]")),
 			mcp.WithReadOnlyHintAnnotation(false),
 			mcp.WithDestructiveHintAnnotation(false),
@@ -212,12 +212,12 @@ type findingInput struct {
 
 func (s *Server) handleQAFailWithFindings(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := req.GetArguments()
-	issueIDStr, _ := args["issue_id"].(string)
+	issueIDStr, _ := args["feature_issue_id"].(string)
 	findingsJSON, _ := args["findings"].(string)
 
 	issueID, err := shared.ParseID(issueIDStr)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid issue_id: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("invalid feature_issue_id: %v", err)), nil
 	}
 
 	parentIssue, err := s.issues.GetByID(ctx, issueID)
