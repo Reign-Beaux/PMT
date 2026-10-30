@@ -96,10 +96,10 @@ Una slice solo incluye `rest.go` o `mcp.go` si esa operación se expone por ese 
 
 | Ruta | Responsabilidad |
 | --- | --- |
-| `api/features/<feature>/` | Contratos públicos de la feature: OpenAPI para REST y esquemas de las herramientas MCP. Es la fuente de verdad de ambos. |
+| `api/features/<feature>/` | Contratos públicos de la feature. `<feature>.openapi.yaml` es la fuente de verdad de REST. `<feature>.mcp.json` documenta las herramientas MCP, cuya fuente de verdad es el código. |
 | `api/features/system/` | Contratos técnicos: salud, disponibilidad y versión. |
 | `cmd/pmt-server/` | Punto de entrada del servidor. |
-| `internal/app/` | Configuración, conexión de dependencias, arranque y cierre. Sin reglas de negocio. |
+| `internal/app/` | Configuración, conexión de dependencias, arranque y cierre. `registerFeatures`, en `app.go`, registra cada feature. Sin reglas de negocio. |
 | `internal/features/<feature>/feature.go` | Construye las slices de la feature y registra sus rutas y herramientas. |
 | `internal/features/<feature>/domain/` | Agregado, invariantes, errores y reglas de negocio. Lo comparten todas las slices de la feature. |
 | `internal/features/<feature>/store/` | Persistencia de la feature. Implementa las interfaces que piden las slices y traduce entre registros y dominio. |
@@ -143,6 +143,8 @@ Cada slice es un paquete de Go con estos ficheros:
 En PMT, **handler** siempre significa el `Handle` de `handler.go`, que no conoce HTTP. La función `serve` de `rest.go` se llama **adaptador REST**, aunque en Go se la conozca como handler HTTP.
 
 `Command`, `Result` e `Item` pueden llevar etiquetas `json`, que no crean dependencia con ningún transporte. `mcp.go` define sus propios `toolInput` y `toolOutput`, porque de ellos se infiere el esquema de la herramienta. Los UUID y las fechas se exponen ahí como `string`.
+
+El esquema publicado por MCP se infiere, por lo que su fuente de verdad es el código. `api/features/<feature>/<feature>.mcp.json` lo documenta como un arreglo de herramientas con `name`, `description`, `inputSchema` y `outputSchema`. La prueba `internal/app/contracts_test.go` construye el servidor en memoria, sin PostgreSQL, y falla si una herramienta registrada y su documentación difieren o si una de ellas falta.
 
 ### Command o query
 
@@ -210,11 +212,11 @@ Cerrar una etapa necesita conocer sus tareas, en sentido contrario a la flecha `
 
 ```text
 cmd → app
-app → feature.go de cada feature, kernel, platform
+app → feature.go de cada feature, kernel, platform, pgx, SDK de MCP
 feature.go → sus slices, store, sqlcgen, SDK de MCP
 handler.go → domain de su feature, kernel
 rest.go → handler.go, platform/rest
-mcp.go → handler.go, platform/mcp, SDK de MCP
+mcp.go → handler.go, kernel, platform/mcp, SDK de MCP
 store → domain de su feature, kernel, sqlcgen, pgx, platform/postgres
 domain → kernel
 kernel → nada
@@ -293,7 +295,7 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio la feature `projects` con su CRUD por REST y la herramienta MCP `create_project`, y la feature `stages` con su CRUD por REST y la herramienta MCP `create_stage`.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST y las herramientas MCP `create_project` y `list_projects`, y la feature `stages` con su CRUD por REST y la herramienta MCP `create_stage`.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects` y `stages` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
@@ -312,14 +314,16 @@ Una operación debe funcionar de entrada a salida antes de extender el patrón a
 ## Procedimiento para implementar una operación
 
 1. Decide si es un command o una query, y a qué feature pertenece.
-2. Define entradas, resultados, errores y reglas, y documenta el contrato en `api/features/<feature>/`.
+2. Define entradas, resultados, errores y reglas, y documenta el contrato REST en `api/features/<feature>/`.
 3. Crea la carpeta de la slice en `commands/<operacion>/` o `queries/<operacion>/`.
 4. Si la operación necesita reglas nuevas, impleméntalas en `domain/`.
 5. Implementa `handler.go`, con sus interfaces mínimas, autorización y límites transaccionales.
 6. Añade la persistencia en `store/` y las migraciones necesarias.
 7. Añade `rest.go` o `mcp.go`.
 8. Registra la slice en `feature.go`.
-9. Ejecuta `go test` y comprueba reglas de negocio, persistencia y correspondencia con el contrato.
+9. Si la feature es nueva, regístrala en `registerFeatures`, en `internal/app/app.go`. Si no, sus rutas y herramientas no se publican.
+10. Si añades o cambias una herramienta MCP, actualiza `api/features/<feature>/<feature>.mcp.json` con lo que publica el servidor.
+11. Ejecuta `go test` y comprueba reglas de negocio, persistencia y correspondencia con el contrato.
 
 ## Criterios de aceptación
 

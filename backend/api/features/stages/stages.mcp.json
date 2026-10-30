@@ -1,0 +1,65 @@
+[
+  {
+    "name": "create_stage",
+    "description": "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción de la etapa",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nombre de la etapa",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto al que pertenece la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "name",
+        "description"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "name",
+        "description",
+        "position",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  }
+]

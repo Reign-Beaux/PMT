@@ -9,6 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"pmt/internal/features/projects"
 	"pmt/internal/features/stages"
 	"pmt/internal/platform/mcp"
@@ -39,9 +42,14 @@ func Run() error {
 
 	mux := http.NewServeMux()
 	tools := mcp.NewServer()
-	projects.Register(mux, tools, pool)
-	stages.Register(mux, tools, pool)
+	registerFeatures(mux, tools, pool)
 	mux.Handle("/mcp", mcp.Handler(tools))
 
 	return rest.Serve(ctx, cfg.ServerAddr, mux)
+}
+
+// registerFeatures registra las rutas REST y las herramientas MCP de cada feature.
+func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool) {
+	projects.Register(mux, tools, pool)
+	stages.Register(mux, tools, pool)
 }

@@ -26,5 +26,8 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
 	update.New(repo).Register(mux)
 	delete.New(repo).Register(mux)
 	get.New(repo).Register(mux)
-	list.New(repo).Register(mux)
+
+	listProjects := list.New(repo)
+	listProjects.Register(mux)
+	listProjects.RegisterTool(tools)
 }
