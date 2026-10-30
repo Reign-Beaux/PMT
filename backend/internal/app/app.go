@@ -9,9 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	workstore "pmt/internal/features/work/store"
-	workrest "pmt/internal/features/work/transport/rest"
-	workusecase "pmt/internal/features/work/usecase"
+	"pmt/internal/features/projects"
 	"pmt/internal/platform/postgres"
 	"pmt/internal/platform/rest"
 )
@@ -38,8 +36,7 @@ func Run() error {
 	defer pool.Close()
 
 	mux := http.NewServeMux()
-	projects := workusecase.NewProjects(workstore.NewProjects(pool))
-	workrest.NewProjects(projects).Register(mux)
+	projects.Register(mux, pool)
 
 	return rest.Serve(ctx, cfg.ServerAddr, mux)
 }

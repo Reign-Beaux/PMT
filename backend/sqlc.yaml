@@ -9,10 +9,10 @@ overrides:
 sql:
   - engine: postgresql
     schema: internal/platform/postgres/migrations
-    queries: internal/features/work/store/queries
+    queries: internal/features/projects/store/queries
     gen:
       go:
         package: sqlcgen
-        out: internal/features/work/store/sqlcgen
+        out: internal/features/projects/store/sqlcgen
         sql_package: pgx/v5
         emit_empty_slices: true

@@ -9,6 +9,10 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
+
+	"pmt/internal/kernel"
 )
 
 const (
@@ -48,12 +52,21 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
-		return fmt.Errorf("cuerpo inválido: %w", err)
+		return kernel.Invalid("cuerpo inválido: " + err.Error())
 	}
 	if decoder.More() {
-		return errors.New("cuerpo inválido: contiene más de un valor JSON")
+		return kernel.Invalid("cuerpo inválido: contiene más de un valor JSON")
 	}
 	return nil
+}
+
+// PathUUID lee un identificador UUID de la ruta.
+func PathUUID(r *http.Request, name string) (uuid.UUID, error) {
+	id, err := uuid.Parse(r.PathValue(name))
+	if err != nil {
+		return uuid.Nil, kernel.Invalid(name + " inválido")
+	}
+	return id, nil
 }
 
 // WriteJSON escribe una respuesta JSON.
@@ -65,7 +78,23 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 	}
 }
 
-// WriteError escribe un error con el formato común de la API.
-func WriteError(w http.ResponseWriter, status int, message string) {
+// WriteError traduce un error al formato común de la API. Los errores que no
+// son de negocio se registran y no exponen su detalle.
+func WriteError(w http.ResponseWriter, err error) {
+	var businessErr *kernel.Error
+	if !errors.As(err, &businessErr) {
+		log.Printf("error interno: %v", err)
+		writeMessage(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+
+	status := http.StatusBadRequest
+	if businessErr.Kind == kernel.KindNotFound {
+		status = http.StatusNotFound
+	}
+	writeMessage(w, status, businessErr.Message)
+}
+
+func writeMessage(w http.ResponseWriter, status int, message string) {
 	WriteJSON(w, status, map[string]string{"error": message})
 }

@@ -11,6 +11,11 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Agregado** | Grupo de entidades y objetos de valor que cambia como una unidad y protege sus reglas. | `struct` y sus métodos | `domain/` |
 | **Raíz del agregado** | Entidad por la que se accede y se modifica todo el agregado. | `struct` principal | `domain/` |
 | **Registro** | Fila de una tabla, representada en Go. No contiene reglas de negocio. | `struct` generado por `sqlc` | `store/sqlcgen/` |
+| **Feature** | Conjunto de todo lo relacionado con un agregado: dominio, persistencia y operaciones. | Carpeta | `internal/features/<feature>/` |
+| **Vertical slice** | Una operación completa en su propia carpeta, desde la entrada hasta la lógica. | Paquete | `commands/<operacion>/` o `queries/<operacion>/` |
+| **Command** | Operación que cambia estado. | Slice | `commands/` |
+| **Query** | Operación que solo lee, sin cambiar estado. | Slice | `queries/` |
+| **Handler** | Código que ejecuta una operación. | `handler.go` | Dentro de cada slice |
 
 ## Términos del negocio
 
