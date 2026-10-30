@@ -23,6 +23,7 @@ Tres ideas organizan el código:
 | Lenguaje | Go |
 | Base de datos | PostgreSQL |
 | Acceso a datos | `pgx` y `sqlc` |
+| Identificadores | UUID con `github.com/google/uuid` |
 | Configuración | Viper |
 | Migraciones | `goose` |
 | MCP | SDK oficial de MCP para Go, con Streamable HTTP |
@@ -106,7 +107,7 @@ Una slice solo incluye `rest.go` o `mcp.go` si esa operación se expone por ese 
 | `internal/features/<feature>/store/sqlcgen/` | Código generado por `sqlc`. No se edita a mano. |
 | `internal/features/<feature>/commands/<operacion>/` | Una operación que cambia estado. |
 | `internal/features/<feature>/queries/<operacion>/` | Una operación que solo lee. |
-| `internal/kernel/` | Conceptos compartidos con la misma semántica en varias features: `Actor`, `Profile`, `Transactor`, identificadores y errores de negocio (`Invalid`, `NotFound`), que `platform/rest` traduce a HTTP. |
+| `internal/kernel/` | Conceptos compartidos con la misma semántica en varias features: `Actor`, `Profile`, `Transactor`, identificadores y errores de negocio (`Invalid`, `NotFound`, `Conflict`), que `platform/rest` traduce a HTTP. |
 | `internal/platform/rest/` | Servidor HTTP, middleware y manejo técnico de errores. |
 | `internal/platform/mcp/` | Servidor MCP, autenticación y filtrado de herramientas por perfil. Sin lógica de negocio. |
 | `internal/platform/postgres/` | Conexión, transacciones y ejecución de migraciones. |
@@ -121,9 +122,27 @@ Cada slice es un paquete de Go con estos ficheros:
 | Fichero | Contenido |
 | --- | --- |
 | `handler.go` | La operación: su entrada, su resultado, su autorización y las interfaces mínimas que necesita. |
-| `handler_test.go` | Pruebas de la operación. |
-| `rest.go` | Adaptación REST: lee la petición, llama al handler y construye la respuesta. |
-| `mcp.go` | Declaración de la herramienta MCP y su adaptación al handler. |
+| `handler_test.go` | Pruebas de la operación y de su entrada REST, con dobles de la persistencia. |
+| `rest.go` | Adaptador REST: lee la petición, llama al handler y construye la respuesta. Es el equivalente a un controller. |
+| `mcp.go` | Adaptador MCP: declara la herramienta y su esquema, y llama al handler. Sus pruebas van en `mcp_test.go`. |
+
+### Convenciones de nombres
+
+| Elemento | Nombre | Ejemplo |
+| --- | --- | --- |
+| Paquete de la slice | Verbo de la operación | `create`, `list` |
+| Entrada | `Command` en los commands; parámetros simples o `Query` en las queries | `create.Command` |
+| Salida | `Result`, o `Item` para los elementos de una lista | `get.Result` |
+| Persistencia requerida | `Repository` en los commands, `Reader` en las queries | `update.Repository` |
+| Constructor | `New` | `create.New(repo)` |
+| Operación | Método `Handle` del `Handler` | `h.Handle(ctx, cmd)` |
+| Adaptador REST | Método `serve`, registrado por `Register(mux)` | `h.serve` |
+| Adaptador MCP | Método `callTool`, registrado por `RegisterTool(server)` | `h.callTool` |
+| Herramienta MCP | Verbo y agregado en `snake_case` | `create_project` |
+
+En PMT, **handler** siempre significa el `Handle` de `handler.go`, que no conoce HTTP. La función `serve` de `rest.go` se llama **adaptador REST**, aunque en Go se la conozca como handler HTTP.
+
+`Command`, `Result` e `Item` pueden llevar etiquetas `json`, que no crean dependencia con ningún transporte. `mcp.go` define sus propios `toolInput` y `toolOutput`, porque de ellos se infiere el esquema de la herramienta. Los UUID y las fechas se exponen ahí como `string`.
 
 ### Command o query
 
@@ -141,6 +160,14 @@ Cada slice es un paquete de Go con estos ficheros:
 - La lógica de negocio no vive en `rest.go` ni en `mcp.go`.
 - El código técnico compartido va a `platform/`, nunca a un paquete `common` o `utils` de la feature.
 - Duplicar código pequeño entre slices es aceptable. Solo se extrae cuando la duplicación represente la misma regla.
+
+## Errores
+
+- Los errores de negocio se crean con `kernel.Invalid`, `kernel.NotFound` o `kernel.Conflict` y se declaran en `domain/`.
+- Cada adaptador los entrega a `platform/rest.WriteError`, que responde 400, 404 o 409 con el formato `{"error": "mensaje"}`.
+- `store` traduce a errores de negocio las violaciones de la base de datos, con `postgres.IsForeignKeyViolation` y `postgres.IsUniqueViolation`.
+- Cualquier otro error se registra en el log y responde 500 con un mensaje genérico, sin exponer su detalle.
+- `platform/mcp.ToolError` aplica la misma regla a las herramientas MCP.
 
 ## Configuración
 
@@ -184,16 +211,18 @@ Cerrar una etapa necesita conocer sus tareas, en sentido contrario a la flecha `
 ```text
 cmd → app
 app → feature.go de cada feature, kernel, platform
-feature.go → sus slices, store, domain, platform
-slice → domain de su feature, kernel, platform/rest, platform/mcp
-store → domain de su feature, kernel, sqlcgen
+feature.go → sus slices, store, sqlcgen, SDK de MCP
+handler.go → domain de su feature, kernel
+rest.go → handler.go, platform/rest
+mcp.go → handler.go, platform/mcp, SDK de MCP
+store → domain de su feature, kernel, sqlcgen, pgx, platform/postgres
 domain → kernel
 kernel → nada
 platform → kernel
 ```
 
 - `domain` no importa transporte, persistencia ni frameworks de infraestructura.
-- `handler.go` no importa `store`, `platform` ni tipos de REST o MCP.
+- `handler.go` no importa `store`, `sqlcgen`, `platform`, `pgx` ni `net/http`.
 - `platform` no importa features.
 - `kernel` solo incorpora conceptos cuya semántica compartida esté comprobada.
 - `rest.go` y `mcp.go` validan el formato de las entradas. Las invariantes de negocio se verifican en `domain` o en el handler.
@@ -260,13 +289,22 @@ La operación es la slice `qa/commands/approve/`.
 4. `tasks` valida la tabla de transiciones y la `version`, y guarda.
 5. `activity` registra la acción y la transacción confirma todo junto.
 
+## Estado actual
+
+Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
+
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio la feature `projects` con su CRUD por REST y la herramienta MCP `create_project`, y la feature `stages` con su CRUD por REST.
+- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil y las demás features.
+- **Excepción temporal:** los commands de `projects` y `stages` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
+
 ## Orden de construcción
 
-1. Base: `kernel`, `platform` y `agents` con autenticación por token.
-2. `projects`, `stages` y `tasks`, con su tabla de transiciones.
-3. `activity`, integrada a las transiciones.
-4. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
-5. REST para el frontend.
+1. `projects` y `stages`. Hechos, salvo la excepción temporal.
+2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`.
+3. `tasks`, con su tabla de transiciones.
+4. `activity`, integrada a las transiciones.
+5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews` y `qa`.
 
 Una operación debe funcionar de entrada a salida antes de extender el patrón a otras.

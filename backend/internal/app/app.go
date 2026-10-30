@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"pmt/internal/features/projects"
+	"pmt/internal/features/stages"
+	"pmt/internal/platform/mcp"
 	"pmt/internal/platform/postgres"
 	"pmt/internal/platform/rest"
 )
@@ -36,7 +38,10 @@ func Run() error {
 	defer pool.Close()
 
 	mux := http.NewServeMux()
-	projects.Register(mux, pool)
+	tools := mcp.NewServer()
+	projects.Register(mux, tools, pool)
+	stages.Register(mux, pool)
+	mux.Handle("/mcp", mcp.Handler(tools))
 
 	return rest.Serve(ctx, cfg.ServerAddr, mux)
 }

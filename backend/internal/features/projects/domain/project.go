@@ -15,6 +15,8 @@ var (
 	ErrProjectNotFound = kernel.NotFound("proyecto no encontrado")
 	// ErrProjectNameRequired indica que el nombre del proyecto está vacío.
 	ErrProjectNameRequired = kernel.Invalid("el nombre del proyecto es obligatorio")
+	// ErrProjectHasStages indica que el proyecto no se puede eliminar porque tiene etapas.
+	ErrProjectHasStages = kernel.Conflict("el proyecto tiene etapas")
 )
 
 // Project es la raíz del agregado de un proyecto.

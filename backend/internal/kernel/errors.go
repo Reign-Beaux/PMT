@@ -9,6 +9,8 @@ const (
 	KindInvalid ErrorKind = iota + 1
 	// KindNotFound indica que el recurso no existe.
 	KindNotFound
+	// KindConflict indica que la operación choca con el estado actual.
+	KindConflict
 )
 
 // Error es un error de negocio con un mensaje apto para quien hace la petición.
@@ -29,4 +31,9 @@ func Invalid(message string) *Error {
 // NotFound crea un error de recurso inexistente.
 func NotFound(message string) *Error {
 	return &Error{Kind: KindNotFound, Message: message}
+}
+
+// Conflict crea un error de conflicto con el estado actual.
+func Conflict(message string) *Error {
+	return &Error{Kind: KindConflict, Message: message}
 }

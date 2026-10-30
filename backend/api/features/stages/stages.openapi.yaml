@@ -1,0 +1,132 @@
+openapi: 3.1.0
+info:
+  title: PMT - Etapas
+  version: 0.1.0
+paths:
+  /api/projects/{project_id}/stages:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista las etapas de un proyecto en orden
+      responses:
+        "200":
+          description: Etapas. La lista viene vacía si el proyecto no existe.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Stage"
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Crea una etapa al final del proyecto
+      requestBody:
+        $ref: "#/components/requestBodies/StageInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/Stage"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Obtiene una etapa
+      responses:
+        "200":
+          $ref: "#/components/responses/Stage"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      summary: Reemplaza los datos editables de una etapa
+      requestBody:
+        $ref: "#/components/requestBodies/StageInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Stage"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      summary: Elimina una etapa
+      responses:
+        "204":
+          description: Etapa eliminada
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  requestBodies:
+    StageInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+  responses:
+    Stage:
+      description: Etapa
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Stage"
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: string
+  schemas:
+    Stage:
+      type: object
+      required: [id, project_id, name, description, position, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        position:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

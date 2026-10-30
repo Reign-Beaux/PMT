@@ -20,6 +20,7 @@ func TestWriteError(t *testing.T) {
 	}{
 		{"inválido", kernel.Invalid("mal"), http.StatusBadRequest, "mal"},
 		{"no existe", kernel.NotFound("nada"), http.StatusNotFound, "nada"},
+		{"conflicto", kernel.Conflict("choque"), http.StatusConflict, "choque"},
 		{"envuelto", fmt.Errorf("capa: %w", kernel.NotFound("nada")), http.StatusNotFound, "nada"},
 		{"interno", errors.New("secreto"), http.StatusInternalServerError, "error interno"},
 	}

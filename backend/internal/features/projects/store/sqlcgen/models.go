@@ -17,3 +17,25 @@ type Project struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+type Stage struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type Task struct {
+	ID          uuid.UUID
+	StageID     uuid.UUID
+	Title       string
+	Description string
+	Status      string
+	Blocked     bool
+	Version     int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}

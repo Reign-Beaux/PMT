@@ -11,6 +11,7 @@ import (
 
 	"pmt/internal/features/projects/domain"
 	"pmt/internal/features/projects/store/sqlcgen"
+	"pmt/internal/platform/postgres"
 )
 
 // Projects implementa con PostgreSQL las interfaces que piden las slices.
@@ -80,6 +81,9 @@ func (s *Projects) Update(ctx context.Context, p domain.Project) (domain.Project
 // Delete elimina un proyecto.
 func (s *Projects) Delete(ctx context.Context, id uuid.UUID) error {
 	deleted, err := s.queries.DeleteProject(ctx, id)
+	if postgres.IsForeignKeyViolation(err) {
+		return domain.ErrProjectHasStages
+	}
 	if err != nil {
 		return fmt.Errorf("eliminar proyecto: %w", err)
 	}

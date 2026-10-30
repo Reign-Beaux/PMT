@@ -57,6 +57,8 @@ paths:
       responses:
         "204":
           description: Proyecto eliminado
+        "409":
+          $ref: "#/components/responses/Error"
         "400":
           $ref: "#/components/responses/Error"
         "404":

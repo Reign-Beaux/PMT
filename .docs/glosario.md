@@ -22,8 +22,8 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | Término | En código | Significado |
 | --- | --- | --- |
 | **Proyecto** | `Project` | Trabajo que se gestiona en PMT y se divide en etapas. Es la raíz de su propio agregado; sus etapas son agregados aparte. |
-| **Etapa** | `Stage` | Parte de un proyecto que agrupa tareas. |
-| **Tarea** | `Task` | Unidad de trabajo de una etapa. |
+| **Etapa** | `Stage` | Parte de un proyecto que agrupa tareas, con un orden dentro de él. Es la raíz de su propio agregado y referencia a su proyecto por ID. |
+| **Tarea** | `Task` | Unidad de trabajo de una etapa. Es la raíz de su propio agregado y referencia a su etapa por ID. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y se comunica con PMT por MCP. |
 | **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DevFrontend, DevBackend, CR, QAP o QA. |
 | **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. |

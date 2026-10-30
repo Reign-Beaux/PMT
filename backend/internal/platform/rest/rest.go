@@ -89,8 +89,11 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 
 	status := http.StatusBadRequest
-	if businessErr.Kind == kernel.KindNotFound {
+	switch businessErr.Kind {
+	case kernel.KindNotFound:
 		status = http.StatusNotFound
+	case kernel.KindConflict:
+		status = http.StatusConflict
 	}
 	writeMessage(w, status, businessErr.Message)
 }

@@ -24,7 +24,7 @@ type Config struct {
 func LoadConfig(path string) (Config, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
-	v.SetDefault(serverAddrKey, ":8080")
+	v.SetDefault(serverAddrKey, "127.0.0.1:8080")
 	if err := v.BindEnv(databaseURLKey, "DATABASE_URL"); err != nil {
 		return Config{}, fmt.Errorf("enlazar DATABASE_URL: %w", err)
 	}
