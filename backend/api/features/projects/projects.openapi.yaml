@@ -42,9 +42,9 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de un proyecto
+      summary: Reemplaza los datos editables de un proyecto. Un campo omitido queda vacío; status tiene su propia ruta
       requestBody:
-        $ref: "#/components/requestBodies/ProjectInput"
+        $ref: "#/components/requestBodies/ProjectUpdateInput"
       responses:
         "200":
           $ref: "#/components/responses/Project"
@@ -63,6 +63,36 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/projects/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de un proyecto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/ProjectStatus"
+      responses:
+        "200":
+          $ref: "#/components/responses/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
 components:
   requestBodies:
     ProjectInput:
@@ -78,6 +108,22 @@ components:
                 type: string
               description:
                 type: string
+    ProjectUpdateInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              product_version:
+                type: string
+                description: Versión del producto, de texto libre. No es control de concurrencia.
   responses:
     Project:
       description: Proyecto
@@ -98,7 +144,7 @@ components:
   schemas:
     Project:
       type: object
-      required: [id, name, description, created_at, updated_at]
+      required: [id, name, description, status, product_version, created_at, updated_at]
       properties:
         id:
           type: string
@@ -107,9 +153,17 @@ components:
           type: string
         description:
           type: string
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        product_version:
+          type: string
+          description: Versión del producto, de texto libre. No es control de concurrencia.
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    ProjectStatus:
+      type: string
+      enum: [planning, stand_by, in_dev, working, stopped, cancelled]

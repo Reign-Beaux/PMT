@@ -52,6 +52,28 @@ func TestHandleUpdatesProject(t *testing.T) {
 	}
 }
 
+func TestHandleReplacesProductVersion(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	result, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "PMT", ProductVersion: " 1.0.0 "})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ProductVersion != "1.0.0" {
+		t.Errorf("result = %+v", result)
+	}
+
+	result, err = New(repo).Handle(context.Background(), Command{ID: id, Name: "PMT"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ProductVersion != "" || repo.projects[id].ProductVersion != "" {
+		t.Errorf("result = %+v", result)
+	}
+}
+
 func TestHandleKeepsProjectWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
@@ -87,6 +109,8 @@ func TestREST(t *testing.T) {
 		{"id inválido", "abc", `{"name":"PMT"}`, http.StatusBadRequest},
 		{"no existe", uuid.NewString(), `{"name":"PMT"}`, http.StatusNotFound},
 		{"nombre vacío", id.String(), `{"name":""}`, http.StatusBadRequest},
+		{"con versión de producto", id.String(), `{"name":"PMT","product_version":"1.0.0"}`, http.StatusOK},
+		{"status no editable", id.String(), `{"name":"PMT","status":"stopped"}`, http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {

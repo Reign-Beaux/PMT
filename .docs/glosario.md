@@ -22,6 +22,8 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | Término | En código | Significado |
 | --- | --- | --- |
 | **Proyecto** | `Project` | Trabajo que se gestiona en PMT y se divide en etapas. Es la raíz de su propio agregado; sus etapas son agregados aparte. |
+| **Status de un proyecto** | `Status` | Estado de un proyecto: `planning`, `stand_by`, `in_dev`, `working`, `stopped` o `cancelled`. `in_dev` significa que se desarrolla la primera versión; `working`, que esa versión ya terminó. Solo cambia mediante las transiciones permitidas. |
+| **Versión de producto** | `ProductVersion` | Versión del producto de un proyecto, de texto libre, por ejemplo `1.0.0`. No es control de concurrencia. |
 | **Etapa** | `Stage` | Parte de un proyecto que agrupa tareas, con un orden dentro de él. Es la raíz de su propio agregado y referencia a su proyecto por ID. |
 | **Tarea** | `Task` | Unidad de trabajo de una etapa. Es la raíz de su propio agregado y referencia a su etapa por ID. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y se comunica con PMT por MCP. |

@@ -27,9 +27,11 @@ func NewProjects(db sqlcgen.DBTX) *Projects {
 // Create guarda un proyecto nuevo.
 func (s *Projects) Create(ctx context.Context, p domain.Project) (domain.Project, error) {
 	row, err := s.queries.CreateProject(ctx, sqlcgen.CreateProjectParams{
-		ID:          p.ID,
-		Name:        p.Name,
-		Description: p.Description,
+		ID:             p.ID,
+		Name:           p.Name,
+		Description:    p.Description,
+		Status:         string(p.Status),
+		ProductVersion: p.ProductVersion,
 	})
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("crear proyecto: %w", err)
@@ -65,15 +67,31 @@ func (s *Projects) List(ctx context.Context) ([]domain.Project, error) {
 // Update guarda los cambios de un proyecto.
 func (s *Projects) Update(ctx context.Context, p domain.Project) (domain.Project, error) {
 	row, err := s.queries.UpdateProject(ctx, sqlcgen.UpdateProjectParams{
-		ID:          p.ID,
-		Name:        p.Name,
-		Description: p.Description,
+		ID:             p.ID,
+		Name:           p.Name,
+		Description:    p.Description,
+		ProductVersion: p.ProductVersion,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("actualizar proyecto: %w", err)
+	}
+	return toDomain(row), nil
+}
+
+// UpdateStatus guarda el status de un proyecto.
+func (s *Projects) UpdateStatus(ctx context.Context, p domain.Project) (domain.Project, error) {
+	row, err := s.queries.UpdateProjectStatus(ctx, sqlcgen.UpdateProjectStatusParams{
+		ID:     p.ID,
+		Status: string(p.Status),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Project{}, domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return domain.Project{}, fmt.Errorf("actualizar status del proyecto: %w", err)
 	}
 	return toDomain(row), nil
 }
@@ -95,10 +113,12 @@ func (s *Projects) Delete(ctx context.Context, id uuid.UUID) error {
 
 func toDomain(row sqlcgen.Project) domain.Project {
 	return domain.Project{
-		ID:          row.ID,
-		Name:        row.Name,
-		Description: row.Description,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:             row.ID,
+		Name:           row.Name,
+		Description:    row.Description,
+		Status:         domain.Status(row.Status),
+		ProductVersion: row.ProductVersion,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }

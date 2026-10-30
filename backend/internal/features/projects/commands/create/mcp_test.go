@@ -2,6 +2,7 @@ package create
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -65,6 +66,13 @@ func TestToolCreatesProject(t *testing.T) {
 	}
 	if len(repo.saved) != 1 || repo.saved[0].Name != "PMT" {
 		t.Errorf("guardados = %+v", repo.saved)
+	}
+	var output toolOutput
+	if err := json.Unmarshal([]byte(result.Content[0].(*sdk.TextContent).Text), &output); err != nil {
+		t.Fatal(err)
+	}
+	if output.Status != "planning" || output.ProductVersion != "" {
+		t.Errorf("salida = %+v", output)
 	}
 }
 

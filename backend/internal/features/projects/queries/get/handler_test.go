@@ -22,6 +22,19 @@ func (r *fakeReader) Get(_ context.Context, id uuid.UUID) (domain.Project, error
 	return r.project, nil
 }
 
+func TestHandleReturnsStatusAndProductVersion(t *testing.T) {
+	project := domain.Project{ID: uuid.New(), Status: domain.StatusWorking, ProductVersion: "1.0.0"}
+
+	result, err := New(&fakeReader{project: project}).Handle(context.Background(), project.ID)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusWorking || result.ProductVersion != "1.0.0" {
+		t.Errorf("result = %+v", result)
+	}
+}
+
 func TestREST(t *testing.T) {
 	id := uuid.New()
 	tests := []struct {

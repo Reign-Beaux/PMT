@@ -1,6 +1,6 @@
 -- name: CreateProject :one
-INSERT INTO projects (id, name, description)
-VALUES ($1, $2, $3)
+INSERT INTO projects (id, name, description, status, product_version)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetProject :one
@@ -13,7 +13,13 @@ ORDER BY created_at DESC, id;
 
 -- name: UpdateProject :one
 UPDATE projects
-SET name = $2, description = $3, updated_at = now()
+SET name = $2, description = $3, product_version = $4, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateProjectStatus :one
+UPDATE projects
+SET status = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 

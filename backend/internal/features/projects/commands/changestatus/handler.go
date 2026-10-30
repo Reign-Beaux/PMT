@@ -1,0 +1,61 @@
+// Package changestatus cambia el status de un proyecto.
+package changestatus
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+
+	"pmt/internal/features/projects/domain"
+)
+
+// Repository es la persistencia que necesita la operación.
+type Repository interface {
+	Get(ctx context.Context, id uuid.UUID) (domain.Project, error)
+	UpdateStatus(ctx context.Context, p domain.Project) (domain.Project, error)
+}
+
+// Command contiene los datos de entrada.
+type Command struct {
+	ID     uuid.UUID     `json:"-"`
+	Status domain.Status `json:"status"`
+}
+
+// Result es el proyecto con su nuevo status.
+type Result struct {
+	ID             uuid.UUID     `json:"id"`
+	Name           string        `json:"name"`
+	Description    string        `json:"description"`
+	Status         domain.Status `json:"status"`
+	ProductVersion string        `json:"product_version"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
+}
+
+// Handler ejecuta la operación.
+type Handler struct {
+	repo Repository
+}
+
+// New crea el handler.
+func New(repo Repository) *Handler {
+	return &Handler{repo: repo}
+}
+
+// Handle cambia el status del proyecto.
+func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	p, err := h.repo.Get(ctx, cmd.ID)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := p.ChangeStatus(cmd.Status); err != nil {
+		return Result{}, err
+	}
+
+	updated, err := h.repo.UpdateStatus(ctx, p)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result(updated), nil
+}

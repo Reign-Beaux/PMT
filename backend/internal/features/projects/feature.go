@@ -6,6 +6,7 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/projects/commands/changestatus"
 	"pmt/internal/features/projects/commands/create"
 	"pmt/internal/features/projects/commands/delete"
 	"pmt/internal/features/projects/commands/update"
@@ -22,6 +23,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
 	createProject := create.New(repo)
 	createProject.Register(mux)
 	createProject.RegisterTool(tools)
+
+	changeStatus := changestatus.New(repo)
+	changeStatus.Register(mux)
+	changeStatus.RegisterTool(tools)
 
 	update.New(repo).Register(mux)
 	delete.New(repo).Register(mux)

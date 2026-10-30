@@ -21,29 +21,32 @@ var (
 
 // Project es la raíz del agregado de un proyecto.
 type Project struct {
-	ID          uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	Status         Status
+	ProductVersion string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
-// NewProject crea un proyecto válido.
+// NewProject crea un proyecto válido en su estado inicial y sin versión de producto.
 func NewProject(name, description string) (Project, error) {
-	p := Project{ID: uuid.New()}
-	if err := p.Update(name, description); err != nil {
+	p := Project{ID: uuid.New(), Status: StatusPlanning}
+	if err := p.Update(name, description, ""); err != nil {
 		return Project{}, err
 	}
 	return p, nil
 }
 
 // Update cambia los datos editables del proyecto.
-func (p *Project) Update(name, description string) error {
+func (p *Project) Update(name, description, productVersion string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return ErrProjectNameRequired
 	}
 	p.Name = name
 	p.Description = strings.TrimSpace(description)
+	p.ProductVersion = strings.TrimSpace(productVersion)
 	return nil
 }
