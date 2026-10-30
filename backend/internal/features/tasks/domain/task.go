@@ -26,8 +26,12 @@ var (
 // Status es el estado de una tarea.
 type Status string
 
-// StatusBacklog es el estado inicial de toda tarea.
-const StatusBacklog Status = "backlog"
+const (
+	// StatusBacklog es el estado inicial de toda tarea.
+	StatusBacklog Status = "backlog"
+	// StatusDone indica que la tarea está cerrada.
+	StatusDone Status = "done"
+)
 
 // Task es la raíz del agregado de una tarea. Referencia a su etapa por ID.
 type Task struct {

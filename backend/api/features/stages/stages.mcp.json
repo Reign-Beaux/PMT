@@ -1,5 +1,67 @@
 [
   {
+    "name": "change_stage_status",
+    "description": "Cambia el status de una etapa de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Usa list_stages para obtener el ID de la etapa y su status actual.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        },
+        "status": {
+          "description": "Nuevo status: planning, stand_by, in_dev, done, stopped o cancelled",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "name",
+        "description",
+        "position",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "create_stage",
     "description": "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
@@ -48,6 +110,9 @@
         },
         "updated_at": {
           "type": "string"
+        },
+        "status": {
+          "type": "string"
         }
       },
       "required": [
@@ -56,6 +121,7 @@
         "name",
         "description",
         "position",
+        "status",
         "created_at",
         "updated_at"
       ],
@@ -105,6 +171,9 @@
               },
               "updated_at": {
                 "type": "string"
+              },
+              "status": {
+                "type": "string"
               }
             },
             "required": [
@@ -113,6 +182,7 @@
               "name",
               "description",
               "position",
+              "status",
               "created_at",
               "updated_at"
             ],

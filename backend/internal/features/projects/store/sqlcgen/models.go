@@ -28,6 +28,7 @@ type Stage struct {
 	Position    int32
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Status      string
 }
 
 type Task struct {

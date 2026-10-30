@@ -12,11 +12,11 @@ import (
 )
 
 const createStage = `-- name: CreateStage :one
-INSERT INTO stages (id, project_id, name, description, position)
-SELECT $1::uuid, $2::uuid, $3::text, $4::text, COALESCE(MAX(position), 0) + 1
+INSERT INTO stages (id, project_id, name, description, status, position)
+SELECT $1::uuid, $2::uuid, $3::text, $4::text, $5::text, COALESCE(MAX(position), 0) + 1
 FROM stages
 WHERE project_id = $2::uuid
-RETURNING id, project_id, name, description, position, created_at, updated_at
+RETURNING id, project_id, name, description, position, created_at, updated_at, status
 `
 
 type CreateStageParams struct {
@@ -24,6 +24,7 @@ type CreateStageParams struct {
 	ProjectID   uuid.UUID
 	Name        string
 	Description string
+	Status      string
 }
 
 func (q *Queries) CreateStage(ctx context.Context, arg CreateStageParams) (Stage, error) {
@@ -32,6 +33,7 @@ func (q *Queries) CreateStage(ctx context.Context, arg CreateStageParams) (Stage
 		arg.ProjectID,
 		arg.Name,
 		arg.Description,
+		arg.Status,
 	)
 	var i Stage
 	err := row.Scan(
@@ -42,6 +44,7 @@ func (q *Queries) CreateStage(ctx context.Context, arg CreateStageParams) (Stage
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
 	)
 	return i, err
 }
@@ -60,7 +63,7 @@ func (q *Queries) DeleteStage(ctx context.Context, id uuid.UUID) (int64, error) 
 }
 
 const getStage = `-- name: GetStage :one
-SELECT id, project_id, name, description, position, created_at, updated_at FROM stages
+SELECT id, project_id, name, description, position, created_at, updated_at, status FROM stages
 WHERE id = $1
 `
 
@@ -75,12 +78,13 @@ func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (Stage, error) {
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
 	)
 	return i, err
 }
 
 const listStages = `-- name: ListStages :many
-SELECT id, project_id, name, description, position, created_at, updated_at FROM stages
+SELECT id, project_id, name, description, position, created_at, updated_at, status FROM stages
 WHERE project_id = $1
 ORDER BY position
 `
@@ -102,6 +106,7 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]Stage,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Status,
 		); err != nil {
 			return nil, err
 		}
@@ -117,7 +122,7 @@ const updateStage = `-- name: UpdateStage :one
 UPDATE stages
 SET name = $2, description = $3, updated_at = now()
 WHERE id = $1
-RETURNING id, project_id, name, description, position, created_at, updated_at
+RETURNING id, project_id, name, description, position, created_at, updated_at, status
 `
 
 type UpdateStageParams struct {
@@ -137,6 +142,35 @@ func (q *Queries) UpdateStage(ctx context.Context, arg UpdateStageParams) (Stage
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
+	)
+	return i, err
+}
+
+const updateStageStatus = `-- name: UpdateStageStatus :one
+UPDATE stages
+SET status = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, project_id, name, description, position, created_at, updated_at, status
+`
+
+type UpdateStageStatusParams struct {
+	ID     uuid.UUID
+	Status string
+}
+
+func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) (Stage, error) {
+	row := q.db.QueryRow(ctx, updateStageStatus, arg.ID, arg.Status)
+	var i Stage
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Name,
+		&i.Description,
+		&i.Position,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
 	)
 	return i, err
 }

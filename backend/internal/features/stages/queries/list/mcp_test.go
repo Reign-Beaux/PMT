@@ -43,7 +43,7 @@ func callTool(t *testing.T, reader Reader, projectID string) *sdk.CallToolResult
 func TestToolListsStagesInOrder(t *testing.T) {
 	reader := &fakeReader{stages: []domain.Stage{
 		{ID: uuid.New(), Name: "A", Position: 1},
-		{ID: uuid.New(), Name: "B", Position: 2},
+		{ID: uuid.New(), Name: "B", Position: 2, Status: domain.StatusInDev},
 	}}
 
 	result := callTool(t, reader, uuid.NewString())
@@ -59,7 +59,7 @@ func TestToolListsStagesInOrder(t *testing.T) {
 	if err := json.Unmarshal(raw, &output); err != nil {
 		t.Fatal(err)
 	}
-	if len(output.Stages) != 2 || output.Stages[1].Name != "B" || output.Stages[1].Position != 2 {
+	if len(output.Stages) != 2 || output.Stages[1].Name != "B" || output.Stages[1].Position != 2 || output.Stages[1].Status != "in_dev" {
 		t.Errorf("salida = %+v", output)
 	}
 }

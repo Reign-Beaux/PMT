@@ -30,13 +30,14 @@ type Stage struct {
 	Name        string
 	Description string
 	Position    int
+	Status      Status
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
-// NewStage crea una etapa válida. La posición se asigna al guardarla.
+// NewStage crea una etapa válida en su estado inicial. La posición se asigna al guardarla.
 func NewStage(projectID uuid.UUID, name, description string) (Stage, error) {
-	s := Stage{ID: uuid.New(), ProjectID: projectID}
+	s := Stage{ID: uuid.New(), ProjectID: projectID, Status: StatusPlanning}
 	if err := s.Update(name, description); err != nil {
 		return Stage{}, err
 	}

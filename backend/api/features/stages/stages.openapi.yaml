@@ -76,6 +76,45 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/stages/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de una etapa
+      description: Solo admite las transiciones permitidas. Una etapa solo pasa a done si todas sus tareas están en done; una etapa sin tareas cumple la condición.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/StageStatus"
+      responses:
+        "200":
+          $ref: "#/components/responses/Stage"
+        "400":
+          description: Identificador inválido o status desconocido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Transición no permitida, incluida la del status a sí mismo, o cierre con tareas sin terminar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   requestBodies:
     StageInput:
@@ -103,15 +142,20 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            required: [error]
-            properties:
-              error:
-                type: string
+            $ref: "#/components/schemas/Error"
   schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    StageStatus:
+      type: string
+      enum: [planning, stand_by, in_dev, done, stopped, cancelled]
     Stage:
       type: object
-      required: [id, project_id, name, description, position, created_at, updated_at]
+      required: [id, project_id, name, description, position, status, created_at, updated_at]
       properties:
         id:
           type: string
@@ -126,6 +170,8 @@ components:
         position:
           type: integer
           minimum: 1
+        status:
+          $ref: "#/components/schemas/StageStatus"
         created_at:
           type: string
           format: date-time

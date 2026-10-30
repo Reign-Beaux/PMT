@@ -263,6 +263,23 @@ Todo proyecto nace en `planning`. `in_dev` significa que se desarrolla la primer
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `projects/commands/changestatus`, no con `PUT /api/projects/{id}`.
 
+## Estados de una etapa
+
+Toda etapa nace en `planning`. Una tabla de transiciones en `stages/domain` define los cambios permitidos:
+
+| Desde | Puede pasar a |
+| --- | --- |
+| `planning` | `stand_by`, `stopped`, `cancelled` |
+| `stand_by` | `planning`, `in_dev`, `stopped`, `cancelled` |
+| `in_dev` | `done`, `stopped`, `cancelled` |
+| `done` | `in_dev` |
+| `stopped` | `planning`, `stand_by`, `in_dev`, `cancelled` |
+| `cancelled` | `planning` |
+
+Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `stages/commands/changestatus`, no con `PUT /api/stages/{id}`.
+
+**Regla de cierre:** una etapa solo pasa a `done` si todas sus tareas están en `done`; si no, la operación responde `kernel.Conflict`. Una etapa sin tareas sí puede pasar a `done`, y reabrirla (`done` → `in_dev`) no consulta las tareas. Como `stages` no importa `tasks`, la slice define la interfaz `changestatus.TaskChecker`, que implementa `tasks.Checker` sobre la query `tasks/queries/checkdone`, conectada en `registerFeatures`.
+
 ## Estados de una tarea
 
 Una tabla de transiciones en `tasks/domain` define qué perfil puede hacer cada cambio:
@@ -311,7 +328,7 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST y las herramientas MCP `create_stage` y `list_stages`, y la feature `tasks` con su CRUD por REST, concurrencia por `version` y las herramientas MCP `create_task` y `list_tasks`. `status` y `blocked` de una tarea se devuelven, pero aún no se pueden cambiar.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, concurrencia por `version` y las herramientas MCP `create_task` y `list_tasks`. `status` y `blocked` de una tarea se devuelven, pero aún no se pueden cambiar.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages` y `tasks` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.

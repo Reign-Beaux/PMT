@@ -31,6 +31,7 @@ func (s *Stages) Create(ctx context.Context, stage domain.Stage) (domain.Stage, 
 		ProjectID:   stage.ProjectID,
 		Name:        stage.Name,
 		Description: stage.Description,
+		Status:      string(stage.Status),
 	})
 	switch {
 	case postgres.IsForeignKeyViolation(err):
@@ -84,6 +85,21 @@ func (s *Stages) Update(ctx context.Context, stage domain.Stage) (domain.Stage, 
 	return toDomain(row), nil
 }
 
+// UpdateStatus guarda el status de una etapa.
+func (s *Stages) UpdateStatus(ctx context.Context, stage domain.Stage) (domain.Stage, error) {
+	row, err := s.queries.UpdateStageStatus(ctx, sqlcgen.UpdateStageStatusParams{
+		ID:     stage.ID,
+		Status: string(stage.Status),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Stage{}, domain.ErrStageNotFound
+	}
+	if err != nil {
+		return domain.Stage{}, fmt.Errorf("actualizar status de etapa: %w", err)
+	}
+	return toDomain(row), nil
+}
+
 // Delete elimina una etapa.
 func (s *Stages) Delete(ctx context.Context, id uuid.UUID) error {
 	deleted, err := s.queries.DeleteStage(ctx, id)
@@ -106,6 +122,7 @@ func toDomain(row sqlcgen.Stage) domain.Stage {
 		Name:        row.Name,
 		Description: row.Description,
 		Position:    int(row.Position),
+		Status:      domain.Status(row.Status),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}

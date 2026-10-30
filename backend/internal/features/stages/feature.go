@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/stages/commands/changestatus"
 	"pmt/internal/features/stages/commands/create"
 	"pmt/internal/features/stages/commands/delete"
 	"pmt/internal/features/stages/commands/update"
@@ -18,7 +19,8 @@ import (
 )
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
+// tasks lo aporta la feature tasks, conectada en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks changestatus.TaskChecker) {
 	repo := store.NewStages(db)
 
 	createStage := create.New(repo)
@@ -26,6 +28,11 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
 	createStage.RegisterTool(tools)
 
 	update.New(repo).Register(mux)
+
+	changeStatus := changestatus.New(repo, tasks)
+	changeStatus.Register(mux)
+	changeStatus.RegisterTool(tools)
+
 	delete.New(repo).Register(mux)
 	get.New(repo).Register(mux)
 

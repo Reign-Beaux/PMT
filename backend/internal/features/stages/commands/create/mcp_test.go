@@ -73,6 +73,9 @@ func TestToolCreatesStage(t *testing.T) {
 	if len(repo.saved) != 1 || repo.saved[0].Name != "Diseño" || repo.saved[0].ProjectID != projectID {
 		t.Errorf("guardadas = %+v", repo.saved)
 	}
+	if text := result.Content[0].(*sdk.TextContent).Text; !strings.Contains(text, `"status":"planning"`) {
+		t.Errorf("salida = %s", text)
+	}
 }
 
 func TestToolRejectsInvalidInput(t *testing.T) {

@@ -38,6 +38,9 @@ func TestHandleCreatesStage(t *testing.T) {
 	if result.Name != "Diseño" || result.ProjectID != projectID || len(repo.saved) != 1 {
 		t.Errorf("result = %+v, guardadas = %d", result, len(repo.saved))
 	}
+	if result.Status != domain.StatusPlanning {
+		t.Errorf("status = %s", result.Status)
+	}
 }
 
 func TestHandleRejectsInvalidStage(t *testing.T) {

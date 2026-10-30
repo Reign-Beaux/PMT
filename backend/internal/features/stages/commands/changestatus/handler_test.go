@@ -1,0 +1,229 @@
+package changestatus
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/google/uuid"
+
+	"pmt/internal/features/stages/domain"
+)
+
+type fakeRepo struct {
+	stages  map[uuid.UUID]domain.Stage
+	updates int
+}
+
+func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
+	t.Helper()
+	s, err := domain.NewStage(uuid.New(), "Diseño", "Inicial")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Status = status
+	return &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}, s.ID
+}
+
+func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
+	s, ok := r.stages[id]
+	if !ok {
+		return domain.Stage{}, domain.ErrStageNotFound
+	}
+	return s, nil
+}
+
+func (r *fakeRepo) UpdateStatus(_ context.Context, s domain.Stage) (domain.Stage, error) {
+	r.updates++
+	r.stages[s.ID] = s
+	return s, nil
+}
+
+// fakeTasks responde como si la etapa tuviera tareas en ese estado. Una etapa
+// sin tareas responde true, igual que una con todas terminadas.
+type fakeTasks struct {
+	allDone bool
+	err     error
+	calls   int
+}
+
+func (f *fakeTasks) AllDone(context.Context, uuid.UUID) (bool, error) {
+	f.calls++
+	return f.allDone, f.err
+}
+
+func TestHandleChangesStatus(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusPlanning)
+	tasks := &fakeTasks{}
+
+	result, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusStandBy || repo.stages[id].Status != domain.StatusStandBy {
+		t.Errorf("result = %+v", result)
+	}
+	if tasks.calls != 0 {
+		t.Errorf("consultó las tareas %d veces", tasks.calls)
+	}
+}
+
+func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
+	tests := []struct {
+		name   string
+		status domain.Status
+		want   error
+	}{
+		{"transición no permitida", domain.StatusDone, domain.ErrStageStatusTransition},
+		{"mismo status", domain.StatusPlanning, domain.ErrStageStatusTransition},
+		{"desconocido", "archived", domain.ErrStageStatusInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, id := newRepoWith(t, domain.StatusPlanning)
+			tasks := &fakeTasks{allDone: true}
+
+			_, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: tt.status})
+
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("err = %v", err)
+			}
+			if repo.updates != 0 || repo.stages[id].Status != domain.StatusPlanning {
+				t.Errorf("updates = %d, etapa = %+v", repo.updates, repo.stages[id])
+			}
+			if tasks.calls != 0 {
+				t.Errorf("consultó las tareas %d veces", tasks.calls)
+			}
+		})
+	}
+}
+
+func TestHandleMissingStage(t *testing.T) {
+	repo, _ := newRepoWith(t, domain.StatusPlanning)
+
+	_, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy})
+
+	if !errors.Is(err, domain.ErrStageNotFound) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestHandleClosesStageWhenAllTasksDone(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusInDev)
+	tasks := &fakeTasks{allDone: true}
+
+	result, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusDone || repo.stages[id].Status != domain.StatusDone || tasks.calls != 1 {
+		t.Errorf("result = %+v, consultas = %d", result, tasks.calls)
+	}
+}
+
+func TestHandleKeepsStageOpenWithPendingTasks(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusInDev)
+
+	_, err := New(repo, &fakeTasks{allDone: false}).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone})
+
+	if !errors.Is(err, domain.ErrStageTasksPending) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.updates != 0 || repo.stages[id].Status != domain.StatusInDev {
+		t.Errorf("updates = %d, etapa = %+v", repo.updates, repo.stages[id])
+	}
+}
+
+func TestHandleKeepsStageOpenWhenCheckFails(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusInDev)
+	failure := errors.New("fallo de lectura")
+
+	_, err := New(repo, &fakeTasks{allDone: true, err: failure}).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone})
+
+	if !errors.Is(err, failure) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.updates != 0 {
+		t.Error("no debió guardar el status")
+	}
+}
+
+func TestHandleReopenDoesNotCheckTasks(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusDone)
+	tasks := &fakeTasks{allDone: false}
+
+	result, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: domain.StatusInDev})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusInDev || tasks.calls != 0 {
+		t.Errorf("result = %+v, consultas = %d", result, tasks.calls)
+	}
+}
+
+func TestREST(t *testing.T) {
+	tests := []struct {
+		name    string
+		from    domain.Status
+		allDone bool
+		id      func(uuid.UUID) string
+		body    string
+		status  int
+	}{
+		{"válido", domain.StatusPlanning, true, uuid.UUID.String, `{"status":"stand_by"}`, http.StatusOK},
+		{"id inválido", domain.StatusPlanning, true, func(uuid.UUID) string { return "abc" }, `{"status":"stand_by"}`, http.StatusBadRequest},
+		{"no existe", domain.StatusPlanning, true, func(uuid.UUID) string { return uuid.NewString() }, `{"status":"stand_by"}`, http.StatusNotFound},
+		{"status desconocido", domain.StatusPlanning, true, uuid.UUID.String, `{"status":"archived"}`, http.StatusBadRequest},
+		{"sin status", domain.StatusPlanning, true, uuid.UUID.String, `{}`, http.StatusBadRequest},
+		{"campo desconocido", domain.StatusPlanning, true, uuid.UUID.String, `{"status":"stand_by","name":"Otro"}`, http.StatusBadRequest},
+		{"transición no permitida", domain.StatusPlanning, true, uuid.UUID.String, `{"status":"done"}`, http.StatusConflict},
+		{"mismo status", domain.StatusPlanning, true, uuid.UUID.String, `{"status":"planning"}`, http.StatusConflict},
+		{"cierre con tareas pendientes", domain.StatusInDev, false, uuid.UUID.String, `{"status":"done"}`, http.StatusConflict},
+		{"cierre", domain.StatusInDev, true, uuid.UUID.String, `{"status":"done"}`, http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, id := newRepoWith(t, tt.from)
+			mux := http.NewServeMux()
+			New(repo, &fakeTasks{allDone: tt.allDone}).Register(mux)
+			rec := httptest.NewRecorder()
+
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+tt.id(id)+"/status", strings.NewReader(tt.body)))
+
+			if rec.Code != tt.status {
+				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+			}
+		})
+	}
+}
+
+func TestRESTReturnsWholeStage(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusPlanning)
+	mux := http.NewServeMux()
+	New(repo, &fakeTasks{}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`)))
+
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"id", "project_id", "name", "description", "position", "created_at", "updated_at"} {
+		if _, ok := body[field]; !ok {
+			t.Errorf("falta %s en %s", field, rec.Body)
+		}
+	}
+	if body["status"] != "stand_by" {
+		t.Errorf("cuerpo = %s", rec.Body)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,6 +21,19 @@ func (r *fakeReader) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) 
 		return domain.Stage{}, domain.ErrStageNotFound
 	}
 	return r.stage, nil
+}
+
+func TestRESTReturnsStatus(t *testing.T) {
+	id := uuid.New()
+	mux := http.NewServeMux()
+	New(&fakeReader{stage: domain.Stage{ID: id, Status: domain.StatusStandBy}}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/stages/"+id.String(), nil))
+
+	if !strings.Contains(rec.Body.String(), `"status":"stand_by"`) {
+		t.Errorf("cuerpo = %s", rec.Body)
+	}
 }
 
 func TestREST(t *testing.T) {

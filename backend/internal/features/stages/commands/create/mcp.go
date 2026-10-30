@@ -23,6 +23,7 @@ type toolOutput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Position    int    `json:"position"`
+	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -56,6 +57,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Name:        result.Name,
 		Description: result.Description,
 		Position:    result.Position,
+		Status:      string(result.Status),
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
 	}, nil

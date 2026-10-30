@@ -78,6 +78,7 @@ func TestREST(t *testing.T) {
 		{"no existe", uuid.NewString(), `{"name":"A"}`, http.StatusNotFound},
 		{"nombre vacío", id.String(), `{"name":""}`, http.StatusBadRequest},
 		{"position no editable", id.String(), `{"name":"A","position":2}`, http.StatusBadRequest},
+		{"status no editable", id.String(), `{"name":"A","status":"stand_by"}`, http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
