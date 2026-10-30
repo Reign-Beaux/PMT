@@ -1,0 +1,43 @@
+[
+  {
+    "name": "import_project",
+    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Ruta absoluta del fichero YAML, en la máquina donde corre pmt-server",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "type": "string"
+        },
+        "project_name": {
+          "type": "string"
+        },
+        "stage_count": {
+          "type": "integer"
+        },
+        "task_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project_id",
+        "project_name",
+        "stage_count",
+        "task_count"
+      ],
+      "type": "object"
+    }
+  }
+]

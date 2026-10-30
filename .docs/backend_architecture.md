@@ -198,6 +198,7 @@ Cada feature corresponde a un agregado principal:
 | `reviews` | Revisiones de CR y hallazgos. |
 | `qa` | Planes QAP, casos y ejecuciones de QA. |
 | `activity` | Auditoría, comentarios y bloqueos. |
+| `imports` | Carga de un proyecto completo desde un fichero. No tiene agregado propio; ver [Feature de composición](#feature-de-composición-imports). |
 
 Las dependencias entre features van, en general, en este sentido:
 
@@ -237,6 +238,16 @@ platform → kernel
 3. `feature.go` o `app` conecta ambas.
 
 Ninguna feature lee las tablas ni importa los detalles internos de otra.
+
+### Feature de composición: `imports`
+
+`imports` es una excepción a las reglas anteriores. Crea un proyecto, sus etapas y sus tareas como una unidad, sin agregado propio, y por eso:
+
+- `imports/domain` y `importproject/handler.go` usan el `domain` de `projects`, `stages` y `tasks`, y aplican sus constructores para validar.
+- `imports/store` usa el `store` de esas tres features sobre una sola `pgx.Tx`, porque aceptan `sqlcgen.DBTX`. No usa `kernel.Transactor`, aún pendiente.
+- `handler.go` lee el fichero con `os` e interpreta el YAML con `gopkg.in/yaml.v3`.
+
+Ninguna otra feature importa `imports`, así que no hay ciclos. La excepción se limita a esta feature. El formato del fichero está en `importar_proyectos.md`.
 
 ## Identidad y permisos
 
@@ -343,7 +354,7 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task` y `list_tasks`. El `status` de una tarea se devuelve, pero aún no se puede cambiar.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task` y `list_tasks`, y la feature `imports` con la herramienta MCP `import_project`. El `status` de una tarea se devuelve, pero aún no se puede cambiar.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages` y `tasks` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
