@@ -40,7 +40,7 @@ func Run() error {
 	mux := http.NewServeMux()
 	tools := mcp.NewServer()
 	projects.Register(mux, tools, pool)
-	stages.Register(mux, pool)
+	stages.Register(mux, tools, pool)
 	mux.Handle("/mcp", mcp.Handler(tools))
 
 	return rest.Serve(ctx, cfg.ServerAddr, mux)

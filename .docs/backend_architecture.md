@@ -293,7 +293,7 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio la feature `projects` con su CRUD por REST y la herramienta MCP `create_project`, y la feature `stages` con su CRUD por REST.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio la feature `projects` con su CRUD por REST y la herramienta MCP `create_project`, y la feature `stages` con su CRUD por REST y la herramienta MCP `create_stage`.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects` y `stages` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
