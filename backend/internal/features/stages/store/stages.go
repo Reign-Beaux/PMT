@@ -87,6 +87,9 @@ func (s *Stages) Update(ctx context.Context, stage domain.Stage) (domain.Stage, 
 // Delete elimina una etapa.
 func (s *Stages) Delete(ctx context.Context, id uuid.UUID) error {
 	deleted, err := s.queries.DeleteStage(ctx, id)
+	if postgres.IsForeignKeyViolation(err) {
+		return domain.ErrStageHasTasks
+	}
 	if err != nil {
 		return fmt.Errorf("eliminar etapa: %w", err)
 	}

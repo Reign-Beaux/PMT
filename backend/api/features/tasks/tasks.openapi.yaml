@@ -1,0 +1,152 @@
+openapi: 3.1.0
+info:
+  title: PMT - Tareas
+  version: 0.1.0
+paths:
+  /api/stages/{stage_id}/tasks:
+    parameters:
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista las tareas de una etapa por fecha de creación
+      responses:
+        "200":
+          description: Tareas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Crea una tarea en estado backlog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          $ref: "#/components/responses/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Obtiene una tarea
+      responses:
+        "200":
+          $ref: "#/components/responses/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      summary: Reemplaza los datos editables de una tarea si sigue en la versión esperada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title, expected_version]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                expected_version:
+                  type: integer
+                  format: int64
+                  minimum: 1
+      responses:
+        "200":
+          $ref: "#/components/responses/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+    delete:
+      summary: Elimina una tarea
+      responses:
+        "204":
+          description: Tarea eliminada
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  responses:
+    Task:
+      description: Tarea
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Task"
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: string
+  schemas:
+    Task:
+      type: object
+      required: [id, stage_id, title, description, status, blocked, version, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stage_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done]
+        blocked:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

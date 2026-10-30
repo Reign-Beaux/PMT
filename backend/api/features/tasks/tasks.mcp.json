@@ -1,0 +1,149 @@
+[
+  {
+    "name": "create_task",
+    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog, sin bloquear y con versión 1. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción de la tarea",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa a la que pertenece la tarea",
+          "type": "string"
+        },
+        "title": {
+          "description": "Título de la tarea",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "title",
+        "description"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "stage_id",
+        "title",
+        "description",
+        "status",
+        "blocked",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "list_tasks",
+    "description": "Lista las tareas de una etapa de PMT, de la más antigua a la más reciente. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "tasks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "blocked": {
+                "type": "boolean"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "stage_id",
+              "title",
+              "description",
+              "status",
+              "blocked",
+              "version",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "tasks"
+      ],
+      "type": "object"
+    }
+  }
+]

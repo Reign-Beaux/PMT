@@ -14,6 +14,7 @@ import (
 
 	"pmt/internal/features/projects"
 	"pmt/internal/features/stages"
+	"pmt/internal/features/tasks"
 	"pmt/internal/platform/mcp"
 	"pmt/internal/platform/postgres"
 	"pmt/internal/platform/rest"
@@ -52,4 +53,5 @@ func Run() error {
 func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool) {
 	projects.Register(mux, tools, pool)
 	stages.Register(mux, tools, pool)
+	tasks.Register(mux, tools, pool, stages.NewChecker(pool))
 }

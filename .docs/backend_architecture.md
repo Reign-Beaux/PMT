@@ -295,16 +295,16 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST y las herramientas MCP `create_project` y `list_projects`, y la feature `stages` con su CRUD por REST y la herramienta MCP `create_stage`.
-- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil y las demás features.
-- **Excepción temporal:** los commands de `projects` y `stages` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST y las herramientas MCP `create_project` y `list_projects`, la feature `stages` con su CRUD por REST y las herramientas MCP `create_stage` y `list_stages`, y la feature `tasks` con su CRUD por REST, concurrencia por `version` y las herramientas MCP `create_task` y `list_tasks`. `status` y `blocked` de una tarea se devuelven, pero aún no se pueden cambiar.
+- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
+- **Excepción temporal:** los commands de `projects`, `stages` y `tasks` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
 ## Orden de construcción
 
 1. `projects` y `stages`. Hechos, salvo la excepción temporal.
 2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`.
-3. `tasks`, con su tabla de transiciones.
+3. Tabla de transiciones de `tasks`. Su CRUD ya existe, adelantado a `agents`.
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews` y `qa`.
