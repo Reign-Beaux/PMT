@@ -66,7 +66,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de una tarea si sigue en la versión esperada
+      summary: Reemplaza los datos editables de una tarea
       requestBody:
         required: true
         content:
@@ -74,24 +74,18 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [title, expected_version]
+              required: [title]
               properties:
                 title:
                   type: string
                 description:
                   type: string
-                expected_version:
-                  type: integer
-                  format: int64
-                  minimum: 1
       responses:
         "200":
           $ref: "#/components/responses/Task"
         "400":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "409":
           $ref: "#/components/responses/Error"
     delete:
       summary: Elimina una tarea
@@ -123,7 +117,7 @@ components:
   schemas:
     Task:
       type: object
-      required: [id, stage_id, title, description, status, blocked, version, created_at, updated_at]
+      required: [id, stage_id, title, description, status, created_at, updated_at]
       properties:
         id:
           type: string
@@ -137,13 +131,7 @@ components:
           type: string
         status:
           type: string
-          enum: [backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done]
-        blocked:
-          type: boolean
-        version:
-          type: integer
-          format: int64
-          minimum: 1
+          enum: [backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done, cancelled]
         created_at:
           type: string
           format: date-time

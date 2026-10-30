@@ -12,9 +12,9 @@ import (
 )
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (id, stage_id, title, description, status, blocked, version)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, stage_id, title, description, status, blocked, version, created_at, updated_at
+INSERT INTO tasks (id, stage_id, title, description, status)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, stage_id, title, description, status, created_at, updated_at
 `
 
 type CreateTaskParams struct {
@@ -23,8 +23,6 @@ type CreateTaskParams struct {
 	Title       string
 	Description string
 	Status      string
-	Blocked     bool
-	Version     int64
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
@@ -34,8 +32,6 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		arg.Title,
 		arg.Description,
 		arg.Status,
-		arg.Blocked,
-		arg.Version,
 	)
 	var i Task
 	err := row.Scan(
@@ -44,8 +40,6 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.Title,
 		&i.Description,
 		&i.Status,
-		&i.Blocked,
-		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -66,7 +60,7 @@ func (q *Queries) DeleteTask(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, stage_id, title, description, status, blocked, version, created_at, updated_at FROM tasks
+SELECT id, stage_id, title, description, status, created_at, updated_at FROM tasks
 WHERE id = $1
 `
 
@@ -79,8 +73,6 @@ func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
 		&i.Title,
 		&i.Description,
 		&i.Status,
-		&i.Blocked,
-		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -88,7 +80,7 @@ func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, stage_id, title, description, status, blocked, version, created_at, updated_at FROM tasks
+SELECT id, stage_id, title, description, status, created_at, updated_at FROM tasks
 WHERE stage_id = $1
 ORDER BY created_at, id
 `
@@ -108,8 +100,6 @@ func (q *Queries) ListTasks(ctx context.Context, stageID uuid.UUID) ([]Task, err
 			&i.Title,
 			&i.Description,
 			&i.Status,
-			&i.Blocked,
-			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -125,25 +115,19 @@ func (q *Queries) ListTasks(ctx context.Context, stageID uuid.UUID) ([]Task, err
 
 const updateTask = `-- name: UpdateTask :one
 UPDATE tasks
-SET title = $1, description = $2, version = version + 1, updated_at = now()
-WHERE id = $3 AND version = $4
-RETURNING id, stage_id, title, description, status, blocked, version, created_at, updated_at
+SET title = $2, description = $3, updated_at = now()
+WHERE id = $1
+RETURNING id, stage_id, title, description, status, created_at, updated_at
 `
 
 type UpdateTaskParams struct {
-	Title           string
-	Description     string
-	ID              uuid.UUID
-	ExpectedVersion int64
+	ID          uuid.UUID
+	Title       string
+	Description string
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
-	row := q.db.QueryRow(ctx, updateTask,
-		arg.Title,
-		arg.Description,
-		arg.ID,
-		arg.ExpectedVersion,
-	)
+	row := q.db.QueryRow(ctx, updateTask, arg.ID, arg.Title, arg.Description)
 	var i Task
 	err := row.Scan(
 		&i.ID,
@@ -151,8 +135,6 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.Title,
 		&i.Description,
 		&i.Status,
-		&i.Blocked,
-		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

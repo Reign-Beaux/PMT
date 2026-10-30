@@ -282,6 +282,22 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 ## Estados de una tarea
 
+Toda tarea nace en `backlog`. Estos son sus status:
+
+| Status | Significado |
+| --- | --- |
+| `backlog` | Definida, aún no liberada. |
+| `ready` | Liberada para desarrollo. |
+| `in_progress` | En desarrollo. |
+| `in_review` | En revisión de código. |
+| `changes_requested` | Con correcciones pendientes. |
+| `in_qa` | En verificación de QA. |
+| `pending_close` | Aprobada por QA, falta el cierre. |
+| `done` | Verificada y cerrada. |
+| `cancelled` | Ya no se hará. |
+
+`cancelled` aún no tiene transiciones: ninguna fila de la tabla siguiente entra en ese status ni sale de él.
+
 Una tabla de transiciones en `tasks/domain` define qué perfil puede hacer cada cambio:
 
 | Desde | Acción | Perfil | Hacia |
@@ -296,7 +312,7 @@ Una tabla de transiciones en `tasks/domain` define qué perfil puede hacer cada 
 | `in_qa` | Aprobar | QA | `pending_close` |
 | `pending_close` | Cerrar | TL | `done` |
 
-Dev corresponde a DevFrontend o DevBackend, según la tarea. El bloqueo es un atributo aparte, no un estado, para que al desbloquear la tarea siga donde estaba.
+Dev corresponde a DevFrontend o DevBackend, según la tarea.
 
 ## Transacciones
 
@@ -306,8 +322,7 @@ Dev corresponde a DevFrontend o DevBackend, según la tarea. El bloqueo es un at
 
 ## Concurrencia
 
-- Los agregados que varios agentes pueden modificar a la vez tienen una columna `version`, y sus escrituras envían `expected_version`. `Project` no la tiene: si dos escrituras coinciden, prevalece la última. Su `product_version` es la versión del producto, de texto libre, y no tiene relación con esta `version` de concurrencia.
-- Si la versión no coincide, el agente recibe un error de conflicto y debe releer antes de reintentar.
+- Ningún agregado tiene control de versión: si dos escrituras coinciden, prevalece la última. La `product_version` de `Project` es la versión del producto, de texto libre, y no es control de concurrencia.
 - Las operaciones críticas aceptan `idempotency_key`, única por actor, para que un reintento no duplique acciones.
 
 ## Eventos
@@ -321,14 +336,14 @@ La operación es la slice `qa/commands/approve/`.
 1. `mcp.go` recibe la llamada y `platform/mcp` resuelve el `Actor`.
 2. `handler.go` abre la transacción y valida que el `Actor` sea QA y que el plan esté aprobado.
 3. Registra la aprobación y pide a `tasks`, mediante una interfaz, la transición a `pending_close`.
-4. `tasks` valida la tabla de transiciones y la `version`, y guarda.
+4. `tasks` valida la tabla de transiciones y guarda.
 5. `activity` registra la acción y la transacción confirma todo junto.
 
 ## Estado actual
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, concurrencia por `version` y las herramientas MCP `create_task` y `list_tasks`. `status` y `blocked` de una tarea se devuelven, pero aún no se pueden cambiar.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task` y `list_tasks`. El `status` de una tarea se devuelve, pero aún no se puede cambiar.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages` y `tasks` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.

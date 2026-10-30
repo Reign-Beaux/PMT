@@ -41,7 +41,7 @@ func callTool(t *testing.T, handler *Handler, stageID string) *sdk.CallToolResul
 }
 
 func TestToolListsTasks(t *testing.T) {
-	reader := &fakeReader{tasks: []domain.Task{{ID: uuid.New(), Title: "Revisar", Status: domain.StatusBacklog, Version: 2}}}
+	reader := &fakeReader{tasks: []domain.Task{{ID: uuid.New(), Title: "Revisar", Status: domain.StatusBacklog}}}
 
 	result := callTool(t, New(reader, fakeStages{}), uuid.NewString())
 
@@ -56,7 +56,7 @@ func TestToolListsTasks(t *testing.T) {
 	if err := json.Unmarshal(raw, &output); err != nil {
 		t.Fatal(err)
 	}
-	if len(output.Tasks) != 1 || output.Tasks[0].Title != "Revisar" || output.Tasks[0].Status != "backlog" || output.Tasks[0].Version != 2 {
+	if len(output.Tasks) != 1 || output.Tasks[0].Title != "Revisar" || output.Tasks[0].Status != "backlog" {
 		t.Errorf("salida = %+v", output)
 	}
 }

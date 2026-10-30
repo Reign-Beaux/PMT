@@ -37,8 +37,6 @@ type Task struct {
 	Title       string
 	Description string
 	Status      string
-	Blocked     bool
-	Version     int64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

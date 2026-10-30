@@ -65,14 +65,14 @@ func TestRESTReturnsNotFoundForMissingStage(t *testing.T) {
 }
 
 func TestHandleKeepsOrder(t *testing.T) {
-	reader := &fakeReader{tasks: []domain.Task{{Title: "A", Version: 1}, {Title: "B", Version: 3}}}
+	reader := &fakeReader{tasks: []domain.Task{{Title: "A"}, {Title: "B"}}}
 
 	items, err := New(reader, fakeStages{}).Handle(context.Background(), uuid.New())
 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 2 || items[1].Title != "B" || items[1].Version != 3 {
+	if len(items) != 2 || items[1].Title != "B" {
 		t.Errorf("items = %+v", items)
 	}
 }

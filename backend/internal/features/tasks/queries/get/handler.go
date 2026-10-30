@@ -22,8 +22,6 @@ type Result struct {
 	Title       string        `json:"title"`
 	Description string        `json:"description"`
 	Status      domain.Status `json:"status"`
-	Blocked     bool          `json:"blocked"`
-	Version     int64         `json:"version"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 }

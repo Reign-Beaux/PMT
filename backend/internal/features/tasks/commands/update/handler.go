@@ -1,4 +1,4 @@
-// Package update cambia los datos de una tarea con control de concurrencia.
+// Package update cambia los datos de una tarea.
 package update
 
 import (
@@ -13,15 +13,14 @@ import (
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Task, error)
-	Update(ctx context.Context, t domain.Task, expectedVersion int64) (domain.Task, error)
+	Update(ctx context.Context, t domain.Task) (domain.Task, error)
 }
 
 // Command contiene los datos de entrada.
 type Command struct {
-	ID              uuid.UUID `json:"-"`
-	Title           string    `json:"title"`
-	Description     string    `json:"description"`
-	ExpectedVersion int64     `json:"expected_version"`
+	ID          uuid.UUID `json:"-"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
 }
 
 // Result es la tarea actualizada.
@@ -31,8 +30,6 @@ type Result struct {
 	Title       string        `json:"title"`
 	Description string        `json:"description"`
 	Status      domain.Status `json:"status"`
-	Blocked     bool          `json:"blocked"`
-	Version     int64         `json:"version"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 }
@@ -47,12 +44,8 @@ func New(repo Repository) *Handler {
 	return &Handler{repo: repo}
 }
 
-// Handle actualiza la tarea si sigue en la versión esperada.
+// Handle actualiza la tarea.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
-	if cmd.ExpectedVersion <= 0 {
-		return Result{}, domain.ErrExpectedVersionRequired
-	}
-
 	t, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err
@@ -61,7 +54,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 
-	updated, err := h.repo.Update(ctx, t, cmd.ExpectedVersion)
+	updated, err := h.repo.Update(ctx, t)
 	if err != nil {
 		return Result{}, err
 	}

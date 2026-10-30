@@ -1,6 +1,6 @@
 -- name: CreateTask :one
-INSERT INTO tasks (id, stage_id, title, description, status, blocked, version)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO tasks (id, stage_id, title, description, status)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetTask :one
@@ -14,8 +14,8 @@ ORDER BY created_at, id;
 
 -- name: UpdateTask :one
 UPDATE tasks
-SET title = @title, description = @description, version = version + 1, updated_at = now()
-WHERE id = @id AND version = @expected_version
+SET title = $2, description = $3, updated_at = now()
+WHERE id = $1
 RETURNING *;
 
 -- name: DeleteTask :execrows

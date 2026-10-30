@@ -21,8 +21,6 @@ type toolTask struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
-	Blocked     bool   `json:"blocked"`
-	Version     int64  `json:"version"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -58,8 +56,6 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 			Title:       item.Title,
 			Description: item.Description,
 			Status:      string(item.Status),
-			Blocked:     item.Blocked,
-			Version:     item.Version,
 			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   item.UpdatedAt.Format(time.RFC3339),
 		})

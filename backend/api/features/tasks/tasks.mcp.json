@@ -1,7 +1,7 @@
 [
   {
     "name": "create_task",
-    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog, sin bloquear y con versión 1. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -28,9 +28,6 @@
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
-        "blocked": {
-          "type": "boolean"
-        },
         "created_at": {
           "type": "string"
         },
@@ -51,9 +48,6 @@
         },
         "updated_at": {
           "type": "string"
-        },
-        "version": {
-          "type": "integer"
         }
       },
       "required": [
@@ -62,8 +56,6 @@
         "title",
         "description",
         "status",
-        "blocked",
-        "version",
         "created_at",
         "updated_at"
       ],
@@ -93,9 +85,6 @@
           "items": {
             "additionalProperties": false,
             "properties": {
-              "blocked": {
-                "type": "boolean"
-              },
               "created_at": {
                 "type": "string"
               },
@@ -116,9 +105,6 @@
               },
               "updated_at": {
                 "type": "string"
-              },
-              "version": {
-                "type": "integer"
               }
             },
             "required": [
@@ -127,8 +113,6 @@
               "title",
               "description",
               "status",
-              "blocked",
-              "version",
               "created_at",
               "updated_at"
             ],

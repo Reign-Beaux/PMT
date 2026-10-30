@@ -38,7 +38,7 @@ func TestHandleCreatesTask(t *testing.T) {
 	if result.Title != "Revisar" || result.StageID != stageID || len(repo.saved) != 1 {
 		t.Errorf("result = %+v, guardadas = %d", result, len(repo.saved))
 	}
-	if result.Status != domain.StatusBacklog || result.Blocked || result.Version != 1 {
+	if result.Status != domain.StatusBacklog {
 		t.Errorf("result = %+v", result)
 	}
 }
@@ -69,7 +69,7 @@ func TestREST(t *testing.T) {
 		{"título vacío", path, `{"title":" "}`, nil, http.StatusBadRequest},
 		{"json inválido", path, `{`, nil, http.StatusBadRequest},
 		{"status no editable", path, `{"title":"A","status":"ready"}`, nil, http.StatusBadRequest},
-		{"blocked no editable", path, `{"title":"A","blocked":true}`, nil, http.StatusBadRequest},
+		{"blocked desconocido", path, `{"title":"A","blocked":true}`, nil, http.StatusBadRequest},
 		{"etapa inválida", "/api/stages/abc/tasks", `{"title":"A"}`, nil, http.StatusBadRequest},
 		{"etapa inexistente", path, `{"title":"A"}`, domain.ErrStageNotFound, http.StatusNotFound},
 	}

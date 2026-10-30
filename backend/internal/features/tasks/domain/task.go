@@ -17,20 +17,30 @@ var (
 	ErrTaskTitleRequired = kernel.Invalid("el título de la tarea es obligatorio")
 	// ErrStageNotFound indica que la etapa de la tarea no existe.
 	ErrStageNotFound = kernel.NotFound("etapa no encontrada")
-	// ErrExpectedVersionRequired indica que falta la versión esperada o no es válida.
-	ErrExpectedVersionRequired = kernel.Invalid("expected_version es obligatorio y debe ser mayor que 0")
-	// ErrTaskVersionConflict indica que la tarea cambió desde que se leyó.
-	ErrTaskVersionConflict = kernel.Conflict("la tarea cambió desde que se leyó: vuelve a leerla antes de reintentar")
 )
 
 // Status es el estado de una tarea.
 type Status string
 
 const (
-	// StatusBacklog es el estado inicial de toda tarea.
+	// StatusBacklog es el estado inicial de toda tarea: definida, aún no liberada.
 	StatusBacklog Status = "backlog"
-	// StatusDone indica que la tarea está cerrada.
+	// StatusReady indica que la tarea está liberada para desarrollo.
+	StatusReady Status = "ready"
+	// StatusInProgress indica que la tarea está en desarrollo.
+	StatusInProgress Status = "in_progress"
+	// StatusInReview indica que la tarea está en revisión de código.
+	StatusInReview Status = "in_review"
+	// StatusChangesRequested indica que la tarea tiene correcciones pendientes.
+	StatusChangesRequested Status = "changes_requested"
+	// StatusInQA indica que la tarea está en verificación de QA.
+	StatusInQA Status = "in_qa"
+	// StatusPendingClose indica que QA aprobó la tarea y falta el cierre.
+	StatusPendingClose Status = "pending_close"
+	// StatusDone indica que la tarea está verificada y cerrada.
 	StatusDone Status = "done"
+	// StatusCancelled indica que la tarea ya no se hará.
+	StatusCancelled Status = "cancelled"
 )
 
 // Task es la raíz del agregado de una tarea. Referencia a su etapa por ID.
@@ -40,15 +50,13 @@ type Task struct {
 	Title       string
 	Description string
 	Status      Status
-	Blocked     bool
-	Version     int64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
 // NewTask crea una tarea válida en su estado inicial.
 func NewTask(stageID uuid.UUID, title, description string) (Task, error) {
-	t := Task{ID: uuid.New(), StageID: stageID, Status: StatusBacklog, Version: 1}
+	t := Task{ID: uuid.New(), StageID: stageID, Status: StatusBacklog}
 	if err := t.Update(title, description); err != nil {
 		return Task{}, err
 	}

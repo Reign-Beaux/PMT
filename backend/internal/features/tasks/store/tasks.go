@@ -32,8 +32,6 @@ func (s *Tasks) Create(ctx context.Context, task domain.Task) (domain.Task, erro
 		Title:       task.Title,
 		Description: task.Description,
 		Status:      string(task.Status),
-		Blocked:     task.Blocked,
-		Version:     task.Version,
 	})
 	if postgres.IsForeignKeyViolation(err) {
 		return domain.Task{}, domain.ErrStageNotFound
@@ -69,18 +67,15 @@ func (s *Tasks) List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, err
 	return tasks, nil
 }
 
-// Update guarda los cambios de una tarea si sigue en expectedVersion. Si ninguna
-// fila coincide, informa un conflicto: quien relea verá la versión nueva, o un
-// 404 si otra operación borró la tarea.
-func (s *Tasks) Update(ctx context.Context, task domain.Task, expectedVersion int64) (domain.Task, error) {
+// Update guarda los cambios de una tarea.
+func (s *Tasks) Update(ctx context.Context, task domain.Task) (domain.Task, error) {
 	row, err := s.queries.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-		ID:              task.ID,
-		Title:           task.Title,
-		Description:     task.Description,
-		ExpectedVersion: expectedVersion,
+		ID:          task.ID,
+		Title:       task.Title,
+		Description: task.Description,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Task{}, domain.ErrTaskVersionConflict
+		return domain.Task{}, domain.ErrTaskNotFound
 	}
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("actualizar tarea: %w", err)
@@ -107,8 +102,6 @@ func toDomain(row sqlcgen.Task) domain.Task {
 		Title:       row.Title,
 		Description: row.Description,
 		Status:      domain.Status(row.Status),
-		Blocked:     row.Blocked,
-		Version:     row.Version,
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}
