@@ -1,2 +1,0 @@
-ALTER TABLE issues DROP COLUMN due_date;
-ALTER TABLE issues DROP COLUMN type;

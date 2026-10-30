@@ -1,0 +1,18 @@
+version: "2"
+overrides:
+  go:
+    overrides:
+      - db_type: uuid
+        go_type: github.com/google/uuid.UUID
+      - db_type: timestamptz
+        go_type: time.Time
+sql:
+  - engine: postgresql
+    schema: internal/platform/postgres/migrations
+    queries: internal/features/work/store/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/features/work/store/sqlcgen
+        sql_package: pgx/v5
+        emit_empty_slices: true

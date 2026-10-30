@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: PMT - Proyectos
+  version: 0.1.0
+paths:
+  /api/projects:
+    get:
+      summary: Lista los proyectos, del más reciente al más antiguo
+      responses:
+        "200":
+          description: Proyectos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      summary: Crea un proyecto
+      requestBody:
+        $ref: "#/components/requestBodies/ProjectInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/projects/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Obtiene un proyecto
+      responses:
+        "200":
+          $ref: "#/components/responses/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      summary: Reemplaza los datos editables de un proyecto
+      requestBody:
+        $ref: "#/components/requestBodies/ProjectInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      summary: Elimina un proyecto
+      responses:
+        "204":
+          description: Proyecto eliminado
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  requestBodies:
+    ProjectInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+  responses:
+    Project:
+      description: Proyecto
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Project"
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: string
+  schemas:
+    Project:
+      type: object
+      required: [id, name, description, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

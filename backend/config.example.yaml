@@ -1,0 +1,5 @@
+database:
+  url: "postgres://usuario:contraseña@localhost:5432/pmt?sslmode=disable"
+
+server:
+  addr: ":8080"
