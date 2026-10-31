@@ -61,6 +61,30 @@ Un comentario junto a `name`, `title` o `description` se rechaza, porque YAML lo
 | Salida | `project_id`, `project_name`, `stage_count` y `task_count`. |
 | Interfaz | Solo MCP, sin ruta REST. |
 
+## Importar una etapa
+
+La herramienta MCP `import_stage` crea una etapa con sus tareas en un proyecto en `working`. La etapa nace en su planning propio, como con `add_stage`: sus tareas no generan registros y su registro `add` se escribe al salir de `planning`.
+
+```yaml
+stage:
+  name: "Pagos"
+  description: "Cobro con tarjeta."
+  tasks:
+    - title: "Crear tabla de pagos"
+      description: "Debe relacionarse con pedidos."
+```
+
+| Aspecto | Regla |
+| --- | --- |
+| Entrada | `project_id`, `path`, `reason` y `requested_by`. |
+| Proyecto | Debe estar en `working`; si no, responde `el proyecto no está en working`. |
+| Formato | Las mismas reglas de escritura y de claves. `name` y `description` son obligatorios; `tasks` puede faltar. |
+| Atomicidad | Valida el fichero completo y guarda en una sola transacción. Si algo falla, no se crea nada. Importar dos veces crea dos etapas. |
+| Salida | `project_id`, `stage_id`, `stage_name` y `task_count`. |
+| Interfaz | Solo MCP, sin ruta REST. |
+
+Los errores indican su ubicación como `etapa: ...` y `tarea 2: ...`.
+
 ## Errores
 
 Los errores del fichero son `kernel.Invalid` e indican su ubicación:

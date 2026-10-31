@@ -96,6 +96,40 @@ func (s *Changes) Retire(ctx context.Context, change domain.Change) (domain.Chan
 	return saved, nil
 }
 
+// LeavePlanning saca a la etapa de su planning propio: escribe su registro add,
+// versión 1, guarda el nuevo status y limpia los datos pendientes. Dos salidas
+// simultáneas chocan en UNIQUE (stage_id, version).
+func (s *Changes) LeavePlanning(ctx context.Context, stage domain.Stage, change domain.Change) (domain.Stage, error) {
+	var updated domain.Stage
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		queries := sqlcgen.New(tx)
+		if _, err := queries.LockStage(ctx, stage.ID); errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrStageNotFound
+		} else if err != nil {
+			return fmt.Errorf("bloquear etapa: %w", err)
+		}
+		if _, err := insertChange(ctx, queries, change, 1); err != nil {
+			return err
+		}
+		err := queries.LeaveStagePlanning(ctx, sqlcgen.LeaveStagePlanningParams{
+			ID:     stage.ID,
+			Status: string(stage.Status),
+		})
+		if err != nil {
+			return fmt.Errorf("salir de planning propio: %w", err)
+		}
+		updated, err = NewStages(tx).Get(ctx, stage.ID)
+		return err
+	})
+	if postgres.IsUniqueViolation(err) {
+		return domain.Stage{}, domain.ErrStageLeftPlanning
+	}
+	if err != nil {
+		return domain.Stage{}, err
+	}
+	return updated, nil
+}
+
 // List devuelve el historial de las etapas de un proyecto, incluidas las retiradas.
 // Si stageID no es nulo, solo el de esa etapa.
 func (s *Changes) List(ctx context.Context, projectID uuid.UUID, stageID *uuid.UUID) ([]domain.History, error) {

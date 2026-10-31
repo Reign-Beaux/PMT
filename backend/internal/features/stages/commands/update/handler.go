@@ -17,10 +17,11 @@ type Repository interface {
 	Update(ctx context.Context, s domain.Stage) (domain.Stage, error)
 }
 
-// ProjectChecker confirma que un proyecto está en planning. Lo implementa la
-// feature projects, conectada en app.
+// ProjectChecker confirma el status de un proyecto. Lo implementa la feature
+// projects, conectada en app.
 type ProjectChecker interface {
 	EnsurePlanning(ctx context.Context, projectID uuid.UUID) error
+	EnsureWorking(ctx context.Context, projectID uuid.UUID) error
 }
 
 // Command contiene los datos de entrada.
@@ -40,6 +41,9 @@ type Result struct {
 	Status      domain.Status `json:"status"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
 }
 
 // Handler ejecuta la operación.
@@ -59,15 +63,8 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := h.projects.EnsurePlanning(ctx, s.ProjectID); err != nil {
+	if err := h.ensureEditable(ctx, s); err != nil {
 		return Result{}, err
-	}
-	hasChanges, err := h.repo.HasChanges(ctx, cmd.ID)
-	if err != nil {
-		return Result{}, err
-	}
-	if hasChanges {
-		return Result{}, domain.ErrStageHasChanges
 	}
 	if err := s.Update(cmd.Name, cmd.Description); err != nil {
 		return Result{}, err
@@ -78,4 +75,22 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	return Result(updated), nil
+}
+
+// ensureEditable aplica la regla de planning propio o la del proyecto, según la etapa.
+func (h *Handler) ensureEditable(ctx context.Context, s domain.Stage) error {
+	if s.InOwnPlanning() {
+		return h.projects.EnsureWorking(ctx, s.ProjectID)
+	}
+	if err := h.projects.EnsurePlanning(ctx, s.ProjectID); err != nil {
+		return err
+	}
+	hasChanges, err := h.repo.HasChanges(ctx, s.ID)
+	if err != nil {
+		return err
+	}
+	if hasChanges {
+		return domain.ErrStageHasChanges
+	}
+	return nil
 }

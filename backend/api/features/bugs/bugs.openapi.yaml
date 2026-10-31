@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: PMT - Bugs
+  version: 0.1.0
+paths:
+  /api/projects/{project_id}/bugs:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista los bugs de un proyecto por fecha de creación, con cualquier status del proyecto
+      responses:
+        "200":
+          description: Bugs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Registra un bug en status reported si el proyecto está en working
+      requestBody:
+        $ref: "#/components/requestBodies/BugInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/bugs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Corrige los datos de un bug si el proyecto está en working; no cambia su status
+      requestBody:
+        $ref: "#/components/requestBodies/BugInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+components:
+  requestBodies:
+    BugInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [title, steps_to_reproduce, product_version]
+            properties:
+              title:
+                type: string
+              description:
+                type: string
+              steps_to_reproduce:
+                type: string
+              product_version:
+                type: string
+                description: Versión del producto donde apareció, de texto libre.
+  responses:
+    Bug:
+      description: Bug
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Bug"
+    Error:
+      description: Error de negocio
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    BugStatus:
+      type: string
+      enum: [reported, confirmed, in_progress, in_review, changes_requested, in_qa, done, rejected]
+    Bug:
+      type: object
+      required: [id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        steps_to_reproduce:
+          type: string
+        product_version:
+          type: string
+        status:
+          $ref: "#/components/schemas/BugStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

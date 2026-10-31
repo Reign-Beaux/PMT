@@ -123,3 +123,14 @@ func TestREST(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
+	repo := newRepo()
+	repo.current.AddReason = "Petición"
+
+	_, err := New(repo).Handle(context.Background(), Command{ID: repo.current.ID, Name: "A", Reason: "M", RequestedBy: "PM"})
+
+	if !errors.Is(err, domain.ErrStageInOwnPlanning) || len(repo.changes) != 0 {
+		t.Errorf("err = %v, cambios = %+v", err, repo.changes)
+	}
+}

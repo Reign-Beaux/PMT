@@ -27,11 +27,13 @@ func NewStages(db sqlcgen.DBTX) *Stages {
 // Create guarda una etapa nueva al final de su proyecto.
 func (s *Stages) Create(ctx context.Context, stage domain.Stage) (domain.Stage, error) {
 	row, err := s.queries.CreateStage(ctx, sqlcgen.CreateStageParams{
-		ID:          stage.ID,
-		ProjectID:   stage.ProjectID,
-		Name:        stage.Name,
-		Description: stage.Description,
-		Status:      string(stage.Status),
+		ID:             stage.ID,
+		ProjectID:      stage.ProjectID,
+		Name:           stage.Name,
+		Description:    stage.Description,
+		Status:         string(stage.Status),
+		AddReason:      stage.AddReason,
+		AddRequestedBy: stage.AddRequestedBy,
 	})
 	switch {
 	case postgres.IsForeignKeyViolation(err):
@@ -124,15 +126,26 @@ func (s *Stages) HasChanges(ctx context.Context, id uuid.UUID) (bool, error) {
 	return has, nil
 }
 
+// HasAdd indica si la etapa tiene un registro add, es decir, si nació con add_stage.
+func (s *Stages) HasAdd(ctx context.Context, id uuid.UUID) (bool, error) {
+	has, err := s.queries.HasStageAdd(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("consultar registro add: %w", err)
+	}
+	return has, nil
+}
+
 func toDomain(row sqlcgen.Stage) domain.Stage {
 	return domain.Stage{
-		ID:          row.ID,
-		ProjectID:   row.ProjectID,
-		Name:        row.Name,
-		Description: row.Description,
-		Position:    int(row.Position),
-		Status:      domain.Status(row.Status),
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:             row.ID,
+		ProjectID:      row.ProjectID,
+		Name:           row.Name,
+		Description:    row.Description,
+		Position:       int(row.Position),
+		Status:         domain.Status(row.Status),
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		AddReason:      row.AddReason.String,
+		AddRequestedBy: row.AddRequestedBy.String,
 	}
 }

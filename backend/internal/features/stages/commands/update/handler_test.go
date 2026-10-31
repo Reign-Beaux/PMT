@@ -17,11 +17,16 @@ import (
 var errNotPlanning = kernel.Conflict("el proyecto no está en planning")
 
 type fakeProjects struct {
-	err error
+	err     error
+	working error
 }
 
 func (p fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
 	return p.err
+}
+
+func (p fakeProjects) EnsureWorking(context.Context, uuid.UUID) error {
+	return p.working
 }
 
 type fakeRepo struct {
@@ -150,5 +155,48 @@ func TestREST(t *testing.T) {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func ownPlanningRepo(t *testing.T) (*fakeRepo, uuid.UUID) {
+	t.Helper()
+	s, err := domain.NewOwnPlanningStage(uuid.New(), "Pagos", "Inicial", "Petición", "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}, s.ID
+}
+
+func TestHandleEditsStageInOwnPlanning(t *testing.T) {
+	repo, id := ownPlanningRepo(t)
+
+	result, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Name: "Cobros"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Name != "Cobros" || result.AddReason != "Petición" {
+		t.Errorf("result = %+v", result)
+	}
+}
+
+func TestHandleRejectsOwnPlanningOutsideWorking(t *testing.T) {
+	repo, id := ownPlanningRepo(t)
+	errNotWorking := kernel.Conflict("el proyecto no está en working")
+
+	_, err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), Command{ID: id, Name: "Cobros"})
+
+	if !errors.Is(err, errNotWorking) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestHandleKeepsProjectRuleForStageDefinedInPlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Name: "Cobros"})
+
+	if !errors.Is(err, errNotPlanning) {
+		t.Errorf("status planning no debe bastar: err = %v", err)
 	}
 }

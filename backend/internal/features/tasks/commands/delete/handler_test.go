@@ -19,7 +19,7 @@ type fakeStages struct {
 	err error
 }
 
-func (s fakeStages) EnsureProjectPlanning(context.Context, uuid.UUID) error {
+func (s fakeStages) EnsureTasksEditable(context.Context, uuid.UUID) error {
 	return s.err
 }
 

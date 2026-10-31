@@ -1,6 +1,5 @@
 [
   {
-    "name": "import_project",
     "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
     "inputSchema": {
       "additionalProperties": false,
@@ -15,6 +14,7 @@
       ],
       "type": "object"
     },
+    "name": "import_project",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -35,6 +35,62 @@
         "project_id",
         "project_name",
         "stage_count",
+        "task_count"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Ruta absoluta del fichero YAML, en la máquina donde corre pmt-server",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto, que debe estar en working",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo de la etapa",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "path",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "import_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_name": {
+          "type": "string"
+        },
+        "task_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project_id",
+        "stage_id",
+        "stage_name",
         "task_count"
       ],
       "type": "object"

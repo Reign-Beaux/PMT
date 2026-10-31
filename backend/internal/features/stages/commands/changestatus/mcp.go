@@ -26,13 +26,16 @@ type toolOutput struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_stage_status",
-		Description: "Cambia el status de una etapa de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Usa list_stages para obtener el ID de la etapa y su status actual.",
+		Description: "Cambia el status de una etapa de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Usa list_stages para obtener el ID de la etapa y su status actual.",
 	}, h.callTool)
 }
 
@@ -56,5 +59,8 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Status:      string(result.Status),
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
+
+		AddReason:      result.AddReason,
+		AddRequestedBy: result.AddRequestedBy,
 	}, nil
 }

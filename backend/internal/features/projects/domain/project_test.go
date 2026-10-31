@@ -117,3 +117,14 @@ func TestEnsurePlanning(t *testing.T) {
 		}
 	}
 }
+
+func TestIsWorking(t *testing.T) {
+	if !(Project{Status: StatusWorking}).IsWorking() {
+		t.Error("working debe responder true")
+	}
+	for _, status := range []Status{StatusPlanning, StatusStandBy, StatusInDev, StatusStopped, StatusCancelled} {
+		if (Project{Status: status}).IsWorking() {
+			t.Errorf("%s debe responder false", status)
+		}
+	}
+}

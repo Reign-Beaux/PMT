@@ -14,6 +14,7 @@ import (
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Stage, error)
 	UpdateStatus(ctx context.Context, s domain.Stage) (domain.Stage, error)
+	LeavePlanning(ctx context.Context, s domain.Stage, change domain.Change) (domain.Stage, error)
 }
 
 // TaskChecker indica si todas las tareas de una etapa están terminadas.
@@ -38,6 +39,9 @@ type Result struct {
 	Status      domain.Status `json:"status"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
 }
 
 // Handler ejecuta la operación.
@@ -51,7 +55,8 @@ func New(repo Repository, tasks TaskChecker) *Handler {
 	return &Handler{repo: repo, tasks: tasks}
 }
 
-// Handle cambia el status de la etapa. Solo la cierra si todas sus tareas están terminadas.
+// Handle cambia el status de la etapa. Solo la cierra si todas sus tareas están
+// terminadas. Al salir de su planning propio escribe el registro add pendiente.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -59,6 +64,17 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	}
 	if err := s.ChangeStatus(cmd.Status); err != nil {
 		return Result{}, err
+	}
+	if s.InOwnPlanning() {
+		change, err := domain.NewChange(s, domain.ChangeAdd, s.AddReason, s.AddRequestedBy)
+		if err != nil {
+			return Result{}, err
+		}
+		updated, err := h.repo.LeavePlanning(ctx, s, change)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result(updated), nil
 	}
 	if s.Status == domain.StatusDone {
 		allDone, err := h.tasks.AllDone(ctx, s.ID)

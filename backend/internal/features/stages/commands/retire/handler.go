@@ -51,6 +51,9 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	if err := stage.EnsureHistoryRule(); err != nil {
+		return Result{}, err
+	}
 	hasActive, err := h.tasks.HasActive(ctx, stage.ID)
 	if err != nil {
 		return Result{}, err

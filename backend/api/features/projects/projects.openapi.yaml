@@ -55,7 +55,7 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina un proyecto en planning y sin etapas, activas o retiradas
+      summary: Elimina un proyecto en planning, sin bugs ni etapas, activas o retiradas
       responses:
         "204":
           description: Proyecto eliminado

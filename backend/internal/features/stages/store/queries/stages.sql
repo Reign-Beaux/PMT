@@ -1,12 +1,12 @@
 -- name: CreateStage :one
-INSERT INTO stages (id, project_id, name, description, status, position)
-SELECT @id::uuid, @project_id::uuid, @name::text, @description::text, @status::text, COALESCE(MAX(position), 0) + 1
+INSERT INTO stages (id, project_id, name, description, status, position, add_reason, add_requested_by)
+SELECT @id::uuid, @project_id::uuid, @name::text, @description::text, @status::text, COALESCE(MAX(position), 0) + 1, NULLIF(@add_reason::text, ''), NULLIF(@add_requested_by::text, '')
 FROM stages
 WHERE project_id = @project_id::uuid
 RETURNING *;
 
 -- name: GetStage :one
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -22,7 +22,7 @@ WHERE id = $1 AND retired_at IS NULL
 FOR UPDATE;
 
 -- name: ListStages :many
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -46,7 +46,7 @@ WITH updated AS (
     WHERE stages.id = $1
     RETURNING *
 )
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
 FROM updated s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -62,4 +62,9 @@ WHERE id = $1;
 -- name: RetireStage :exec
 UPDATE stages
 SET retired_at = now(), updated_at = now()
+WHERE id = $1;
+
+-- name: LeaveStagePlanning :exec
+UPDATE stages
+SET status = $2, add_reason = NULL, add_requested_by = NULL, updated_at = now()
 WHERE id = $1;

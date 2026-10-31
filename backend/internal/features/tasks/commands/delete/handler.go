@@ -16,10 +16,10 @@ type Repository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
-// StageChecker confirma que el proyecto de una etapa está en planning. Lo
-// implementa la feature stages, conectada en app.
+// StageChecker confirma que las tareas de una etapa se pueden editar
+// directamente. Lo implementa la feature stages, conectada en app.
 type StageChecker interface {
-	EnsureProjectPlanning(ctx context.Context, stageID uuid.UUID) error
+	EnsureTasksEditable(ctx context.Context, stageID uuid.UUID) error
 }
 
 // Handler ejecuta la operación.
@@ -39,7 +39,7 @@ func (h *Handler) Handle(ctx context.Context, id uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if err := h.stages.EnsureProjectPlanning(ctx, t.StageID); err != nil {
+	if err := h.stages.EnsureTasksEditable(ctx, t.StageID); err != nil {
 		return err
 	}
 	hasChanges, err := h.repo.HasChanges(ctx, id)

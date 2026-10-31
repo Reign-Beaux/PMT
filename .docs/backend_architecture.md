@@ -198,12 +198,14 @@ Cada feature corresponde a un agregado principal:
 | `reviews` | Revisiones de CR y hallazgos. |
 | `qa` | Planes QAP, casos y ejecuciones de QA. |
 | `activity` | Auditoría, comentarios y bloqueos. |
-| `imports` | Carga de un proyecto completo desde un fichero. No tiene agregado propio; ver [Feature de composición](#feature-de-composición-imports). |
+| `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
+| `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#feature-de-composición-imports). |
 
 Las dependencias entre features van, en general, en este sentido:
 
 ```text
 reviews, qa → tasks → stages → projects
+bugs → projects
 tasks → agents
 todas → activity
 ```
@@ -241,11 +243,11 @@ Ninguna feature lee las tablas ni importa los detalles internos de otra.
 
 ### Feature de composición: `imports`
 
-`imports` es una excepción a las reglas anteriores. Crea un proyecto, sus etapas y sus tareas como una unidad, sin agregado propio, y por eso:
+`imports` es una excepción a las reglas anteriores. Crea un proyecto con sus etapas y tareas, o una etapa con sus tareas, como una unidad, sin agregado propio, y por eso:
 
-- `imports/domain` y `importproject/handler.go` usan el `domain` de `projects`, `stages` y `tasks`, y aplican sus constructores para validar.
+- `imports/domain` y los handlers de `importproject` e `importstage` usan el `domain` de `projects`, `stages` y `tasks`, y aplican sus constructores para validar.
 - `imports/store` usa el `store` de esas tres features sobre una sola `pgx.Tx`, porque aceptan `sqlcgen.DBTX`. No usa `kernel.Transactor`, aún pendiente.
-- `handler.go` lee el fichero con `os` e interpreta el YAML con `gopkg.in/yaml.v3`.
+- `imports/file` lee el fichero con `os` e interpreta el YAML con `gopkg.in/yaml.v3`. Lo comparten ambas slices, que no se importan entre sí; es un paquete propio porque `domain` no conoce formatos de fichero.
 
 Ninguna otra feature importa `imports`, así que no hay ciclos. La excepción se limita a esta feature. El formato del fichero está en `importar_proyectos.md`.
 
@@ -339,9 +341,11 @@ Un proyecto solo admite estas operaciones, por REST o por MCP, mientras está en
 
 `update_project` es la excepción: fuera de `planning`, `PUT /api/projects/{id}` cambia `name` y `description`, y `Project.Update` responde `kernel.Conflict` si `product_version` difiere de la actual. Enviar el mismo valor es válido.
 
-Fuera de `planning` responden `kernel.Conflict` con `el proyecto no está en planning`. Se comprueba después de confirmar que el elemento existe y antes de validar sus datos. Dentro de `planning` siguen vigentes `el proyecto tiene etapas, activas o retiradas` y `la etapa tiene tareas, activas o retiradas`: lo retirado cuenta, porque sus filas siguen referenciando al padre. Una etapa o tarea con historial responde `la etapa tiene historial de cambios` o `la tarea tiene historial de cambios`, aunque el proyecto haya vuelto a `planning`.
+Fuera de `planning` responden `kernel.Conflict` con `el proyecto no está en planning`. Se comprueba después de confirmar que el elemento existe y antes de validar sus datos. Dentro de `planning` siguen vigentes `el proyecto tiene etapas o bugs, activos o retirados` y `la etapa tiene tareas, activas o retiradas`: lo retirado cuenta, porque sus filas siguen referenciando al padre. Una etapa o tarea con historial responde `la etapa tiene historial de cambios` o `la tarea tiene historial de cambios`, aunque el proyecto haya vuelto a `planning`.
 
-La regla es `Project.EnsurePlanning`, en `projects/domain`, y la aplican los handlers de `commands/update`, `commands/delete` y `commands/create`. `projects` la usa directamente en `delete`. `stages` define `ProjectChecker`, que implementa `projects.Checker` sobre la query `projects/queries/checkplanning`. `tasks` define `StageChecker`, que implementa `stages.Checker`: busca la etapa y pregunta por su proyecto, de modo que `tasks` no conoce `projects`. `checkplanning` solo lee y delega la decisión en `domain`. Todo se conecta en `registerFeatures`.
+Las etapas en su planning propio son la excepción a esta sección; ver [Planning propio de una etapa](#planning-propio-de-una-etapa).
+
+La regla es `Project.EnsurePlanning`, en `projects/domain`, y la aplican los handlers de `commands/update`, `commands/delete` y `commands/create`. `projects` la usa directamente en `delete`. `stages` define `ProjectChecker`, que implementa `projects.Checker` sobre la query `projects/queries/checkplanning`. `tasks` define `StageChecker`, que implementa `stages.Checker` sobre la query `stages/queries/checktasks`: busca la etapa y pregunta por su proyecto, de modo que `tasks` no conoce `projects`. `checkplanning` solo lee y delega la decisión en `domain`. Todo se conecta en `registerFeatures`.
 
 ## Cambios de etapas y tareas
 
@@ -349,19 +353,65 @@ Fuera de `planning`, las etapas y tareas cambian mediante registros inmutables, 
 
 | Tipo | `kind` | Efecto | MCP | REST |
 | --- | --- | --- | --- | --- |
-| Agregar | `add` | Nace al final, versión 1 | `add_stage`, `add_task` | `POST /api/projects/{project_id}/stages/add`, `POST /api/stages/{stage_id}/tasks/add` |
+| Agregar | `add` | Nace al final, versión 1, salvo el planning propio | `add_stage`, `add_task` | `POST /api/projects/{project_id}/stages/add`, `POST /api/stages/{stage_id}/tasks/add` |
 | Editar | `edit` | Nueva versión | `revise_stage`, `revise_task` | `POST /api/stages/{id}/revise`, `POST /api/tasks/{id}/revise` |
 | Retirar | `retire` | Se marca `retired_at`, sin borrar nada | `retire_stage`, `retire_task` | `POST /api/stages/{id}/retire`, `POST /api/tasks/{id}/retire` |
 
 - **Versiones:** `version` numera los cambios desde 1; una tarea con dos cambios tiene exactamente 2 registros. Lo agregado con `add_*` tiene su registro `add` como versión 1. Solo se versionan nombre o título y descripción.
-- **Lectura:** toda lectura devuelve la última versión: el contenido del cambio más reciente, o el de la fila si no tiene cambios. `GetStage`, `GetTask`, `ListStages`, `ListTasks` y `UpdateStageStatus` lo resuelven con `LEFT JOIN LATERAL`. `status`, `position` y `updated_at` salen siempre de la fila. La fila solo se escribe en `planning` y sin cambios, porque `update_*` y `delete_*` rechazan lo que tiene historial.
+- **Lectura:** toda lectura devuelve la última versión: el contenido del cambio más reciente, o el de la fila si no tiene cambios. `GetStage`, `GetTask`, `ListStages`, `ListTasks` y `UpdateStageStatus` lo resuelven con `LEFT JOIN LATERAL`. `status`, `position` y `updated_at` salen siempre de la fila. La fila solo se escribe en `planning` o en el planning propio, y sin cambios, porque `update_*` y `delete_*` rechazan lo que tiene historial.
 - **Historial:** `list_stage_changes` (`GET /api/projects/{project_id}/stage-changes?stage_id=`) y `list_task_changes` (`GET /api/stages/{stage_id}/task-changes?task_id=`). Para cada elemento con al menos un cambio devuelven `original` (contenido de la fila, con `created_at`) y `changes` en orden de `version`. Se consulta por padre porque lo retirado no aparece en `list_*`. Sin registros responde lista vacía.
 - **Retirado:** `GetStage`, `GetTask`, `ListStages` y `ListTasks` lo excluyen, así que responde `NotFound` en todas las operaciones y el retiro no se deshace. Su `status` y su `position` no cambian. `position` nunca se renumera ni se reutiliza.
 - **Cierre:** las tareas retiradas no cuentan para pasar a `done`; las agregadas nacen en `backlog` y sí cuentan. Agregar a una etapa en `done` no la reabre.
 - **Retirar una etapa:** con tareas activas responde `kernel.Conflict`. `stages` define `retire.TaskChecker`, que implementa `tasks.Checker` sobre `tasks/queries/hasactive`.
-- **Status del proyecto:** `add_*`, `revise_*` y `retire_*` funcionan con cualquiera. Así, un elemento con historial se sigue pudiendo cambiar si el proyecto vuelve a `planning`.
+- **Status del proyecto:** `add_*`, `revise_*` y `retire_*` funcionan con cualquiera, salvo sobre una etapa en su planning propio. Así, un elemento con historial se sigue pudiendo cambiar si el proyecto vuelve a `planning`.
 - **Inmutabilidad:** triggers de PostgreSQL rechazan `UPDATE`, `DELETE` y `TRUNCATE` en ambas tablas, y `ON DELETE RESTRICT` impide borrar un elemento con historial. No hay consultas, comandos ni rutas que los modifiquen.
 - **Transacción:** `store/changes.go` escribe el registro, y en `retire_*` también `retired_at`, con `pgx.BeginFunc`, porque `kernel.Transactor` sigue pendiente. Bloquea el elemento con `FOR UPDATE` para numerar las versiones.
+
+## Planning propio de una etapa
+
+Una etapa pedida con el proyecto en `working` se planea por sí sola, sin que el proyecto cambie de status. Está en **planning propio** si su fila tiene `add_reason` y `add_requested_by`: el status `planning` no basta, porque también lo tienen las etapas definidas en el `planning` del proyecto, que siguen sin poder editarse. `Stage.InOwnPlanning` hace la distinción.
+
+`add_stage` e `import_stage` guardan motivo y solicitante en la fila y no escriben en `stage_changes`, porque el registro es inmutable y `ON DELETE RESTRICT` impediría editar o eliminar la etapa. Al salir, `Changes.LeavePlanning` escribe en una transacción el `add` versión 1 con el contenido definitivo, cambia el status y vuelve a `NULL` ambas columnas. Por eso `changed_at` del `add` es la fecha de salida, y una etapa eliminada en su planning propio no deja rastro. Con el proyecto en otro status, `add_stage` escribe el `add` de inmediato.
+
+Cualquier transición desde `planning` es la salida, y es definitiva: si la etapa vuelve al status `planning`, sigue bajo historial.
+
+| Operación | En planning propio | Después de salir |
+| --- | --- | --- |
+| `update_stage`, `delete_stage` | Con proyecto en `working` | `el proyecto no está en planning`, o `la etapa tiene historial de cambios` si el proyecto volvió a `planning` |
+| `create_task`, `update_task`, `delete_task` | Con proyecto en `working`, sin registros | Rechazadas, aunque el proyecto vuelva a `planning` |
+| `add_task`, `revise_*`, `retire_*` | `la etapa está en su propio planning` | Permitidas |
+| `change_stage_status` | Escribe el `add` al salir | Sin cambios |
+
+- Fuera de `working`, las operaciones permitidas responden `el proyecto no está en working`, aunque el proyecto vuelva a `planning`. `change_stage_status` sigue disponible, así que la etapa no queda atascada.
+- Las tareas creadas en esta fase quedan como originales en su fila, sin registros.
+- Toda etapa con registro `add` rechaza `create_task`, `update_task` y `delete_task`, aunque el proyecto vuelva a `planning`. `add_reason` y `add_requested_by` aparecen en las salidas solo durante el planning propio.
+- `tasks` lo consulta con `StageChecker`: `EnsureTasksEditable` en `create`, `update` y `delete`, y `EnsureHistoryRule` en `add`, `revise` y `retire`. `stages` pide `IsWorking` y `EnsureWorking` a `projects.Checker`, sobre la query `projects/queries/checkworking`.
+- Si `update_*` coincide con la salida, el registro gana en la lectura. Aplica la regla de [Concurrencia](#concurrencia).
+
+## Bugs
+
+Un bug pertenece a un proyecto, sin etapa: `tasks` no cambia y los bugs no afectan al cierre de etapas. Guarda `steps_to_reproduce` y `product_version`, la versión donde apareció, de texto libre y sin compararla con la del proyecto.
+
+| Comando | REST | Status del proyecto |
+| --- | --- | --- |
+| `create_bug` | `POST /api/projects/{project_id}/bugs` | Solo `working` |
+| `update_bug` | `PUT /api/bugs/{id}` | Solo `working` |
+| `list_bugs` | `GET /api/projects/{project_id}/bugs` | Cualquiera |
+
+Fuera de `working` responden `el proyecto no está en working`. `update_bug` corrige el reporte y no cambia el status. No hay comando para eliminar un bug ni para cambiar su status. `delete_project` se bloquea si el proyecto tiene bugs.
+
+Todo bug nace en `reported`. Estos son sus status, por ahora sin transiciones:
+
+| Status | Significado |
+| --- | --- |
+| `reported` | Reportado, aún sin confirmar. |
+| `confirmed` | Reproducido, pendiente de corregir. |
+| `in_progress` | En corrección. |
+| `in_review` | En revisión de código. |
+| `changes_requested` | Con correcciones pendientes. |
+| `in_qa` | En verificación de QA. |
+| `done` | Corregido y verificado. |
+| `rejected` | No se corregirá: no se reproduce, está duplicado o no es un bug. |
 
 ## Transacciones
 
@@ -392,9 +442,9 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task`, `list_tasks`, `update_task` y `delete_task`, y la feature `imports` con la herramienta MCP `import_project`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`. El `status` de una tarea se devuelve, pero aún no se puede cambiar.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task`, `list_tasks`, `update_task` y `delete_task`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug` y `list_bugs`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio. El `status` de una tarea o de un bug se devuelve, pero aún no se puede cambiar.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
-- **Excepción temporal:** los commands de `projects`, `stages` y `tasks` no tienen autorización, auditoría ni, salvo los de cambios, transacción. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen autorización, auditoría ni, salvo los de cambios, transacción. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
 ## Orden de construcción

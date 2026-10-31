@@ -16,6 +16,12 @@ type Repository interface {
 	Revise(ctx context.Context, change domain.Change) (domain.Task, domain.Change, error)
 }
 
+// StageChecker confirma que la etapa de una tarea admite cambios con historial.
+// Lo implementa la feature stages, conectada en app.
+type StageChecker interface {
+	EnsureHistoryRule(ctx context.Context, id uuid.UUID) error
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID          uuid.UUID `json:"-"`
@@ -39,18 +45,22 @@ type Result struct {
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo   Repository
+	stages StageChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, stages StageChecker) *Handler {
+	return &Handler{repo: repo, stages: stages}
 }
 
 // Handle registra el cambio con la nueva versión. La fila conserva el original.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	task, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := h.stages.EnsureHistoryRule(ctx, task.StageID); err != nil {
 		return Result{}, err
 	}
 	if err := task.Update(cmd.Title, cmd.Description); err != nil {

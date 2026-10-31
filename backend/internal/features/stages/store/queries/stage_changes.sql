@@ -10,6 +10,9 @@ WHERE stage_id = $1;
 -- name: HasStageChanges :one
 SELECT EXISTS (SELECT 1 FROM stage_changes WHERE stage_id = $1);
 
+-- name: HasStageAdd :one
+SELECT EXISTS (SELECT 1 FROM stage_changes WHERE stage_id = $1 AND kind = 'add');
+
 -- name: ListStageChanges :many
 SELECT sqlc.embed(c), e.name AS original_name, e.description AS original_description, e.created_at AS original_created_at
 FROM stage_changes c

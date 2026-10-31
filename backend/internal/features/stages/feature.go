@@ -15,6 +15,7 @@ import (
 	"pmt/internal/features/stages/commands/retire"
 	"pmt/internal/features/stages/commands/revise"
 	"pmt/internal/features/stages/commands/update"
+	"pmt/internal/features/stages/queries/checktasks"
 	"pmt/internal/features/stages/queries/get"
 	"pmt/internal/features/stages/queries/list"
 	"pmt/internal/features/stages/queries/listchanges"
@@ -28,9 +29,15 @@ type TaskChecker interface {
 	retire.TaskChecker
 }
 
+// ProjectChecker reúne lo que las slices piden a la feature projects.
+type ProjectChecker interface {
+	add.ProjectChecker
+	update.ProjectChecker
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature.
 // tasks y projects los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects update.ProjectChecker) {
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker) {
 	repo := store.NewStages(db)
 	changes := store.NewChanges(db)
 
@@ -42,7 +49,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	updateStage.Register(mux)
 	updateStage.RegisterTool(tools)
 
-	changeStatus := changestatus.New(repo, tasks)
+	changeStatus := changestatus.New(struct {
+		*store.Stages
+		*store.Changes
+	}{repo, changes}, tasks)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
@@ -56,7 +66,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	listStages.Register(mux)
 	listStages.RegisterTool(tools)
 
-	addStage := add.New(changes)
+	addStage := add.New(struct {
+		*store.Stages
+		*store.Changes
+	}{repo, changes}, projects)
 	addStage.Register(mux)
 	addStage.RegisterTool(tools)
 
@@ -79,16 +92,17 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	listChanges.RegisterTool(tools)
 }
 
-// Checker permite a otras features confirmar que una etapa existe y que su
-// proyecto está en planning.
+// Checker permite a otras features confirmar que una etapa existe y qué
+// operaciones admiten sus tareas.
 type Checker struct {
-	get      *get.Handler
-	projects update.ProjectChecker
+	get   *get.Handler
+	tasks *checktasks.Handler
 }
 
-// NewChecker crea el verificador sobre la query get.
-func NewChecker(db sqlcgen.DBTX, projects update.ProjectChecker) *Checker {
-	return &Checker{get: get.New(store.NewStages(db)), projects: projects}
+// NewChecker crea el verificador sobre las queries get y checktasks.
+func NewChecker(db sqlcgen.DBTX, projects ProjectChecker) *Checker {
+	repo := store.NewStages(db)
+	return &Checker{get: get.New(repo), tasks: checktasks.New(repo, projects)}
 }
 
 // Check devuelve un error de negocio si la etapa no existe.
@@ -97,12 +111,14 @@ func (c *Checker) Check(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-// EnsureProjectPlanning devuelve un error de negocio si la etapa no existe o su
-// proyecto no está en planning.
-func (c *Checker) EnsureProjectPlanning(ctx context.Context, id uuid.UUID) error {
-	stage, err := c.get.Handle(ctx, id)
-	if err != nil {
-		return err
-	}
-	return c.projects.EnsurePlanning(ctx, stage.ProjectID)
+// EnsureTasksEditable devuelve un error de negocio si la etapa no existe o sus
+// tareas no se pueden crear, editar ni eliminar directamente.
+func (c *Checker) EnsureTasksEditable(ctx context.Context, id uuid.UUID) error {
+	return c.tasks.EnsureEditable(ctx, id)
+}
+
+// EnsureHistoryRule devuelve un error de negocio si la etapa no existe o está
+// en su planning propio, donde sus tareas no admiten cambios con historial.
+func (c *Checker) EnsureHistoryRule(ctx context.Context, id uuid.UUID) error {
+	return c.tasks.EnsureHistoryRule(ctx, id)
 }

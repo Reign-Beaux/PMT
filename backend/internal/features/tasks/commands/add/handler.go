@@ -15,10 +15,10 @@ type Repository interface {
 	Add(ctx context.Context, task domain.Task, change domain.Change) (domain.Task, domain.Change, error)
 }
 
-// StageChecker confirma que una etapa existe y no está retirada. Lo implementa
-// la feature stages, conectada en app.
+// StageChecker confirma que una etapa existe, no está retirada y admite cambios
+// con historial. Lo implementa la feature stages, conectada en app.
 type StageChecker interface {
-	Check(ctx context.Context, id uuid.UUID) error
+	EnsureHistoryRule(ctx context.Context, id uuid.UUID) error
 }
 
 // Command contiene los datos de entrada.
@@ -55,7 +55,7 @@ func New(repo Repository, stages StageChecker) *Handler {
 
 // Handle agrega la tarea y registra el cambio.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
-	if err := h.stages.Check(ctx, cmd.StageID); err != nil {
+	if err := h.stages.EnsureHistoryRule(ctx, cmd.StageID); err != nil {
 		return Result{}, err
 	}
 	task, err := domain.NewTask(cmd.StageID, cmd.Title, cmd.Description)

@@ -16,15 +16,21 @@ import (
 var errNotPlanning = kernel.Conflict("el proyecto no está en planning")
 
 type fakeProjects struct {
-	err error
+	err     error
+	working error
 }
 
 func (p fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
 	return p.err
 }
 
+func (p fakeProjects) EnsureWorking(context.Context, uuid.UUID) error {
+	return p.working
+}
+
 type fakeRepo struct {
 	hasChanges bool
+	ownPlan    bool
 	existing   uuid.UUID
 	err        error
 	deleted    bool
@@ -33,6 +39,9 @@ type fakeRepo struct {
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
 	if id != r.existing {
 		return domain.Stage{}, domain.ErrStageNotFound
+	}
+	if r.ownPlan {
+		return domain.Stage{ID: id, AddReason: "Petición", AddRequestedBy: "PM"}, nil
 	}
 	return domain.Stage{ID: id}, nil
 }
@@ -118,5 +127,31 @@ func TestREST(t *testing.T) {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func TestHandleDeletesStageInOwnPlanning(t *testing.T) {
+	id := uuid.New()
+	repo := &fakeRepo{existing: id, ownPlan: true}
+
+	err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), id)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !repo.deleted {
+		t.Error("no eliminó la etapa")
+	}
+}
+
+func TestHandleRejectsOwnPlanningOutsideWorking(t *testing.T) {
+	id := uuid.New()
+	repo := &fakeRepo{existing: id, ownPlan: true}
+	errNotWorking := kernel.Conflict("el proyecto no está en working")
+
+	err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), id)
+
+	if !errors.Is(err, errNotWorking) || repo.deleted {
+		t.Errorf("err = %v, eliminada = %v", err, repo.deleted)
 	}
 }

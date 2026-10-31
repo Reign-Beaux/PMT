@@ -31,7 +31,7 @@ func connect(t *testing.T, handler *Handler) *sdk.ClientSession {
 
 func call(t *testing.T, repo Repository, id string) *sdk.CallToolResult {
 	t.Helper()
-	result, err := connect(t, New(repo)).CallTool(context.Background(), &sdk.CallToolParams{
+	result, err := connect(t, New(repo, fakeStages{})).CallTool(context.Background(), &sdk.CallToolParams{
 		Name: "revise_task",
 		Arguments: map[string]any{
 			"task_id": id, "title": "Otra", "description": "Detalle", "reason": "Motivo", "requested_by": "PM",

@@ -11,6 +11,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Bug struct {
+	ID               uuid.UUID
+	ProjectID        uuid.UUID
+	Title            string
+	Description      string
+	StepsToReproduce string
+	ProductVersion   string
+	Status           string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type Project struct {
 	ID             uuid.UUID
 	Name           string
@@ -22,15 +34,17 @@ type Project struct {
 }
 
 type Stage struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Name        string
-	Description string
-	Position    int32
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Status      string
-	RetiredAt   pgtype.Timestamptz
+	ID             uuid.UUID
+	ProjectID      uuid.UUID
+	Name           string
+	Description    string
+	Position       int32
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Status         string
+	RetiredAt      pgtype.Timestamptz
+	AddReason      pgtype.Text
+	AddRequestedBy pgtype.Text
 }
 
 type StageChange struct {

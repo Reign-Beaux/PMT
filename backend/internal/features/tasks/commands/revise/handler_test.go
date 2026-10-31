@@ -11,7 +11,16 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
+
+type fakeStages struct {
+	err error
+}
+
+func (s fakeStages) EnsureHistoryRule(context.Context, uuid.UUID) error {
+	return s.err
+}
 
 type fakeRepo struct {
 	current domain.Task
@@ -40,7 +49,7 @@ func (r *fakeRepo) Revise(_ context.Context, change domain.Change) (domain.Task,
 func TestHandleSavesNewVersion(t *testing.T) {
 	repo := newRepo()
 
-	result, err := New(repo).Handle(context.Background(), Command{
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{
 		ID: repo.current.ID, Title: "Crear login con Google", Reason: "Incongruencia", RequestedBy: "PM",
 	})
 
@@ -71,7 +80,7 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 			repo := newRepo()
 			tt.cmd.ID = repo.current.ID
 
-			_, err := New(repo).Handle(context.Background(), tt.cmd)
+			_, err := New(repo, fakeStages{}).Handle(context.Background(), tt.cmd)
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -86,7 +95,7 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 func TestHandleMissingOrRetired(t *testing.T) {
 	repo := newRepo()
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Title: "A", Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: uuid.New(), Title: "A", Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrTaskNotFound) {
 		t.Fatalf("err = %v", err)
@@ -112,7 +121,7 @@ func TestREST(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := newRepo()
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/tasks/"+tt.id(repo.current.ID)+"/revise", strings.NewReader(tt.body)))
@@ -121,5 +130,18 @@ func TestREST(t *testing.T) {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
+	errOwnPlanning := kernel.Conflict("la etapa está en su propio planning")
+	repo := newRepo()
+
+	_, err := New(repo, fakeStages{err: errOwnPlanning}).Handle(context.Background(), Command{
+		ID: repo.current.ID, Title: "A", Reason: "M", RequestedBy: "PM",
+	})
+
+	if !errors.Is(err, errOwnPlanning) || len(repo.changes) != 0 {
+		t.Errorf("err = %v, cambios = %+v", err, repo.changes)
 	}
 }

@@ -25,7 +25,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "retire_stage",
-		Description: "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas activas: primero retira sus tareas. Usa list_stages para obtener su ID.",
+		Description: "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas activas: primero retira sus tareas. Se rechaza si la etapa está en su planning propio. Usa list_stages para obtener su ID.",
 	}, h.callTool)
 }
 

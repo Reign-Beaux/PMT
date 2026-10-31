@@ -1,6 +1,6 @@
 [
   {
-    "description": "Cambia el status de una etapa de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Usa list_stages para obtener el ID de la etapa y su status actual.",
+    "description": "Cambia el status de una etapa de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Usa list_stages para obtener el ID de la etapa y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -23,6 +23,12 @@
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "add_reason": {
+          "type": "string"
+        },
+        "add_requested_by": {
+          "type": "string"
+        },
         "created_at": {
           "type": "string"
         },
@@ -151,6 +157,12 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "add_reason": {
+                "type": "string"
+              },
+              "add_requested_by": {
+                "type": "string"
+              },
               "created_at": {
                 "type": "string"
               },
@@ -201,7 +213,7 @@
     }
   },
   {
-    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -229,6 +241,12 @@
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "add_reason": {
+          "type": "string"
+        },
+        "add_requested_by": {
+          "type": "string"
+        },
         "created_at": {
           "type": "string"
         },
@@ -268,7 +286,7 @@
     }
   },
   {
-    "description": "Elimina una etapa de PMT y devuelve su ID. Solo funciona si su proyecto está en planning y la etapa no tiene historial ni tareas, activas o retiradas; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
+    "description": "Elimina una etapa de PMT y devuelve su ID. Solo funciona si la etapa no tiene tareas, activas o retiradas, y además está en su planning propio con el proyecto en working, o su proyecto está en planning y la etapa no tiene historial; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -297,7 +315,7 @@
     }
   },
   {
-    "description": "Agrega una etapa nueva al final de un proyecto y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una etapa cuando el proyecto ya no está en planning. Devuelve la etapa y su versión.",
+    "description": "Agrega una etapa nueva al final de un proyecto cuando ya no está en planning, con su motivo y quién la pidió. Con el proyecto en working nace en su planning propio: se define con update_stage y create_task, devuelve version 0 y add_reason, y su registro inmutable se escribe al sacarla de planning con change_stage_status. En otro status se registra de inmediato como cambio, con version 1.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -335,6 +353,12 @@
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "add_reason": {
+          "type": "string"
+        },
+        "add_requested_by": {
+          "type": "string"
+        },
         "created_at": {
           "type": "string"
         },
@@ -378,7 +402,7 @@
     }
   },
   {
-    "description": "Registra una nueva versión de una etapa como cambio inmutable, con su motivo y quién lo pidió, y devuelve la etapa y su versión. Es la forma de editar una etapa cuando el proyecto ya no está en planning o la etapa ya tiene historial. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Registra una nueva versión de una etapa como cambio inmutable, con su motivo y quién lo pidió, y devuelve la etapa y su versión. Es la forma de editar una etapa cuando el proyecto ya no está en planning o la etapa ya tiene historial. Se rechaza si la etapa está en su planning propio. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -459,7 +483,7 @@
     }
   },
   {
-    "description": "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas activas: primero retira sus tareas. Usa list_stages para obtener su ID.",
+    "description": "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas activas: primero retira sus tareas. Se rechaza si la etapa está en su planning propio. Usa list_stages para obtener su ID.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

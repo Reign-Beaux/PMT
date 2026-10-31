@@ -26,13 +26,16 @@ type toolOutput struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "update_stage",
-		Description: "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+		Description: "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
 	}, h.callTool)
 }
 
@@ -60,5 +63,8 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Status:      string(result.Status),
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
+
+		AddReason:      result.AddReason,
+		AddRequestedBy: result.AddRequestedBy,
 	}, nil
 }

@@ -28,7 +28,6 @@ type StageChecker interface {
 	add.StageChecker
 	create.StageChecker
 	list.StageChecker
-	update.StageChecker
 }
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
@@ -62,14 +61,14 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	reviseTask := revise.New(struct {
 		*store.Tasks
 		*store.Changes
-	}{repo, changes})
+	}{repo, changes}, stages)
 	reviseTask.Register(mux)
 	reviseTask.RegisterTool(tools)
 
 	retireTask := retire.New(struct {
 		*store.Tasks
 		*store.Changes
-	}{repo, changes})
+	}{repo, changes}, stages)
 	retireTask.Register(mux)
 	retireTask.RegisterTool(tools)
 

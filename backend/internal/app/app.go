@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/bugs"
 	"pmt/internal/features/imports"
 	"pmt/internal/features/projects"
 	"pmt/internal/features/stages"
@@ -58,4 +59,5 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	stages.Register(mux, tools, pool, tasks.NewChecker(pool), projectChecker)
 	tasks.Register(mux, tools, pool, stages.NewChecker(pool, projectChecker))
 	imports.Register(tools, pool)
+	bugs.Register(mux, tools, pool, projectChecker)
 }

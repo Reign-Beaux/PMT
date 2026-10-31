@@ -16,10 +16,11 @@ type Repository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
-// ProjectChecker confirma que un proyecto está en planning. Lo implementa la
-// feature projects, conectada en app.
+// ProjectChecker confirma el status de un proyecto. Lo implementa la feature
+// projects, conectada en app.
 type ProjectChecker interface {
 	EnsurePlanning(ctx context.Context, projectID uuid.UUID) error
+	EnsureWorking(ctx context.Context, projectID uuid.UUID) error
 }
 
 // Handler ejecuta la operación.
@@ -38,6 +39,12 @@ func (h *Handler) Handle(ctx context.Context, id uuid.UUID) error {
 	s, err := h.repo.Get(ctx, id)
 	if err != nil {
 		return err
+	}
+	if s.InOwnPlanning() {
+		if err := h.projects.EnsureWorking(ctx, s.ProjectID); err != nil {
+			return err
+		}
+		return h.repo.Delete(ctx, id)
 	}
 	if err := h.projects.EnsurePlanning(ctx, s.ProjectID); err != nil {
 		return err

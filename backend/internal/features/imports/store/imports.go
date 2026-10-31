@@ -4,9 +4,11 @@ package store
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"pmt/internal/features/imports/domain"
+	projectdomain "pmt/internal/features/projects/domain"
 	projects "pmt/internal/features/projects/store"
 	stages "pmt/internal/features/stages/store"
 	tasks "pmt/internal/features/tasks/store"
@@ -45,6 +47,30 @@ func (s *Imports) Save(ctx context.Context, plan domain.Plan) error {
 				if _, err := taskRepo.Create(ctx, task); err != nil {
 					return err
 				}
+			}
+		}
+		return nil
+	})
+}
+
+// SaveStage guarda una etapa y sus tareas en un proyecto en working. Si algo falla, no guarda nada.
+func (s *Imports) SaveStage(ctx context.Context, projectID uuid.UUID, plan domain.StagePlan) error {
+	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		project, err := projects.NewProjects(tx).Get(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		if !project.IsWorking() {
+			return projectdomain.ErrProjectNotWorking
+		}
+
+		if _, err := stages.NewStages(tx).Create(ctx, plan.Stage); err != nil {
+			return err
+		}
+		taskRepo := tasks.NewTasks(tx)
+		for _, task := range plan.Tasks {
+			if _, err := taskRepo.Create(ctx, task); err != nil {
+				return err
 			}
 		}
 		return nil

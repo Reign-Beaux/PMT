@@ -1,6 +1,6 @@
 [
   {
-    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog. Solo funciona si el proyecto de la etapa está en planning; si no, usa add_task. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si el proyecto de la etapa está en planning y la etapa no nació con add_stage; si no, usa add_task. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -131,7 +131,7 @@
     }
   },
   {
-    "description": "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo funciona si el proyecto de su etapa está en planning y la tarea no tiene historial; si no, usa revise_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si el proyecto de su etapa está en planning y ni la tarea tiene historial ni la etapa nació con add_stage; si no, usa revise_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -194,7 +194,7 @@
     }
   },
   {
-    "description": "Elimina una tarea de PMT y devuelve su ID. Solo funciona si el proyecto de su etapa está en planning y la tarea no tiene historial; si no, usa retire_task. Usa list_tasks para obtener el ID de la tarea.",
+    "description": "Elimina una tarea de PMT y devuelve su ID. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si el proyecto de su etapa está en planning y ni la tarea tiene historial ni la etapa nació con add_stage; si no, usa retire_task. Usa list_tasks para obtener el ID de la tarea.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -223,7 +223,7 @@
     }
   },
   {
-    "description": "Agrega una tarea nueva al final de una etapa y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una tarea cuando el proyecto ya no está en planning. Devuelve la tarea y su versión.",
+    "description": "Agrega una tarea nueva al final de una etapa y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una tarea cuando el proyecto ya no está en planning. Se rechaza si la etapa está en su planning propio: ahí usa create_task. Devuelve la tarea y su versión.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -300,7 +300,7 @@
     }
   },
   {
-    "description": "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Se rechaza si su etapa está en su planning propio: ahí usa update_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -377,7 +377,7 @@
     }
   },
   {
-    "description": "Retira una tarea de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_tasks y sigue en list_task_changes. El retiro no se deshace. Usa list_tasks para obtener su ID.",
+    "description": "Retira una tarea de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_tasks y sigue en list_task_changes. El retiro no se deshace. Se rechaza si su etapa está en su planning propio: ahí usa delete_task. Usa list_tasks para obtener su ID.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

@@ -11,7 +11,16 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
+
+type fakeStages struct {
+	err error
+}
+
+func (s fakeStages) EnsureHistoryRule(context.Context, uuid.UUID) error {
+	return s.err
+}
 
 type fakeRepo struct {
 	existing uuid.UUID
@@ -32,7 +41,7 @@ func (r *fakeRepo) Retire(_ context.Context, change domain.Change) (domain.Chang
 }
 
 func newHandler(repo Repository) *Handler {
-	return New(repo)
+	return New(repo, fakeStages{})
 }
 
 func TestHandleRetires(t *testing.T) {
@@ -107,5 +116,17 @@ func TestREST(t *testing.T) {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
+	errOwnPlanning := kernel.Conflict("la etapa está en su propio planning")
+	id := uuid.New()
+	repo := &fakeRepo{existing: id}
+
+	_, err := New(repo, fakeStages{err: errOwnPlanning}).Handle(context.Background(), Command{ID: id, Reason: "M", RequestedBy: "PM"})
+
+	if !errors.Is(err, errOwnPlanning) || len(repo.changes) != 0 {
+		t.Errorf("err = %v, cambios = %+v", err, repo.changes)
 	}
 }

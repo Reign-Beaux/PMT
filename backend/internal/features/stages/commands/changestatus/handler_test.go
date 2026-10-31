@@ -17,6 +17,7 @@ import (
 type fakeRepo struct {
 	stages  map[uuid.UUID]domain.Stage
 	updates int
+	changes []domain.Change
 }
 
 func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
@@ -39,6 +40,13 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
 
 func (r *fakeRepo) UpdateStatus(_ context.Context, s domain.Stage) (domain.Stage, error) {
 	r.updates++
+	r.stages[s.ID] = s
+	return s, nil
+}
+
+func (r *fakeRepo) LeavePlanning(_ context.Context, s domain.Stage, change domain.Change) (domain.Stage, error) {
+	r.changes = append(r.changes, change)
+	s.AddReason, s.AddRequestedBy = "", ""
 	r.stages[s.ID] = s
 	return s, nil
 }
@@ -225,5 +233,66 @@ func TestRESTReturnsWholeStage(t *testing.T) {
 	}
 	if body["status"] != "stand_by" {
 		t.Errorf("cuerpo = %s", rec.Body)
+	}
+}
+
+func TestHandleWritesAddWhenLeavingOwnPlanning(t *testing.T) {
+	for _, status := range []domain.Status{domain.StatusStandBy, domain.StatusStopped, domain.StatusCancelled} {
+		t.Run(string(status), func(t *testing.T) {
+			s, err := domain.NewOwnPlanningStage(uuid.New(), "Pagos", "Inicial", "Petición", "PM")
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Name = "Cobros"
+			repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
+
+			result, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: s.ID, Status: status})
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(repo.changes) != 1 {
+				t.Fatalf("cambios = %+v", repo.changes)
+			}
+			change := repo.changes[0]
+			if change.Kind != domain.ChangeAdd || change.Name != "Cobros" || change.Reason != "Petición" || change.RequestedBy != "PM" {
+				t.Errorf("cambio = %+v", change)
+			}
+			if result.Status != status || result.AddReason != "" {
+				t.Errorf("result = %+v", result)
+			}
+		})
+	}
+}
+
+func TestHandleDoesNotReopenOwnPlanning(t *testing.T) {
+	s, err := domain.NewOwnPlanningStage(uuid.New(), "Pagos", "Inicial", "Petición", "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
+	handler := New(repo, &fakeTasks{})
+
+	if _, err := handler.Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := handler.Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusPlanning})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusPlanning || repo.stages[s.ID].InOwnPlanning() || len(repo.changes) != 1 {
+		t.Errorf("result = %+v, cambios = %+v", result, repo.changes)
+	}
+}
+
+func TestHandleDoesNotWriteAddForOtherStages(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusPlanning)
+
+	if _, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy}); err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.changes) != 0 {
+		t.Errorf("cambios = %+v", repo.changes)
 	}
 }

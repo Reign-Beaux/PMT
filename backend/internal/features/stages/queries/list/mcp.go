@@ -24,6 +24,9 @@ type toolStage struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
 }
 
 type toolOutput struct {
@@ -60,6 +63,9 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 			Status:      string(item.Status),
 			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   item.UpdatedAt.Format(time.RFC3339),
+
+			AddReason:      item.AddReason,
+			AddRequestedBy: item.AddRequestedBy,
 		})
 	}
 	return nil, toolOutput{Stages: stages}, nil

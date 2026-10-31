@@ -17,10 +17,10 @@ type Repository interface {
 	Update(ctx context.Context, t domain.Task) (domain.Task, error)
 }
 
-// StageChecker confirma que el proyecto de una etapa está en planning. Lo
-// implementa la feature stages, conectada en app.
+// StageChecker confirma que las tareas de una etapa se pueden editar
+// directamente. Lo implementa la feature stages, conectada en app.
 type StageChecker interface {
-	EnsureProjectPlanning(ctx context.Context, stageID uuid.UUID) error
+	EnsureTasksEditable(ctx context.Context, stageID uuid.UUID) error
 }
 
 // Command contiene los datos de entrada.
@@ -58,7 +58,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := h.stages.EnsureProjectPlanning(ctx, t.StageID); err != nil {
+	if err := h.stages.EnsureTasksEditable(ctx, t.StageID); err != nil {
 		return Result{}, err
 	}
 	hasChanges, err := h.repo.HasChanges(ctx, cmd.ID)

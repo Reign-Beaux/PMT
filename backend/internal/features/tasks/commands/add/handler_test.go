@@ -17,7 +17,7 @@ type fakeStages struct {
 	err error
 }
 
-func (s fakeStages) Check(context.Context, uuid.UUID) error {
+func (s fakeStages) EnsureHistoryRule(context.Context, uuid.UUID) error {
 	return s.err
 }
 

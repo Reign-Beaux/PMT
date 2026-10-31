@@ -12,7 +12,9 @@ import (
 	"pmt/internal/features/projects/commands/create"
 	"pmt/internal/features/projects/commands/delete"
 	"pmt/internal/features/projects/commands/update"
+	"pmt/internal/features/projects/domain"
 	"pmt/internal/features/projects/queries/checkplanning"
+	"pmt/internal/features/projects/queries/checkworking"
 	"pmt/internal/features/projects/queries/get"
 	"pmt/internal/features/projects/queries/list"
 	"pmt/internal/features/projects/store"
@@ -46,17 +48,36 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
 	listProjects.RegisterTool(tools)
 }
 
-// Checker permite a otras features saber si un proyecto admite cambios de definición.
+// Checker permite a otras features saber qué admite un proyecto según su status.
 type Checker struct {
 	checkPlanning *checkplanning.Handler
+	checkWorking  *checkworking.Handler
 }
 
-// NewChecker crea el verificador sobre la query checkplanning.
+// NewChecker crea el verificador sobre las queries checkplanning y checkworking.
 func NewChecker(db sqlcgen.DBTX) *Checker {
-	return &Checker{checkPlanning: checkplanning.New(store.NewProjects(db))}
+	repo := store.NewProjects(db)
+	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo)}
 }
 
 // EnsurePlanning devuelve un error de negocio si el proyecto no existe o no está en planning.
 func (c *Checker) EnsurePlanning(ctx context.Context, id uuid.UUID) error {
 	return c.checkPlanning.Handle(ctx, id)
+}
+
+// IsWorking indica si el proyecto está en working. Si no existe, devuelve un error de negocio.
+func (c *Checker) IsWorking(ctx context.Context, id uuid.UUID) (bool, error) {
+	return c.checkWorking.Handle(ctx, id)
+}
+
+// EnsureWorking devuelve un error de negocio si el proyecto no existe o no está en working.
+func (c *Checker) EnsureWorking(ctx context.Context, id uuid.UUID) error {
+	working, err := c.checkWorking.Handle(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !working {
+		return domain.ErrProjectNotWorking
+	}
+	return nil
 }

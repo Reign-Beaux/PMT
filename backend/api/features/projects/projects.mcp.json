@@ -239,7 +239,7 @@
     }
   },
   {
-    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
+    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene bugs ni etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

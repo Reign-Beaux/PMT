@@ -34,7 +34,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "add_task",
-		Description: "Agrega una tarea nueva al final de una etapa y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una tarea cuando el proyecto ya no está en planning. Devuelve la tarea y su versión.",
+		Description: "Agrega una tarea nueva al final de una etapa y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una tarea cuando el proyecto ya no está en planning. Se rechaza si la etapa está en su planning propio: ahí usa create_task. Devuelve la tarea y su versión.",
 	}, h.callTool)
 }
 

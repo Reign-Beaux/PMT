@@ -46,13 +46,9 @@ type Change struct {
 
 // NewChange crea un cambio con el contenido de la etapa. La versión se asigna al guardarlo.
 func NewChange(stage Stage, kind ChangeKind, reason, requestedBy string) (Change, error) {
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		return Change{}, ErrChangeReasonRequired
-	}
-	requestedBy = strings.TrimSpace(requestedBy)
-	if requestedBy == "" {
-		return Change{}, ErrChangeRequesterRequired
+	reason, requestedBy, err := cleanRequest(reason, requestedBy)
+	if err != nil {
+		return Change{}, err
 	}
 	return Change{
 		ID:          uuid.New(),
@@ -63,6 +59,18 @@ func NewChange(stage Stage, kind ChangeKind, reason, requestedBy string) (Change
 		Reason:      reason,
 		RequestedBy: requestedBy,
 	}, nil
+}
+
+func cleanRequest(reason, requestedBy string) (string, string, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return "", "", ErrChangeReasonRequired
+	}
+	requestedBy = strings.TrimSpace(requestedBy)
+	if requestedBy == "" {
+		return "", "", ErrChangeRequesterRequired
+	}
+	return reason, requestedBy, nil
 }
 
 // History es la evolución de una etapa: el contenido original de su fila y sus

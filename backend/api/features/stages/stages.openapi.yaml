@@ -55,7 +55,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de una etapa cuyo proyecto está en planning
+      summary: Reemplaza los datos editables de una etapa en su planning propio con el proyecto en working, o de una etapa sin historial cuyo proyecto está en planning
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
@@ -68,7 +68,7 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina una etapa sin tareas cuyo proyecto está en planning
+      summary: Elimina una etapa sin tareas en su planning propio con el proyecto en working, o sin historial cuyo proyecto está en planning
       responses:
         "204":
           description: Etapa eliminada
@@ -126,7 +126,7 @@ paths:
           type: string
           format: uuid
     post:
-      summary: Agrega una etapa como cambio inmutable
+      summary: Agrega una etapa. Con el proyecto en working nace en su planning propio, sin registro y con version 0; en otro status se registra como cambio inmutable, con version 1
       requestBody:
         required: true
         content:
@@ -362,6 +362,12 @@ components:
           minimum: 1
         status:
           $ref: "#/components/schemas/StageStatus"
+        add_reason:
+          type: string
+          description: Motivo del registro add pendiente. Su presencia indica que la etapa está en su planning propio.
+        add_requested_by:
+          type: string
+          description: Quién pidió la etapa, mientras esté en su planning propio.
         created_at:
           type: string
           format: date-time

@@ -55,6 +55,17 @@ func (q *Queries) CreateStageChange(ctx context.Context, arg CreateStageChangePa
 	return i, err
 }
 
+const hasStageAdd = `-- name: HasStageAdd :one
+SELECT EXISTS (SELECT 1 FROM stage_changes WHERE stage_id = $1 AND kind = 'add')
+`
+
+func (q *Queries) HasStageAdd(ctx context.Context, stageID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasStageAdd, stageID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const hasStageChanges = `-- name: HasStageChanges :one
 SELECT EXISTS (SELECT 1 FROM stage_changes WHERE stage_id = $1)
 `

@@ -29,13 +29,16 @@ type toolOutput struct {
 	Version     int    `json:"version"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "add_stage",
-		Description: "Agrega una etapa nueva al final de un proyecto y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una etapa cuando el proyecto ya no está en planning. Devuelve la etapa y su versión.",
+		Description: "Agrega una etapa nueva al final de un proyecto cuando ya no está en planning, con su motivo y quién la pidió. Con el proyecto en working nace en su planning propio: se define con update_stage y create_task, devuelve version 0 y add_reason, y su registro inmutable se escribe al sacarla de planning con change_stage_status. En otro status se registra de inmediato como cambio, con version 1.",
 	}, h.callTool)
 }
 
@@ -66,5 +69,8 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Version:     result.Version,
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
+
+		AddReason:      result.AddReason,
+		AddRequestedBy: result.AddRequestedBy,
 	}, nil
 }

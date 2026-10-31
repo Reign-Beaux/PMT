@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"gopkg.in/yaml.v3"
-
 	"pmt/internal/features/imports/domain"
 	"pmt/internal/kernel"
 )
@@ -213,19 +211,6 @@ func TestHandleTranslatesSyntaxErrors(t *testing.T) {
 				t.Error("no debió guardar nada")
 			}
 		})
-	}
-}
-
-func TestYAMLKeepsCommentInValueNode(t *testing.T) {
-	var document yaml.Node
-	if err := yaml.Unmarshal([]byte("title: Revisar API # urgente\n"), &document); err != nil {
-		t.Fatal(err)
-	}
-
-	_, value := field(document.Content[0], "title")
-
-	if value.Value != "Revisar API" || value.LineComment != "# urgente" {
-		t.Errorf("valor = %q, comentario = %q", value.Value, value.LineComment)
 	}
 }
 

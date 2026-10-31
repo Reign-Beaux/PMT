@@ -23,12 +23,16 @@ func (f fakeTasks) HasActive(context.Context, uuid.UUID) (bool, error) {
 
 type fakeRepo struct {
 	existing uuid.UUID
+	ownPlan  bool
 	changes  []domain.Change
 }
 
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
 	if id != r.existing {
 		return domain.Stage{}, domain.ErrStageNotFound
+	}
+	if r.ownPlan {
+		return domain.Stage{ID: id, Name: "Crear login", AddReason: "Petición", AddRequestedBy: "PM"}, nil
 	}
 	return domain.Stage{ID: id, Name: "Crear login"}, nil
 }
@@ -129,5 +133,16 @@ func TestREST(t *testing.T) {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
+	id := uuid.New()
+	repo := &fakeRepo{existing: id, ownPlan: true}
+
+	_, err := newHandler(repo).Handle(context.Background(), Command{ID: id, Reason: "M", RequestedBy: "PM"})
+
+	if !errors.Is(err, domain.ErrStageInOwnPlanning) || len(repo.changes) != 0 {
+		t.Errorf("err = %v, cambios = %+v", err, repo.changes)
 	}
 }

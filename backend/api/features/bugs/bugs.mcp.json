@@ -1,0 +1,240 @@
+[
+  {
+    "description": "Registra un bug en un proyecto de PMT. No pertenece a ninguna etapa y nace en status reported. Solo funciona si el proyecto está en working. Pide steps_to_reproduce y product_version, la versión donde apareció, antes de llamar a esta herramienta.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción del bug; puede ir vacía",
+          "type": "string"
+        },
+        "product_version": {
+          "description": "Versión del producto donde apareció",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto, que debe estar en working",
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "description": "Pasos para reproducirlo",
+          "type": "string"
+        },
+        "title": {
+          "description": "Título del bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version"
+      ],
+      "type": "object"
+    },
+    "name": "create_bug",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Reemplaza título, descripción, pasos para reproducirlo y versión de un bug, para corregir el reporte, y devuelve el bug completo. No cambia su status. Solo funciona si el proyecto está en working. Usa list_bugs para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug",
+          "type": "string"
+        },
+        "description": {
+          "description": "Descripción del bug; puede ir vacía",
+          "type": "string"
+        },
+        "product_version": {
+          "description": "Versión del producto donde apareció",
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "description": "Pasos para reproducirlo",
+          "type": "string"
+        },
+        "title": {
+          "description": "Título del bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bug_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version"
+      ],
+      "type": "object"
+    },
+    "name": "update_bug",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista los bugs de un proyecto de PMT por fecha de creación. Funciona con cualquier status del proyecto. Para obtener project_id usa list_projects.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_bugs",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bugs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "product_version": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "steps_to_reproduce": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "project_id",
+              "title",
+              "description",
+              "steps_to_reproduce",
+              "product_version",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "bugs"
+      ],
+      "type": "object"
+    }
+  }
+]
