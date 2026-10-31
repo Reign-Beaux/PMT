@@ -412,11 +412,12 @@ Un bug pertenece a un proyecto, sin etapa: `tasks` no cambia y los bugs no afect
 | --- | --- | --- |
 | `create_bug` | `POST /api/projects/{project_id}/bugs` | Solo `working` |
 | `update_bug` | `PUT /api/bugs/{id}` | Solo `working` |
+| `change_bug_status` | `PUT /api/bugs/{id}/status` | Cualquiera |
 | `list_bugs` | `GET /api/projects/{project_id}/bugs` | Cualquiera |
 
-Fuera de `working` responden `el proyecto no está en working`. `update_bug` corrige el reporte y no cambia el status. No hay comando para eliminar un bug ni para cambiar su status. `delete_project` se bloquea si el proyecto tiene bugs.
+Fuera de `working` responden `el proyecto no está en working`. `update_bug` corrige el reporte y no cambia el status. No hay comando para eliminar un bug. `delete_project` se bloquea si el proyecto tiene bugs.
 
-Todo bug nace en `reported`. Estos son sus status, por ahora sin transiciones:
+Todo bug nace en `reported`. Estos son sus status:
 
 | Status | Significado |
 | --- | --- |
@@ -428,6 +429,23 @@ Todo bug nace en `reported`. Estos son sus status, por ahora sin transiciones:
 | `in_qa` | En verificación de QA. |
 | `done` | Corregido y verificado. |
 | `rejected` | No se corregirá: no se reproduce, está duplicado o no es un bug. |
+
+Una tabla de transiciones en `bugs/domain` define los cambios permitidos:
+
+| Desde | Puede pasar a |
+| --- | --- |
+| `reported` | `confirmed`, `rejected` |
+| `confirmed` | `in_progress`, `rejected` |
+| `in_progress` | `in_review`, `rejected` |
+| `in_review` | `in_qa`, `changes_requested`, `rejected` |
+| `changes_requested` | `in_review`, `rejected` |
+| `in_qa` | `done`, `changes_requested`, `rejected` |
+| `done` | ninguna |
+| `rejected` | `reported` |
+
+Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. Un bug inexistente responde `NotFound`. El status solo cambia con la slice `bugs/commands/changestatus` (`change_bug_status`, `PUT /api/bugs/{id}/status`), no con `update_bug`. Cambiar el status no depende del status del proyecto, igual que `change_task_status`, y devuelve el bug completo.
+
+**Perfiles pendientes:** hoy cualquiera puede ejecutar cualquier transición permitida. Las reglas por perfil de los bugs se definirán cuando existan `agents` y `Actor`.
 
 ## Transacciones
 
@@ -458,8 +476,8 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug` y `list_bugs`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio. El `status` de un bug se devuelve, pero aún no se puede cambiar.
-- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, las reglas por perfil de las transiciones de `tasks` y las demás features.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, las reglas por perfil de las transiciones de `tasks` y `bugs` y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen autorización, auditoría ni, salvo los de cambios, transacción. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
@@ -467,7 +485,7 @@ Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
 1. `projects` y `stages`. Hechos, salvo la excepción temporal.
 2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`.
-3. Reglas por perfil en las transiciones de `tasks`. Su CRUD y su tabla de transiciones ya existen, adelantados a `agents`.
+3. Reglas por perfil en las transiciones de `tasks` y `bugs`. Sus tablas de transiciones ya existen, adelantadas a `agents`.
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews` y `qa`.

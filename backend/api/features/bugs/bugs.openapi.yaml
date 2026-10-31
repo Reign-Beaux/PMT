@@ -58,6 +58,38 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/bugs/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de un bug
+      description: Solo admite las transiciones permitidas. No depende del status del proyecto y devuelve el bug completo. Aún no hay reglas por perfil.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [reported, confirmed, in_progress, in_review, changes_requested, in_qa, done, rejected]
+      responses:
+        "200":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
 components:
   requestBodies:
     BugInput:

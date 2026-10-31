@@ -147,3 +147,32 @@ func (q *Queries) UpdateBug(ctx context.Context, arg UpdateBugParams) (Bug, erro
 	)
 	return i, err
 }
+
+const updateBugStatus = `-- name: UpdateBugStatus :one
+UPDATE bugs
+SET status = $2, updated_at = clock_timestamp()
+WHERE id = $1
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at
+`
+
+type UpdateBugStatusParams struct {
+	ID     uuid.UUID
+	Status string
+}
+
+func (q *Queries) UpdateBugStatus(ctx context.Context, arg UpdateBugStatusParams) (Bug, error) {
+	row := q.db.QueryRow(ctx, updateBugStatus, arg.ID, arg.Status)
+	var i Bug
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Description,
+		&i.StepsToReproduce,
+		&i.ProductVersion,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

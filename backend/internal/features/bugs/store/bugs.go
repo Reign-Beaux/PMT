@@ -87,6 +87,21 @@ func (s *Bugs) Update(ctx context.Context, bug domain.Bug) (domain.Bug, error) {
 	return toDomain(row), nil
 }
 
+// UpdateStatus guarda el status de un bug.
+func (s *Bugs) UpdateStatus(ctx context.Context, bug domain.Bug) (domain.Bug, error) {
+	row, err := s.queries.UpdateBugStatus(ctx, sqlcgen.UpdateBugStatusParams{
+		ID:     bug.ID,
+		Status: string(bug.Status),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Bug{}, domain.ErrBugNotFound
+	}
+	if err != nil {
+		return domain.Bug{}, fmt.Errorf("actualizar status del bug: %w", err)
+	}
+	return toDomain(row), nil
+}
+
 func toDomain(row sqlcgen.Bug) domain.Bug {
 	return domain.Bug{
 		ID:               row.ID,

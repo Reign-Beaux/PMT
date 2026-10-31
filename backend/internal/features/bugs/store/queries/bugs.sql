@@ -17,3 +17,9 @@ UPDATE bugs
 SET title = $2, description = $3, steps_to_reproduce = $4, product_version = $5, updated_at = clock_timestamp()
 WHERE id = $1
 RETURNING *;
+
+-- name: UpdateBugStatus :one
+UPDATE bugs
+SET status = $2, updated_at = clock_timestamp()
+WHERE id = $1
+RETURNING *;
