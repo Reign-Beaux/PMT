@@ -7,14 +7,16 @@ package sqlcgen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (id, stage_id, title, description, status)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, stage_id, title, description, status, created_at, updated_at
+RETURNING id, stage_id, title, description, status, created_at, updated_at, retired_at
 `
 
 type CreateTaskParams struct {
@@ -42,6 +44,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RetiredAt,
 	)
 	return i, err
 }
@@ -60,13 +63,31 @@ func (q *Queries) DeleteTask(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, stage_id, title, description, status, created_at, updated_at FROM tasks
-WHERE id = $1
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at
+FROM tasks s
+LEFT JOIN LATERAL (
+    SELECT title, description FROM task_changes
+    WHERE task_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true
+WHERE s.id = $1 AND s.retired_at IS NULL
 `
 
-func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
+type GetTaskRow struct {
+	ID          uuid.UUID
+	StageID     uuid.UUID
+	Title       string
+	Description string
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	RetiredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (GetTaskRow, error) {
 	row := q.db.QueryRow(ctx, getTask, id)
-	var i Task
+	var i GetTaskRow
 	err := row.Scan(
 		&i.ID,
 		&i.StageID,
@@ -75,25 +96,44 @@ func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RetiredAt,
 	)
 	return i, err
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, stage_id, title, description, status, created_at, updated_at FROM tasks
-WHERE stage_id = $1
-ORDER BY created_at, id
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at
+FROM tasks s
+LEFT JOIN LATERAL (
+    SELECT title, description FROM task_changes
+    WHERE task_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true
+WHERE s.stage_id = $1 AND s.retired_at IS NULL
+ORDER BY s.created_at, s.id
 `
 
-func (q *Queries) ListTasks(ctx context.Context, stageID uuid.UUID) ([]Task, error) {
+type ListTasksRow struct {
+	ID          uuid.UUID
+	StageID     uuid.UUID
+	Title       string
+	Description string
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	RetiredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) ListTasks(ctx context.Context, stageID uuid.UUID) ([]ListTasksRow, error) {
 	rows, err := q.db.Query(ctx, listTasks, stageID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Task{}
+	items := []ListTasksRow{}
 	for rows.Next() {
-		var i Task
+		var i ListTasksRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.StageID,
@@ -102,6 +142,7 @@ func (q *Queries) ListTasks(ctx context.Context, stageID uuid.UUID) ([]Task, err
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RetiredAt,
 		); err != nil {
 			return nil, err
 		}
@@ -113,11 +154,44 @@ func (q *Queries) ListTasks(ctx context.Context, stageID uuid.UUID) ([]Task, err
 	return items, nil
 }
 
+const lockTask = `-- name: LockTask :one
+SELECT id, stage_id, title, description, status, created_at, updated_at, retired_at FROM tasks
+WHERE id = $1 AND retired_at IS NULL
+FOR UPDATE
+`
+
+func (q *Queries) LockTask(ctx context.Context, id uuid.UUID) (Task, error) {
+	row := q.db.QueryRow(ctx, lockTask, id)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.StageID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RetiredAt,
+	)
+	return i, err
+}
+
+const retireTask = `-- name: RetireTask :exec
+UPDATE tasks
+SET retired_at = now(), updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) RetireTask(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, retireTask, id)
+	return err
+}
+
 const updateTask = `-- name: UpdateTask :one
 UPDATE tasks
 SET title = $2, description = $3, updated_at = now()
 WHERE id = $1
-RETURNING id, stage_id, title, description, status, created_at, updated_at
+RETURNING id, stage_id, title, description, status, created_at, updated_at, retired_at
 `
 
 type UpdateTaskParams struct {
@@ -137,6 +211,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RetiredAt,
 	)
 	return i, err
 }

@@ -1,6 +1,5 @@
 [
   {
-    "name": "change_stage_status",
     "description": "Cambia el status de una etapa de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Usa list_stages para obtener el ID de la etapa y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
@@ -20,6 +19,7 @@
       ],
       "type": "object"
     },
+    "name": "change_stage_status",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -41,10 +41,10 @@
         "project_id": {
           "type": "string"
         },
-        "updated_at": {
+        "status": {
           "type": "string"
         },
-        "status": {
+        "updated_at": {
           "type": "string"
         }
       },
@@ -62,8 +62,7 @@
     }
   },
   {
-    "name": "create_stage",
-    "description": "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+    "description": "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Solo funciona si el proyecto está en planning; si no, usa add_stage. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -87,6 +86,7 @@
       ],
       "type": "object"
     },
+    "name": "create_stage",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -108,10 +108,10 @@
         "project_id": {
           "type": "string"
         },
-        "updated_at": {
+        "status": {
           "type": "string"
         },
-        "status": {
+        "updated_at": {
           "type": "string"
         }
       },
@@ -129,7 +129,6 @@
     }
   },
   {
-    "name": "list_stages",
     "description": "Lista las etapas de un proyecto de PMT, ordenadas por posición. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
     "inputSchema": {
       "additionalProperties": false,
@@ -144,6 +143,7 @@
       ],
       "type": "object"
     },
+    "name": "list_stages",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -169,10 +169,10 @@
               "project_id": {
                 "type": "string"
               },
-              "updated_at": {
+              "status": {
                 "type": "string"
               },
-              "status": {
+              "updated_at": {
                 "type": "string"
               }
             },
@@ -201,7 +201,7 @@
     }
   },
   {
-    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si su proyecto está en planning. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -268,7 +268,7 @@
     }
   },
   {
-    "description": "Elimina una etapa de PMT y devuelve su ID. Solo funciona si su proyecto está en planning y la etapa no tiene tareas. Usa list_stages para obtener el ID de la etapa.",
+    "description": "Elimina una etapa de PMT y devuelve su ID. Solo funciona si su proyecto está en planning y la etapa no tiene historial ni tareas, activas o retiradas; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -292,6 +292,327 @@
       },
       "required": [
         "deleted_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Agrega una etapa nueva al final de un proyecto y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una etapa cuando el proyecto ya no está en planning. Devuelve la etapa y su versión.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción de la etapa",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nombre de la etapa",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto al que pertenece la etapa",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió el cambio",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "name",
+        "description",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "add_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "name",
+        "description",
+        "position",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Registra una nueva versión de una etapa como cambio inmutable, con su motivo y quién lo pidió, y devuelve la etapa y su versión. Es la forma de editar una etapa cuando el proyecto ya no está en planning o la etapa ya tiene historial. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Nueva descripción de la etapa",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nuevo nombre de la etapa",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió el cambio",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "name",
+        "description",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "revise_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "name",
+        "description",
+        "position",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas activas: primero retira sus tareas. Usa list_stages para obtener su ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Motivo del cambio",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió el cambio",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "retire_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "retired_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "retired_id",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista la evolución completa de las etapas con cambios de un proyecto, incluidas las retiradas: para cada una, el contenido original y sus cambios en orden de versión. Una etapa sin cambios no aparece. Con stage_id devuelve solo la de esa etapa.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de una etapa para ver solo su historial",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_stage_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "histories": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "changes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "changed_at": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "requested_by": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version",
+                    "kind",
+                    "name",
+                    "description",
+                    "reason",
+                    "requested_by",
+                    "changed_at"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "original": {
+                "additionalProperties": false,
+                "properties": {
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "description",
+                  "created_at"
+                ],
+                "type": "object"
+              },
+              "stage_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "stage_id",
+              "original",
+              "changes"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "histories"
       ],
       "type": "object"
     }

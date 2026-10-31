@@ -24,9 +24,10 @@ func (p fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
 }
 
 type fakeRepo struct {
-	existing uuid.UUID
-	err      error
-	deleted  bool
+	hasChanges bool
+	existing   uuid.UUID
+	err        error
+	deleted    bool
 }
 
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
@@ -42,6 +43,10 @@ func (r *fakeRepo) Delete(context.Context, uuid.UUID) error {
 	}
 	r.deleted = true
 	return nil
+}
+
+func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
+	return r.hasChanges, nil
 }
 
 func TestHandleDeletesInPlanning(t *testing.T) {
@@ -70,6 +75,20 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	}
 }
 
+func TestHandleRejectsElementWithChanges(t *testing.T) {
+	id := uuid.New()
+	repo := &fakeRepo{existing: id, hasChanges: true}
+
+	err := New(repo, fakeProjects{}).Handle(context.Background(), id)
+
+	if !errors.Is(err, domain.ErrStageHasChanges) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.deleted {
+		t.Error("no debió eliminar")
+	}
+}
+
 func TestREST(t *testing.T) {
 	id := uuid.New()
 	tests := []struct {
@@ -83,6 +102,7 @@ func TestREST(t *testing.T) {
 		{"id inválido", "abc", nil, nil, http.StatusBadRequest},
 		{"no existe", uuid.NewString(), nil, nil, http.StatusNotFound},
 		{"con tareas", id.String(), domain.ErrStageHasTasks, nil, http.StatusConflict},
+		{"solo con tareas retiradas", id.String(), domain.ErrStageHasTasks, nil, http.StatusConflict},
 		{"fuera de planning", id.String(), nil, errNotPlanning, http.StatusConflict},
 	}
 

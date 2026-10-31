@@ -97,7 +97,7 @@ func TestHandleMissingProject(t *testing.T) {
 	}
 }
 
-func TestHandleRejectsOutsidePlanning(t *testing.T) {
+func TestHandleOutsidePlanning(t *testing.T) {
 	statuses := []domain.Status{
 		domain.StatusStandBy, domain.StatusInDev, domain.StatusWorking, domain.StatusStopped, domain.StatusCancelled,
 	}
@@ -107,33 +107,56 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 			repo, id := newRepoWith(t)
 			p := repo.projects[id]
 			p.Status = status
+			p.ProductVersion = "1.0.0"
 			repo.projects[id] = p
 
-			_, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "Otro"})
+			result, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "Otro", Description: "Nueva", ProductVersion: "1.0.0"})
 
-			if !errors.Is(err, domain.ErrProjectNotPlanning) {
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Name != "Otro" || result.Description != "Nueva" {
+				t.Errorf("result = %+v", result)
+			}
+
+			_, err = New(repo).Handle(context.Background(), Command{ID: id, Name: "Tercero", ProductVersion: "2.0.0"})
+
+			if !errors.Is(err, domain.ErrProductVersionFrozen) {
 				t.Fatalf("err = %v", err)
 			}
-			if repo.projects[id].Name != "PMT" {
+			if repo.projects[id].Name != "Otro" || repo.projects[id].ProductVersion != "1.0.0" {
 				t.Errorf("proyecto = %+v", repo.projects[id])
 			}
 		})
 	}
 }
 
-func TestRESTRejectsOutsidePlanning(t *testing.T) {
-	repo, id := newRepoWith(t)
-	p := repo.projects[id]
-	p.Status = domain.StatusStandBy
-	repo.projects[id] = p
-	mux := http.NewServeMux()
-	New(repo).Register(mux)
-	rec := httptest.NewRecorder()
+func TestRESTOutsidePlanning(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   string
+		status int
+	}{
+		{"nombre", `{"name":"Otro"}`, http.StatusOK},
+		{"versión de producto", `{"name":"Otro","product_version":"2.0.0"}`, http.StatusConflict},
+	}
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String(), strings.NewReader(`{"name":"Otro"}`)))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, id := newRepoWith(t)
+			p := repo.projects[id]
+			p.Status = domain.StatusStandBy
+			repo.projects[id] = p
+			mux := http.NewServeMux()
+			New(repo).Register(mux)
+			rec := httptest.NewRecorder()
 
-	if rec.Code != http.StatusConflict {
-		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String(), strings.NewReader(tt.body)))
+
+			if rec.Code != tt.status {
+				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+			}
+		})
 	}
 }
 

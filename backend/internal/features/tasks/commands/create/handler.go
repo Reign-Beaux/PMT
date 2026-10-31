@@ -15,6 +15,12 @@ type Repository interface {
 	Create(ctx context.Context, t domain.Task) (domain.Task, error)
 }
 
+// StageChecker confirma que el proyecto de una etapa está en planning. Lo
+// implementa la feature stages, conectada en app.
+type StageChecker interface {
+	EnsureProjectPlanning(ctx context.Context, stageID uuid.UUID) error
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	StageID     uuid.UUID `json:"-"`
@@ -35,16 +41,20 @@ type Result struct {
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo   Repository
+	stages StageChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, stages StageChecker) *Handler {
+	return &Handler{repo: repo, stages: stages}
 }
 
 // Handle crea la tarea.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := h.stages.EnsureProjectPlanning(ctx, cmd.StageID); err != nil {
+		return Result{}, err
+	}
 	t, err := domain.NewTask(cmd.StageID, cmd.Title, cmd.Description)
 	if err != nil {
 		return Result{}, err

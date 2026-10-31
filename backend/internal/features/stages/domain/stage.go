@@ -19,8 +19,10 @@ var (
 	ErrProjectNotFound = kernel.NotFound("proyecto no encontrado")
 	// ErrPositionTaken indica que otra operación ocupó la posición al mismo tiempo.
 	ErrPositionTaken = kernel.Conflict("la posición de la etapa cambió, intenta de nuevo")
-	// ErrStageHasTasks indica que la etapa no se puede eliminar porque tiene tareas.
-	ErrStageHasTasks = kernel.Conflict("la etapa tiene tareas")
+	// ErrStageHasTasks indica que la etapa no se puede eliminar porque tiene tareas, incluidas las retiradas.
+	ErrStageHasTasks = kernel.Conflict("la etapa tiene tareas, activas o retiradas")
+	// ErrStageHasActiveTasks indica que la etapa no se puede retirar porque tiene tareas sin retirar.
+	ErrStageHasActiveTasks = kernel.Conflict("la etapa tiene tareas activas")
 )
 
 // Stage es la raíz del agregado de una etapa. Referencia a su proyecto por ID.

@@ -1,6 +1,5 @@
 [
   {
-    "name": "change_project_status",
     "description": "Cambia el status de un proyecto de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Usa list_projects para obtener el ID del proyecto y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
@@ -20,6 +19,7 @@
       ],
       "type": "object"
     },
+    "name": "change_project_status",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -58,7 +58,6 @@
     }
   },
   {
-    "name": "create_project",
     "description": "Crea un proyecto en PMT. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
@@ -78,6 +77,7 @@
       ],
       "type": "object"
     },
+    "name": "create_project",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -112,12 +112,12 @@
     }
   },
   {
-    "name": "list_projects",
     "description": "Lista los proyectos de PMT. Úsala para obtener el ID de un proyecto a partir de su nombre, por ejemplo antes de usar create_stage.",
     "inputSchema": {
       "additionalProperties": false,
       "type": "object"
     },
+    "name": "list_projects",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -171,7 +171,7 @@
     }
   },
   {
-    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Solo funciona si el proyecto está en planning. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -239,7 +239,7 @@
     }
   },
   {
-    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene etapas. Usa list_projects para obtener el ID del proyecto.",
+    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

@@ -42,7 +42,7 @@ func (s *Tasks) Create(ctx context.Context, task domain.Task) (domain.Task, erro
 	return toDomain(row), nil
 }
 
-// Get busca una tarea por su ID.
+// Get busca la última versión de una tarea sin retirar por su ID.
 func (s *Tasks) Get(ctx context.Context, id uuid.UUID) (domain.Task, error) {
 	row, err := s.queries.GetTask(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -51,10 +51,10 @@ func (s *Tasks) Get(ctx context.Context, id uuid.UUID) (domain.Task, error) {
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("obtener tarea: %w", err)
 	}
-	return toDomain(row), nil
+	return toDomain(sqlcgen.Task(row)), nil
 }
 
-// List devuelve las tareas de una etapa, de la más antigua a la más reciente.
+// List devuelve la última versión de las tareas sin retirar de una etapa, de la más antigua a la más reciente.
 func (s *Tasks) List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, error) {
 	rows, err := s.queries.ListTasks(ctx, stageID)
 	if err != nil {
@@ -62,7 +62,7 @@ func (s *Tasks) List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, err
 	}
 	tasks := make([]domain.Task, 0, len(rows))
 	for _, row := range rows {
-		tasks = append(tasks, toDomain(row))
+		tasks = append(tasks, toDomain(sqlcgen.Task(row)))
 	}
 	return tasks, nil
 }
@@ -86,6 +86,9 @@ func (s *Tasks) Update(ctx context.Context, task domain.Task) (domain.Task, erro
 // Delete elimina una tarea.
 func (s *Tasks) Delete(ctx context.Context, id uuid.UUID) error {
 	deleted, err := s.queries.DeleteTask(ctx, id)
+	if postgres.IsForeignKeyViolation(err) {
+		return domain.ErrTaskHasChanges
+	}
 	if err != nil {
 		return fmt.Errorf("eliminar tarea: %w", err)
 	}
@@ -93,6 +96,15 @@ func (s *Tasks) Delete(ctx context.Context, id uuid.UUID) error {
 		return domain.ErrTaskNotFound
 	}
 	return nil
+}
+
+// HasChanges indica si la tarea tiene historial de cambios.
+func (s *Tasks) HasChanges(ctx context.Context, id uuid.UUID) (bool, error) {
+	has, err := s.queries.HasTaskChanges(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("consultar cambios: %w", err)
+	}
+	return has, nil
 }
 
 func toDomain(row sqlcgen.Task) domain.Task {

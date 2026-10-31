@@ -12,7 +12,7 @@ paths:
           type: string
           format: uuid
     get:
-      summary: Lista las tareas de una etapa por fecha de creación
+      summary: Lista las tareas sin retirar de una etapa por fecha de creación
       responses:
         "200":
           description: Tareas
@@ -27,7 +27,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     post:
-      summary: Crea una tarea en estado backlog
+      summary: Crea una tarea en estado backlog si el proyecto está en planning
       requestBody:
         required: true
         content:
@@ -48,6 +48,8 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/tasks/{id}:
     parameters:
       - name: id
@@ -66,7 +68,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de una tarea
+      summary: Reemplaza los datos editables de una tarea sin historial cuyo proyecto está en planning
       requestBody:
         required: true
         content:
@@ -90,7 +92,7 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina una tarea cuyo proyecto está en planning
+      summary: Elimina una tarea sin historial cuyo proyecto está en planning
       responses:
         "204":
           description: Tarea eliminada
@@ -100,8 +102,134 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/stages/{stage_id}/tasks/add:
+    parameters:
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Agrega una tarea como cambio inmutable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "201":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/stages/{stage_id}/task-changes:
+    parameters:
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: task_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista la evolución completa de lo que tiene cambios, incluido lo retirado
+      responses:
+        "200":
+          description: Evolución de cada tarea con cambios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/History"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/revise:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Registra una nueva versión como cambio inmutable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "200":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/retire:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Retira la tarea sin borrar nada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, requested_by]
+              properties:
+                reason:
+                  type: string
+                requested_by:
+                  type: string
+      responses:
+        "200":
+          description: Retiro registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retired_id, version]
+                properties:
+                  retired_id:
+                    type: string
+                    format: uuid
+                  version:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   responses:
+    Versioned:
+      description: Task y su versión
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Task"
+              - type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
     Task:
       description: Tarea
       content:
@@ -119,6 +247,66 @@ components:
               error:
                 type: string
   schemas:
+    ChangeContent:
+      type: object
+      additionalProperties: false
+      required: [title, reason, requested_by]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+    History:
+      type: object
+      required: [task_id, original, changes]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        original:
+          $ref: "#/components/schemas/Original"
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+    Original:
+      type: object
+      required: [title, description, created_at]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Change:
+      type: object
+      required: [id, version, kind, title, description, reason, requested_by, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        kind:
+          type: string
+          enum: [add, edit, retire]
+        title:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     Task:
       type: object
       required: [id, stage_id, title, description, status, created_at, updated_at]

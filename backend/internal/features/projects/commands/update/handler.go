@@ -51,9 +51,6 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := p.EnsurePlanning(); err != nil {
-		return Result{}, err
-	}
 	if err := p.Update(cmd.Name, cmd.Description, cmd.ProductVersion); err != nil {
 		return Result{}, err
 	}

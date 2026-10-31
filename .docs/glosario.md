@@ -28,6 +28,8 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Status de una etapa** | `Status` | Estado de una etapa: `planning` (se definen sus tareas), `stand_by` (lista, esperando su turno), `in_dev` (sus tareas se están trabajando), `done` (terminada y cerrada), `stopped` (detenida por una causa mayor) o `cancelled` (ya no se hará). Solo cambia mediante las transiciones permitidas, y solo pasa a `done` si todas sus tareas están en `done`. |
 | **Tarea** | `Task` | Unidad de trabajo de una etapa. Es la raíz de su propio agregado y referencia a su etapa por ID. |
 | **Status de una tarea** | `Status` | Estado de una tarea: `backlog` (definida, aún no liberada), `ready` (liberada para desarrollo), `in_progress` (en desarrollo), `in_review` (en revisión de código), `changes_requested` (con correcciones pendientes), `in_qa` (en verificación de QA), `pending_close` (aprobada por QA, falta el cierre), `done` (verificada y cerrada) o `cancelled` (ya no se hará). |
+| **Cambio** | `Change` | Registro inmutable de una etapa o tarea, de tipo `add`, `edit` o `retire`, con su contenido completo, su motivo, quién lo pidió y su fecha. El original no es un cambio: queda en la fila de la etapa o tarea. Es una entidad del agregado `Stage` o `Task`. Nunca se edita ni se borra. |
+| **Retirar** | `Retire` | Sacar una etapa o tarea de las consultas registrando un cambio, sin borrar nada. Sigue en el historial y no se deshace. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y se comunica con PMT por MCP. |
 | **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DevFrontend, DevBackend, CR, QAP o QA. |
 | **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. |

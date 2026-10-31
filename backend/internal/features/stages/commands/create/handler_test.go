@@ -11,7 +11,18 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
+
+var errNotPlanning = kernel.Conflict("el proyecto no está en planning")
+
+type fakeProjects struct {
+	err error
+}
+
+func (c fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
+	return c.err
+}
 
 type fakeRepo struct {
 	saved []domain.Stage
@@ -30,7 +41,7 @@ func TestHandleCreatesStage(t *testing.T) {
 	repo := &fakeRepo{}
 	projectID := uuid.New()
 
-	result, err := New(repo).Handle(context.Background(), Command{ProjectID: projectID, Name: " Diseño "})
+	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ProjectID: projectID, Name: " Diseño "})
 
 	if err != nil {
 		t.Fatal(err)
@@ -46,13 +57,39 @@ func TestHandleCreatesStage(t *testing.T) {
 func TestHandleRejectsInvalidStage(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo).Handle(context.Background(), Command{ProjectID: uuid.New(), Name: " "})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ProjectID: uuid.New(), Name: " "})
 
 	if !errors.Is(err, domain.ErrStageNameRequired) {
 		t.Fatalf("err = %v", err)
 	}
 	if len(repo.saved) != 0 {
 		t.Error("no debió guardar la etapa")
+	}
+}
+
+func TestHandleRejectsOutsidePlanning(t *testing.T) {
+	repo := &fakeRepo{}
+
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ProjectID: uuid.New(), Name: "Diseño"})
+
+	if !errors.Is(err, errNotPlanning) {
+		t.Fatalf("err = %v", err)
+	}
+	if len(repo.saved) != 0 {
+		t.Error("no debió guardar")
+	}
+}
+
+func TestRESTRejectsOutsidePlanning(t *testing.T) {
+	mux := http.NewServeMux()
+	New(&fakeRepo{}, fakeProjects{err: errNotPlanning}).Register(mux)
+	rec := httptest.NewRecorder()
+	path := "/api/projects/" + uuid.NewString() + "/stages"
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"name":"A"}`)))
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 	}
 }
 
@@ -76,7 +113,7 @@ func TestREST(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
-			New(&fakeRepo{err: tt.err}).Register(mux)
+			New(&fakeRepo{err: tt.err}, fakeProjects{}).Register(mux)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body)))

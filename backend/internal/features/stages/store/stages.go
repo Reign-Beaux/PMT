@@ -44,7 +44,7 @@ func (s *Stages) Create(ctx context.Context, stage domain.Stage) (domain.Stage, 
 	return toDomain(row), nil
 }
 
-// Get busca una etapa por su ID.
+// Get busca la última versión de una etapa sin retirar por su ID.
 func (s *Stages) Get(ctx context.Context, id uuid.UUID) (domain.Stage, error) {
 	row, err := s.queries.GetStage(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -53,10 +53,10 @@ func (s *Stages) Get(ctx context.Context, id uuid.UUID) (domain.Stage, error) {
 	if err != nil {
 		return domain.Stage{}, fmt.Errorf("obtener etapa: %w", err)
 	}
-	return toDomain(row), nil
+	return toDomain(sqlcgen.Stage(row)), nil
 }
 
-// List devuelve las etapas de un proyecto en orden.
+// List devuelve la última versión de las etapas sin retirar de un proyecto en orden.
 func (s *Stages) List(ctx context.Context, projectID uuid.UUID) ([]domain.Stage, error) {
 	rows, err := s.queries.ListStages(ctx, projectID)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *Stages) List(ctx context.Context, projectID uuid.UUID) ([]domain.Stage,
 	}
 	stages := make([]domain.Stage, 0, len(rows))
 	for _, row := range rows {
-		stages = append(stages, toDomain(row))
+		stages = append(stages, toDomain(sqlcgen.Stage(row)))
 	}
 	return stages, nil
 }
@@ -85,7 +85,7 @@ func (s *Stages) Update(ctx context.Context, stage domain.Stage) (domain.Stage, 
 	return toDomain(row), nil
 }
 
-// UpdateStatus guarda el status de una etapa.
+// UpdateStatus guarda el status de una etapa y devuelve su última versión.
 func (s *Stages) UpdateStatus(ctx context.Context, stage domain.Stage) (domain.Stage, error) {
 	row, err := s.queries.UpdateStageStatus(ctx, sqlcgen.UpdateStageStatusParams{
 		ID:     stage.ID,
@@ -97,7 +97,7 @@ func (s *Stages) UpdateStatus(ctx context.Context, stage domain.Stage) (domain.S
 	if err != nil {
 		return domain.Stage{}, fmt.Errorf("actualizar status de etapa: %w", err)
 	}
-	return toDomain(row), nil
+	return toDomain(sqlcgen.Stage(row)), nil
 }
 
 // Delete elimina una etapa.
@@ -113,6 +113,15 @@ func (s *Stages) Delete(ctx context.Context, id uuid.UUID) error {
 		return domain.ErrStageNotFound
 	}
 	return nil
+}
+
+// HasChanges indica si la etapa tiene historial de cambios.
+func (s *Stages) HasChanges(ctx context.Context, id uuid.UUID) (bool, error) {
+	has, err := s.queries.HasStageChanges(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("consultar cambios: %w", err)
+	}
+	return has, nil
 }
 
 func toDomain(row sqlcgen.Stage) domain.Stage {

@@ -31,7 +31,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_task",
-		Description: "Crea una tarea en una etapa de PMT. Nace en estado backlog. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+		Description: "Crea una tarea en una etapa de PMT. Nace en estado backlog. Solo funciona si el proyecto de la etapa está en planning; si no, usa add_task. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
 	}, h.callTool)
 }
 

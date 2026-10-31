@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Project struct {
@@ -29,6 +30,19 @@ type Stage struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Status      string
+	RetiredAt   pgtype.Timestamptz
+}
+
+type StageChange struct {
+	ID          uuid.UUID
+	StageID     uuid.UUID
+	Version     int32
+	Kind        string
+	Name        string
+	Description string
+	Reason      string
+	RequestedBy string
+	ChangedAt   time.Time
 }
 
 type Task struct {
@@ -39,4 +53,17 @@ type Task struct {
 	Status      string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	RetiredAt   pgtype.Timestamptz
+}
+
+type TaskChange struct {
+	ID          uuid.UUID
+	TaskID      uuid.UUID
+	Version     int32
+	Kind        string
+	Title       string
+	Description string
+	Reason      string
+	RequestedBy string
+	ChangedAt   time.Time
 }

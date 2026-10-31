@@ -13,6 +13,7 @@ import (
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Task, error)
+	HasChanges(ctx context.Context, id uuid.UUID) (bool, error)
 	Update(ctx context.Context, t domain.Task) (domain.Task, error)
 }
 
@@ -59,6 +60,13 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	}
 	if err := h.stages.EnsureProjectPlanning(ctx, t.StageID); err != nil {
 		return Result{}, err
+	}
+	hasChanges, err := h.repo.HasChanges(ctx, cmd.ID)
+	if err != nil {
+		return Result{}, err
+	}
+	if hasChanges {
+		return Result{}, domain.ErrTaskHasChanges
 	}
 	if err := t.Update(cmd.Title, cmd.Description); err != nil {
 		return Result{}, err

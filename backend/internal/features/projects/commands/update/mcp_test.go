@@ -87,6 +87,7 @@ func TestToolRejectsInvalidInput(t *testing.T) {
 	repo, id := newRepoWith(t)
 	p := repo.projects[id]
 	p.Status = domain.StatusStandBy
+	p.ProductVersion = "1.0.0"
 	stopped := uuid.New()
 	p.ID = stopped
 	repo.projects[stopped] = p
@@ -100,7 +101,7 @@ func TestToolRejectsInvalidInput(t *testing.T) {
 		{"id no es UUID", "abc", "PMT", "project_id inválido"},
 		{"nombre vacío", id.String(), " ", "obligatorio"},
 		{"no existe", uuid.NewString(), "PMT", "proyecto no encontrado"},
-		{"fuera de planning", stopped.String(), "Otro", "el proyecto no está en planning"},
+		{"versión fuera de planning", stopped.String(), "Otro", "la versión de producto no se edita"},
 	}
 
 	for _, tt := range tests {

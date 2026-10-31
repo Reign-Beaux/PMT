@@ -1,7 +1,6 @@
 [
   {
-    "name": "create_task",
-    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+    "description": "Crea una tarea en una etapa de PMT. Nace en estado backlog. Solo funciona si el proyecto de la etapa está en planning; si no, usa add_task. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -25,6 +24,7 @@
       ],
       "type": "object"
     },
+    "name": "create_task",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -63,7 +63,6 @@
     }
   },
   {
-    "name": "list_tasks",
     "description": "Lista las tareas de una etapa de PMT, de la más antigua a la más reciente. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
     "inputSchema": {
       "additionalProperties": false,
@@ -78,6 +77,7 @@
       ],
       "type": "object"
     },
+    "name": "list_tasks",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -131,7 +131,7 @@
     }
   },
   {
-    "description": "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo funciona si el proyecto de su etapa está en planning. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo funciona si el proyecto de su etapa está en planning y la tarea no tiene historial; si no, usa revise_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -194,7 +194,7 @@
     }
   },
   {
-    "description": "Elimina una tarea de PMT y devuelve su ID. Solo funciona si el proyecto de su etapa está en planning. Usa list_tasks para obtener el ID de la tarea.",
+    "description": "Elimina una tarea de PMT y devuelve su ID. Solo funciona si el proyecto de su etapa está en planning y la tarea no tiene historial; si no, usa retire_task. Usa list_tasks para obtener el ID de la tarea.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -218,6 +218,319 @@
       },
       "required": [
         "deleted_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Agrega una tarea nueva al final de una etapa y la registra como cambio inmutable, con su motivo y quién lo pidió. Es la forma de agregar una tarea cuando el proyecto ya no está en planning. Devuelve la tarea y su versión.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción de la tarea",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió el cambio",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa a la que pertenece la tarea",
+          "type": "string"
+        },
+        "title": {
+          "description": "Título de la tarea",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "title",
+        "description",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "add_task",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "stage_id",
+        "title",
+        "description",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Nueva descripción de la tarea",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió el cambio",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "UUID de la tarea",
+          "type": "string"
+        },
+        "title": {
+          "description": "Nuevo título de la tarea",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "title",
+        "description",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "revise_task",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "stage_id",
+        "title",
+        "description",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Retira una tarea de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_tasks y sigue en list_task_changes. El retiro no se deshace. Usa list_tasks para obtener su ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Motivo del cambio",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Quién pidió el cambio",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "UUID de la tarea",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "reason",
+        "requested_by"
+      ],
+      "type": "object"
+    },
+    "name": "retire_task",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "retired_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "retired_id",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista la evolución completa de las tareas con cambios de una etapa, incluidas las retiradas: para cada una, el contenido original y sus cambios en orden de versión. Una tarea sin cambios no aparece. Con task_id devuelve solo la de esa tarea.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "UUID de una tarea para ver solo su historial",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_task_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "histories": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "changes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "changed_at": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "requested_by": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version",
+                    "kind",
+                    "title",
+                    "description",
+                    "reason",
+                    "requested_by",
+                    "changed_at"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "original": {
+                "additionalProperties": false,
+                "properties": {
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "description",
+                  "created_at"
+                ],
+                "type": "object"
+              },
+              "task_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "task_id",
+              "original",
+              "changes"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "histories"
       ],
       "type": "object"
     }

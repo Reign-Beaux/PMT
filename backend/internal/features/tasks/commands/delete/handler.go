@@ -12,6 +12,7 @@ import (
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Task, error)
+	HasChanges(ctx context.Context, id uuid.UUID) (bool, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -40,6 +41,13 @@ func (h *Handler) Handle(ctx context.Context, id uuid.UUID) error {
 	}
 	if err := h.stages.EnsureProjectPlanning(ctx, t.StageID); err != nil {
 		return err
+	}
+	hasChanges, err := h.repo.HasChanges(ctx, id)
+	if err != nil {
+		return err
+	}
+	if hasChanges {
+		return domain.ErrTaskHasChanges
 	}
 	return h.repo.Delete(ctx, id)
 }

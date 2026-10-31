@@ -7,8 +7,10 @@ package sqlcgen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createStage = `-- name: CreateStage :one
@@ -16,7 +18,7 @@ INSERT INTO stages (id, project_id, name, description, status, position)
 SELECT $1::uuid, $2::uuid, $3::text, $4::text, $5::text, COALESCE(MAX(position), 0) + 1
 FROM stages
 WHERE project_id = $2::uuid
-RETURNING id, project_id, name, description, position, created_at, updated_at, status
+RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at
 `
 
 type CreateStageParams struct {
@@ -45,6 +47,7 @@ func (q *Queries) CreateStage(ctx context.Context, arg CreateStageParams) (Stage
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Status,
+		&i.RetiredAt,
 	)
 	return i, err
 }
@@ -63,13 +66,32 @@ func (q *Queries) DeleteStage(ctx context.Context, id uuid.UUID) (int64, error) 
 }
 
 const getStage = `-- name: GetStage :one
-SELECT id, project_id, name, description, position, created_at, updated_at, status FROM stages
-WHERE id = $1
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at
+FROM stages s
+LEFT JOIN LATERAL (
+    SELECT name, description FROM stage_changes
+    WHERE stage_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true
+WHERE s.id = $1 AND s.retired_at IS NULL
 `
 
-func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (Stage, error) {
+type GetStageRow struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Status      string
+	RetiredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (GetStageRow, error) {
 	row := q.db.QueryRow(ctx, getStage, id)
-	var i Stage
+	var i GetStageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
@@ -79,25 +101,45 @@ func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (Stage, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Status,
+		&i.RetiredAt,
 	)
 	return i, err
 }
 
 const listStages = `-- name: ListStages :many
-SELECT id, project_id, name, description, position, created_at, updated_at, status FROM stages
-WHERE project_id = $1
-ORDER BY position
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at
+FROM stages s
+LEFT JOIN LATERAL (
+    SELECT name, description FROM stage_changes
+    WHERE stage_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true
+WHERE s.project_id = $1 AND s.retired_at IS NULL
+ORDER BY s.position
 `
 
-func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]Stage, error) {
+type ListStagesRow struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Status      string
+	RetiredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListStagesRow, error) {
 	rows, err := q.db.Query(ctx, listStages, projectID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Stage{}
+	items := []ListStagesRow{}
 	for rows.Next() {
-		var i Stage
+		var i ListStagesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
@@ -107,6 +149,7 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]Stage,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Status,
+			&i.RetiredAt,
 		); err != nil {
 			return nil, err
 		}
@@ -118,11 +161,45 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]Stage,
 	return items, nil
 }
 
+const lockStage = `-- name: LockStage :one
+SELECT id, project_id, name, description, position, created_at, updated_at, status, retired_at FROM stages
+WHERE id = $1 AND retired_at IS NULL
+FOR UPDATE
+`
+
+func (q *Queries) LockStage(ctx context.Context, id uuid.UUID) (Stage, error) {
+	row := q.db.QueryRow(ctx, lockStage, id)
+	var i Stage
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Name,
+		&i.Description,
+		&i.Position,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.RetiredAt,
+	)
+	return i, err
+}
+
+const retireStage = `-- name: RetireStage :exec
+UPDATE stages
+SET retired_at = now(), updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) RetireStage(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, retireStage, id)
+	return err
+}
+
 const updateStage = `-- name: UpdateStage :one
 UPDATE stages
 SET name = $2, description = $3, updated_at = now()
 WHERE id = $1
-RETURNING id, project_id, name, description, position, created_at, updated_at, status
+RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at
 `
 
 type UpdateStageParams struct {
@@ -143,15 +220,26 @@ func (q *Queries) UpdateStage(ctx context.Context, arg UpdateStageParams) (Stage
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Status,
+		&i.RetiredAt,
 	)
 	return i, err
 }
 
 const updateStageStatus = `-- name: UpdateStageStatus :one
-UPDATE stages
-SET status = $2, updated_at = now()
-WHERE id = $1
-RETURNING id, project_id, name, description, position, created_at, updated_at, status
+WITH updated AS (
+    UPDATE stages
+    SET status = $2, updated_at = now()
+    WHERE stages.id = $1
+    RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at
+)
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at
+FROM updated s
+LEFT JOIN LATERAL (
+    SELECT name, description FROM stage_changes
+    WHERE stage_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true
 `
 
 type UpdateStageStatusParams struct {
@@ -159,9 +247,21 @@ type UpdateStageStatusParams struct {
 	Status string
 }
 
-func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) (Stage, error) {
+type UpdateStageStatusRow struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Status      string
+	RetiredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) (UpdateStageStatusRow, error) {
 	row := q.db.QueryRow(ctx, updateStageStatus, arg.ID, arg.Status)
-	var i Stage
+	var i UpdateStageStatusRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
@@ -171,6 +271,7 @@ func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Status,
+		&i.RetiredAt,
 	)
 	return i, err
 }

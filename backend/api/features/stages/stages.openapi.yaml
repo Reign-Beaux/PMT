@@ -25,7 +25,7 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
     post:
-      summary: Crea una etapa al final del proyecto
+      summary: Crea una etapa al final de un proyecto en planning
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
@@ -117,6 +117,122 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/projects/{project_id}/stages/add:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Agrega una etapa como cambio inmutable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "201":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/projects/{project_id}/stage-changes:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stage_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista la evolución completa de lo que tiene cambios, incluido lo retirado
+      responses:
+        "200":
+          description: Evolución de cada etapa con cambios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/History"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/revise:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Registra una nueva versión como cambio inmutable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "200":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/retire:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Retira la etapa sin borrar nada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, requested_by]
+              properties:
+                reason:
+                  type: string
+                requested_by:
+                  type: string
+      responses:
+        "200":
+          description: Retiro y su versión
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retired_id, version]
+                properties:
+                  retired_id:
+                    type: string
+                    format: uuid
+                  version:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
 components:
   requestBodies:
     StageInput:
@@ -133,6 +249,18 @@ components:
               description:
                 type: string
   responses:
+    Versioned:
+      description: Etapa y su versión
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Stage"
+              - type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
     Stage:
       description: Etapa
       content:
@@ -146,6 +274,66 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    ChangeContent:
+      type: object
+      additionalProperties: false
+      required: [name, reason, requested_by]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+    History:
+      type: object
+      required: [stage_id, original, changes]
+      properties:
+        stage_id:
+          type: string
+          format: uuid
+        original:
+          $ref: "#/components/schemas/Original"
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+    Original:
+      type: object
+      required: [name, description, created_at]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Change:
+      type: object
+      required: [id, version, kind, name, description, reason, requested_by, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        kind:
+          type: string
+          enum: [add, edit, retire]
+        name:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     Error:
       type: object
       required: [error]

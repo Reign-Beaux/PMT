@@ -25,7 +25,8 @@ func (s fakeStages) EnsureProjectPlanning(context.Context, uuid.UUID) error {
 }
 
 type fakeRepo struct {
-	tasks map[uuid.UUID]domain.Task
+	tasks      map[uuid.UUID]domain.Task
+	hasChanges bool
 }
 
 func newRepoWith(t *testing.T) (*fakeRepo, uuid.UUID) {
@@ -48,6 +49,10 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Task, error) {
 func (r *fakeRepo) Update(_ context.Context, task domain.Task) (domain.Task, error) {
 	r.tasks[task.ID] = task
 	return task, nil
+}
+
+func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
+	return r.hasChanges, nil
 }
 
 func TestHandleUpdatesTask(t *testing.T) {
@@ -102,6 +107,21 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	}
 	if repo.tasks[id].Title != "Revisar" {
 		t.Errorf("tarea = %+v", repo.tasks[id])
+	}
+}
+
+func TestHandleRejectsElementWithChanges(t *testing.T) {
+	repo, id := newRepoWith(t)
+	repo.hasChanges = true
+	before := repo.tasks[id].Title
+
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Title: "Otra"})
+
+	if !errors.Is(err, domain.ErrTaskHasChanges) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.tasks[id].Title != before {
+		t.Errorf("elemento = %+v", repo.tasks[id])
 	}
 }
 

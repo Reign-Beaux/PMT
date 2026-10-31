@@ -22,7 +22,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "delete_project",
-		Description: "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene etapas. Usa list_projects para obtener el ID del proyecto.",
+		Description: "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
 	}, h.callTool)
 }
 

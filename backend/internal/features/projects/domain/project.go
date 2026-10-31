@@ -15,10 +15,12 @@ var (
 	ErrProjectNotFound = kernel.NotFound("proyecto no encontrado")
 	// ErrProjectNameRequired indica que el nombre del proyecto está vacío.
 	ErrProjectNameRequired = kernel.Invalid("el nombre del proyecto es obligatorio")
-	// ErrProjectHasStages indica que el proyecto no se puede eliminar porque tiene etapas.
-	ErrProjectHasStages = kernel.Conflict("el proyecto tiene etapas")
+	// ErrProjectHasStages indica que el proyecto no se puede eliminar porque tiene etapas, incluidas las retiradas.
+	ErrProjectHasStages = kernel.Conflict("el proyecto tiene etapas, activas o retiradas")
 	// ErrProjectNotPlanning indica que el proyecto ya no admite cambios de definición.
 	ErrProjectNotPlanning = kernel.Conflict("el proyecto no está en planning")
+	// ErrProductVersionFrozen indica que la versión de producto ya no se puede cambiar.
+	ErrProductVersionFrozen = kernel.Conflict("la versión de producto no se edita fuera de planning")
 )
 
 // Project es la raíz del agregado de un proyecto.
@@ -49,14 +51,19 @@ func (p Project) EnsurePlanning() error {
 	return nil
 }
 
-// Update cambia los datos editables del proyecto.
+// Update cambia los datos editables del proyecto. Fuera de planning, la versión
+// de producto debe ser la actual.
 func (p *Project) Update(name, description, productVersion string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return ErrProjectNameRequired
 	}
+	productVersion = strings.TrimSpace(productVersion)
+	if p.Status != StatusPlanning && productVersion != p.ProductVersion {
+		return ErrProductVersionFrozen
+	}
 	p.Name = name
 	p.Description = strings.TrimSpace(description)
-	p.ProductVersion = strings.TrimSpace(productVersion)
+	p.ProductVersion = productVersion
 	return nil
 }

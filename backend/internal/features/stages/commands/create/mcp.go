@@ -32,7 +32,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_stage",
-		Description: "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+		Description: "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Solo funciona si el proyecto está en planning; si no, usa add_stage. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
 	}, h.callTool)
 }
 

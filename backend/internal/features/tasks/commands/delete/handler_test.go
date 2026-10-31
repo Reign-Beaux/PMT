@@ -24,8 +24,9 @@ func (s fakeStages) EnsureProjectPlanning(context.Context, uuid.UUID) error {
 }
 
 type fakeRepo struct {
-	existing uuid.UUID
-	deleted  bool
+	hasChanges bool
+	existing   uuid.UUID
+	deleted    bool
 }
 
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Task, error) {
@@ -38,6 +39,10 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Task, error) {
 func (r *fakeRepo) Delete(context.Context, uuid.UUID) error {
 	r.deleted = true
 	return nil
+}
+
+func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
+	return r.hasChanges, nil
 }
 
 func TestHandleDeletesInPlanning(t *testing.T) {
@@ -63,6 +68,20 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	}
 	if repo.deleted {
 		t.Error("no debió eliminar la tarea")
+	}
+}
+
+func TestHandleRejectsElementWithChanges(t *testing.T) {
+	id := uuid.New()
+	repo := &fakeRepo{existing: id, hasChanges: true}
+
+	err := New(repo, fakeStages{}).Handle(context.Background(), id)
+
+	if !errors.Is(err, domain.ErrTaskHasChanges) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.deleted {
+		t.Error("no debió eliminar")
 	}
 }
 

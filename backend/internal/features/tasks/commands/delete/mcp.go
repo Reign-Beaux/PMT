@@ -22,7 +22,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "delete_task",
-		Description: "Elimina una tarea de PMT y devuelve su ID. Solo funciona si el proyecto de su etapa está en planning. Usa list_tasks para obtener el ID de la tarea.",
+		Description: "Elimina una tarea de PMT y devuelve su ID. Solo funciona si el proyecto de su etapa está en planning y la tarea no tiene historial; si no, usa retire_task. Usa list_tasks para obtener el ID de la tarea.",
 	}, h.callTool)
 }
 

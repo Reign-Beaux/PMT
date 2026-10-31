@@ -82,6 +82,31 @@ func TestUpdateKeepsStatus(t *testing.T) {
 	}
 }
 
+func TestUpdateFreezesProductVersionOutsidePlanning(t *testing.T) {
+	p, err := NewProject("PMT", "Gestor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Update("PMT", "Gestor", "1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	p.Status = StatusInDev
+
+	if err := p.Update("Otro", "Nuevo", " 1.0.0 "); err != nil {
+		t.Fatal(err)
+	}
+	if p.Name != "Otro" || p.Description != "Nuevo" {
+		t.Errorf("proyecto = %+v", p)
+	}
+
+	if err := p.Update("Tercero", "Nuevo", "2.0.0"); !errors.Is(err, ErrProductVersionFrozen) {
+		t.Fatalf("err = %v", err)
+	}
+	if p.Name != "Otro" || p.ProductVersion != "1.0.0" {
+		t.Errorf("proyecto = %+v", p)
+	}
+}
+
 func TestEnsurePlanning(t *testing.T) {
 	if err := (Project{Status: StatusPlanning}).EnsurePlanning(); err != nil {
 		t.Errorf("err = %v", err)

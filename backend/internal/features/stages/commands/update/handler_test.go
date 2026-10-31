@@ -25,7 +25,8 @@ func (p fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
 }
 
 type fakeRepo struct {
-	stages map[uuid.UUID]domain.Stage
+	stages     map[uuid.UUID]domain.Stage
+	hasChanges bool
 }
 
 func newRepoWith(t *testing.T) (*fakeRepo, uuid.UUID) {
@@ -48,6 +49,10 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
 func (r *fakeRepo) Update(_ context.Context, s domain.Stage) (domain.Stage, error) {
 	r.stages[s.ID] = s
 	return s, nil
+}
+
+func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
+	return r.hasChanges, nil
 }
 
 func TestHandleUpdatesStage(t *testing.T) {
@@ -86,6 +91,21 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	}
 	if repo.stages[id].Name != "Diseño" {
 		t.Errorf("etapa = %+v", repo.stages[id])
+	}
+}
+
+func TestHandleRejectsElementWithChanges(t *testing.T) {
+	repo, id := newRepoWith(t)
+	repo.hasChanges = true
+	before := repo.stages[id].Name
+
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Name: "Otra"})
+
+	if !errors.Is(err, domain.ErrStageHasChanges) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.stages[id].Name != before {
+		t.Errorf("elemento = %+v", repo.stages[id])
 	}
 }
 
