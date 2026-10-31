@@ -17,10 +17,11 @@ import (
 // fakeRepo imita al store: Get no encuentra lo retirado y ambas lecturas
 // devuelven la última versión, no el contenido original de la fila.
 type fakeRepo struct {
-	tasks   map[uuid.UUID]domain.Task
-	retired map[uuid.UUID]bool
-	latest  map[uuid.UUID]domain.Task
-	updates int
+	tasks    map[uuid.UUID]domain.Task
+	retired  map[uuid.UUID]bool
+	latest   map[uuid.UUID]domain.Task
+	updates  int
+	recorded []domain.StatusChange
 }
 
 func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
@@ -45,8 +46,9 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Task, error) {
 	return r.withLatest(task), nil
 }
 
-func (r *fakeRepo) UpdateStatus(_ context.Context, task domain.Task) (domain.Task, error) {
+func (r *fakeRepo) ChangeStatus(_ context.Context, task domain.Task, change domain.StatusChange) (domain.Task, error) {
 	r.updates++
+	r.recorded = append(r.recorded, change)
 	row := r.tasks[task.ID]
 	row.Status = task.Status
 	r.tasks[task.ID] = row

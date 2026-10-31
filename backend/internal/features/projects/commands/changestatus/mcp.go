@@ -15,6 +15,7 @@ import (
 type toolInput struct {
 	ProjectID string `json:"project_id" jsonschema:"UUID del proyecto"`
 	Status    string `json:"status" jsonschema:"Nuevo status: planning, stand_by, in_dev, working, stopped o cancelled"`
+	Reason    string `json:"reason,omitempty" jsonschema:"Motivo del cambio de status; queda en el historial"`
 }
 
 type toolOutput struct {
@@ -31,17 +32,17 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_project_status",
-		Description: "Cambia el status de un proyecto de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Usa list_projects para obtener el ID del proyecto y su status actual.",
+		Description: "Cambia el status de un proyecto de PMT. Deja un registro inmutable, consultable con list_project_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Usa list_projects para obtener el ID del proyecto y su status actual.",
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
 	projectID, err := uuid.Parse(input.ProjectID)
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("project_id inválido"))
 	}
 
-	result, err := h.Handle(ctx, Command{ID: projectID, Status: domain.Status(input.Status)})
+	result, err := h.Handle(ctx, Command{ID: projectID, Status: domain.Status(input.Status), Reason: input.Reason, Actor: platformmcp.ActorFrom(req)})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}

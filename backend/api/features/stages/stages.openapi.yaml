@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: PMT - Etapas
   version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
 paths:
   /api/projects/{project_id}/stages:
     parameters:
@@ -14,6 +17,8 @@ paths:
     get:
       summary: Lista las etapas de un proyecto en orden
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Etapas. La lista viene vacía si el proyecto no existe.
           content:
@@ -29,6 +34,8 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "201":
           $ref: "#/components/responses/Stage"
         "400":
@@ -48,6 +55,8 @@ paths:
     get:
       summary: Obtiene una etapa
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Stage"
         "400":
@@ -59,6 +68,8 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Stage"
         "400":
@@ -70,6 +81,8 @@ paths:
     delete:
       summary: Elimina una etapa sin tareas en su planning propio con el proyecto en working, o sin historial cuyo proyecto está en planning
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "204":
           description: Etapa eliminada
         "400":
@@ -100,7 +113,12 @@ paths:
               properties:
                 status:
                   $ref: "#/components/schemas/StageStatus"
+                reason:
+                  type: string
+                  description: Motivo del cambio; queda en el historial de status.
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Stage"
         "400":
@@ -134,6 +152,8 @@ paths:
             schema:
               $ref: "#/components/schemas/ChangeContent"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "201":
           $ref: "#/components/responses/Versioned"
         "400":
@@ -157,6 +177,8 @@ paths:
     get:
       summary: Lista la evolución completa de lo que tiene cambios, incluido lo retirado
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Evolución de cada etapa con cambios
           content:
@@ -184,6 +206,8 @@ paths:
             schema:
               $ref: "#/components/schemas/ChangeContent"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Versioned"
         "400":
@@ -214,6 +238,8 @@ paths:
                 requested_by:
                   type: string
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Retiro y su versión
           content:
@@ -233,7 +259,35 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/stages/{id}/status-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de status de una etapa
+      description: Funciona aunque ya no exista o esté retirado. Un ID sin registros responde lista vacía.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios por orden de fecha
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChange"
+        "400":
+          $ref: "#/components/responses/Error"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   requestBodies:
     StageInput:
       required: true
@@ -249,6 +303,12 @@ components:
               description:
                 type: string
   responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token, la petición sigue como `sin-autenticar` durante la transición.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     Versioned:
       description: Etapa y su versión
       content:
@@ -274,6 +334,30 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    StatusChange:
+      type: object
+      required: [id, stage_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stage_id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+        to_status:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+          description: Vacío si actuó `sin-autenticar`.
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     ChangeContent:
       type: object
       additionalProperties: false

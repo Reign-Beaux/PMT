@@ -23,3 +23,8 @@ UPDATE bugs
 SET status = $2, updated_at = clock_timestamp()
 WHERE id = $1
 RETURNING *;
+
+-- name: LockBug :one
+SELECT * FROM bugs
+WHERE id = $1
+FOR UPDATE;

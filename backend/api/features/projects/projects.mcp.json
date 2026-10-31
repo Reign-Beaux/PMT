@@ -1,11 +1,15 @@
 [
   {
-    "description": "Cambia el status de un proyecto de PMT. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Usa list_projects para obtener el ID del proyecto y su status actual.",
+    "description": "Cambia el status de un proyecto de PMT. Deja un registro inmutable, consultable con list_project_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Usa list_projects para obtener el ID del proyecto y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "project_id": {
           "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio de status; queda en el historial",
           "type": "string"
         },
         "status": {
@@ -263,6 +267,78 @@
       },
       "required": [
         "deleted_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista el historial inmutable de cambios de status de un proyecto por orden de fecha: desde, hacia, actor, perfil, fecha y motivo. Funciona aunque el proyecto esté retirado o eliminado. Sin cambios devuelve una lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto; sirve aunque ya no exista",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_project_status_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "changed_at": {
+                "type": "string"
+              },
+              "from_status": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "to_status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "project_id",
+              "from_status",
+              "to_status",
+              "actor_name",
+              "actor_profile",
+              "reason",
+              "changed_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "changes"
       ],
       "type": "object"
     }

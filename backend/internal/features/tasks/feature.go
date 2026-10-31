@@ -20,6 +20,7 @@ import (
 	"pmt/internal/features/tasks/queries/hasactive"
 	"pmt/internal/features/tasks/queries/list"
 	"pmt/internal/features/tasks/queries/listchanges"
+	"pmt/internal/features/tasks/queries/liststatuschanges"
 	"pmt/internal/features/tasks/store"
 	"pmt/internal/features/tasks/store/sqlcgen"
 )
@@ -36,6 +37,7 @@ type StageChecker interface {
 func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageChecker) {
 	repo := store.NewTasks(db)
 	changes := store.NewChanges(db)
+	statusChanges := store.NewStatusChanges(db)
 
 	createTask := create.New(repo, stages)
 	createTask.Register(mux)
@@ -49,7 +51,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	deleteTask.Register(mux)
 	deleteTask.RegisterTool(tools)
 
-	changeStatus := changestatus.New(repo)
+	changeStatus := changestatus.New(struct {
+		*store.Tasks
+		*store.StatusChanges
+	}{repo, statusChanges})
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
@@ -76,6 +81,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	}{repo, changes}, stages)
 	retireTask.Register(mux)
 	retireTask.RegisterTool(tools)
+
+	listStatusChanges := liststatuschanges.New(statusChanges)
+	listStatusChanges.Register(mux)
+	listStatusChanges.RegisterTool(tools)
 
 	listChanges := listchanges.New(changes)
 	listChanges.Register(mux)

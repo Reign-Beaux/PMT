@@ -110,6 +110,29 @@ func (q *Queries) ListBugs(ctx context.Context, projectID uuid.UUID) ([]Bug, err
 	return items, nil
 }
 
+const lockBug = `-- name: LockBug :one
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at FROM bugs
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockBug(ctx context.Context, id uuid.UUID) (Bug, error) {
+	row := q.db.QueryRow(ctx, lockBug, id)
+	var i Bug
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Description,
+		&i.StepsToReproduce,
+		&i.ProductVersion,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateBug = `-- name: UpdateBug :one
 UPDATE bugs
 SET title = $2, description = $3, steps_to_reproduce = $4, product_version = $5, updated_at = clock_timestamp()

@@ -97,18 +97,19 @@ func (s *Changes) Retire(ctx context.Context, change domain.Change) (domain.Chan
 }
 
 // LeavePlanning saca a la etapa de su planning propio: escribe su registro add,
-// versión 1, guarda el nuevo status y limpia los datos pendientes. Dos salidas
+// versión 1 y su registro de status, guarda el nuevo status y limpia los datos pendientes. Dos salidas
 // simultáneas chocan en UNIQUE (stage_id, version).
-func (s *Changes) LeavePlanning(ctx context.Context, stage domain.Stage, change domain.Change) (domain.Stage, error) {
+func (s *Changes) LeavePlanning(ctx context.Context, stage domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error) {
 	var updated domain.Stage
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		queries := sqlcgen.New(tx)
-		if _, err := queries.LockStage(ctx, stage.ID); errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrStageNotFound
-		} else if err != nil {
-			return fmt.Errorf("bloquear etapa: %w", err)
+		if err := ensureStatus(ctx, queries, statusChange); err != nil {
+			return err
 		}
 		if _, err := insertChange(ctx, queries, change, 1); err != nil {
+			return err
+		}
+		if err := insertStatusChange(ctx, queries, statusChange); err != nil {
 			return err
 		}
 		err := queries.LeaveStagePlanning(ctx, sqlcgen.LeaveStagePlanningParams{

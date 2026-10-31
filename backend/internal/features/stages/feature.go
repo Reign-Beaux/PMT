@@ -19,6 +19,7 @@ import (
 	"pmt/internal/features/stages/queries/get"
 	"pmt/internal/features/stages/queries/list"
 	"pmt/internal/features/stages/queries/listchanges"
+	"pmt/internal/features/stages/queries/liststatuschanges"
 	"pmt/internal/features/stages/store"
 	"pmt/internal/features/stages/store/sqlcgen"
 )
@@ -40,6 +41,7 @@ type ProjectChecker interface {
 func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker) {
 	repo := store.NewStages(db)
 	changes := store.NewChanges(db)
+	statusChanges := store.NewStatusChanges(db)
 
 	createStage := create.New(repo, projects)
 	createStage.Register(mux)
@@ -52,7 +54,8 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	changeStatus := changestatus.New(struct {
 		*store.Stages
 		*store.Changes
-	}{repo, changes}, tasks)
+		*store.StatusChanges
+	}{repo, changes, statusChanges}, tasks)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
@@ -86,6 +89,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	}{repo, changes}, tasks)
 	retireStage.Register(mux)
 	retireStage.RegisterTool(tools)
+
+	listStatusChanges := liststatuschanges.New(statusChanges)
+	listStatusChanges.Register(mux)
+	listStatusChanges.RegisterTool(tools)
 
 	listChanges := listchanges.New(changes)
 	listChanges.Register(mux)

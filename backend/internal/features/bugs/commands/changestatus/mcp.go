@@ -15,6 +15,7 @@ import (
 type toolInput struct {
 	BugID  string `json:"bug_id" jsonschema:"UUID del bug"`
 	Status string `json:"status" jsonschema:"Nuevo status: reported, confirmed, in_progress, in_review, changes_requested, in_qa, done o rejected"`
+	Reason string `json:"reason,omitempty" jsonschema:"Motivo del cambio de status; queda en el historial"`
 }
 
 type toolOutput struct {
@@ -33,17 +34,17 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_bug_status",
-		Description: "Cambia el status de un bug de PMT y devuelve el bug completo. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. No depende del status del proyecto. Usa list_bugs para obtener el ID del bug y su status actual.",
+		Description: "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. No depende del status del proyecto. Usa list_bugs para obtener el ID del bug y su status actual.",
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
 	id, err := uuid.Parse(input.BugID)
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("bug_id inválido"))
 	}
 
-	result, err := h.Handle(ctx, Command{ID: id, Status: domain.Status(input.Status)})
+	result, err := h.Handle(ctx, Command{ID: id, Status: domain.Status(input.Status), Reason: input.Reason, Actor: platformmcp.ActorFrom(req)})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}

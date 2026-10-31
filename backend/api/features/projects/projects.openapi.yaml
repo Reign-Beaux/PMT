@@ -2,11 +2,16 @@ openapi: 3.1.0
 info:
   title: PMT - Proyectos
   version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
 paths:
   /api/projects:
     get:
       summary: Lista los proyectos, del más reciente al más antiguo
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Proyectos
           content:
@@ -20,6 +25,8 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/ProjectInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "201":
           $ref: "#/components/responses/Project"
         "400":
@@ -35,6 +42,8 @@ paths:
     get:
       summary: Obtiene un proyecto
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Project"
         "400":
@@ -46,6 +55,8 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/ProjectUpdateInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Project"
         "400":
@@ -57,6 +68,8 @@ paths:
     delete:
       summary: Elimina un proyecto en planning, sin bugs ni etapas, activas o retiradas
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "204":
           description: Proyecto eliminado
         "409":
@@ -86,7 +99,12 @@ paths:
               properties:
                 status:
                   $ref: "#/components/schemas/ProjectStatus"
+                reason:
+                  type: string
+                  description: Motivo del cambio; queda en el historial de status.
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Project"
         "400":
@@ -95,7 +113,35 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/projects/{id}/status-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de status de un proyecto
+      description: Funciona aunque ya no exista o esté retirado. Un ID sin registros responde lista vacía.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios por orden de fecha
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChange"
+        "400":
+          $ref: "#/components/responses/Error"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   requestBodies:
     ProjectInput:
       required: true
@@ -127,6 +173,12 @@ components:
                 type: string
                 description: Versión del producto, de texto libre. No es control de concurrencia.
   responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token, la petición sigue como `sin-autenticar` durante la transición.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     Project:
       description: Proyecto
       content:
@@ -144,6 +196,30 @@ components:
               error:
                 type: string
   schemas:
+    StatusChange:
+      type: object
+      required: [id, project_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+        to_status:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+          description: Vacío si actuó `sin-autenticar`.
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     Project:
       type: object
       required: [id, name, description, status, product_version, created_at, updated_at]

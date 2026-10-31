@@ -11,6 +11,8 @@ const (
 	KindNotFound
 	// KindConflict indica que la operación choca con el estado actual.
 	KindConflict
+	// KindForbidden indica que el perfil de quien actúa no permite la operación.
+	KindForbidden
 )
 
 // Error es un error de negocio con un mensaje apto para quien hace la petición.
@@ -36,4 +38,9 @@ func NotFound(message string) *Error {
 // Conflict crea un error de conflicto con el estado actual.
 func Conflict(message string) *Error {
 	return &Error{Kind: KindConflict, Message: message}
+}
+
+// Forbidden crea un error de permiso.
+func Forbidden(message string) *Error {
+	return &Error{Kind: KindForbidden, Message: message}
 }

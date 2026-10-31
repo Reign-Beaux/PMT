@@ -35,4 +35,6 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Retirar** | `Retire` | Sacar una etapa o tarea de las consultas registrando un cambio, sin borrar nada. Sigue en el historial y no se deshace. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y se comunica con PMT por MCP. |
 | **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DevFrontend, DevBackend, CR, QAP o QA. |
-| **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. |
+| **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. Lo resuelve el servidor a partir del token. |
+| **Token** | | Credencial de un agente o del usuario. Determina su `Actor`. PMT solo guarda su hash. |
+| **Historial de status** | `StatusChange` | Registro inmutable de cada cambio de status: desde, hacia, actor, fecha y motivo. Sobrevive al elemento eliminado. |

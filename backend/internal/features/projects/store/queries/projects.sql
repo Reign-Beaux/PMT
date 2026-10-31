@@ -26,3 +26,8 @@ RETURNING *;
 -- name: DeleteProject :execrows
 DELETE FROM projects
 WHERE id = $1;
+
+-- name: LockProject :one
+SELECT * FROM projects
+WHERE id = $1
+FOR UPDATE;

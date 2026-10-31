@@ -15,8 +15,9 @@ import (
 )
 
 type fakeRepo struct {
-	bugs    map[uuid.UUID]domain.Bug
-	updates int
+	bugs     map[uuid.UUID]domain.Bug
+	updates  int
+	recorded []domain.StatusChange
 }
 
 func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
@@ -37,8 +38,9 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Bug, error) {
 	return bug, nil
 }
 
-func (r *fakeRepo) UpdateStatus(_ context.Context, bug domain.Bug) (domain.Bug, error) {
+func (r *fakeRepo) ChangeStatus(_ context.Context, bug domain.Bug, change domain.StatusChange) (domain.Bug, error) {
 	r.updates++
+	r.recorded = append(r.recorded, change)
 	row := r.bugs[bug.ID]
 	row.Status = bug.Status
 	r.bugs[bug.ID] = row

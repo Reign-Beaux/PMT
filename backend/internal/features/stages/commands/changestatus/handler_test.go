@@ -15,9 +15,10 @@ import (
 )
 
 type fakeRepo struct {
-	stages  map[uuid.UUID]domain.Stage
-	updates int
-	changes []domain.Change
+	stages   map[uuid.UUID]domain.Stage
+	updates  int
+	recorded []domain.StatusChange
+	changes  []domain.Change
 }
 
 func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
@@ -38,13 +39,15 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
 	return s, nil
 }
 
-func (r *fakeRepo) UpdateStatus(_ context.Context, s domain.Stage) (domain.Stage, error) {
+func (r *fakeRepo) ChangeStatus(_ context.Context, s domain.Stage, change domain.StatusChange) (domain.Stage, error) {
 	r.updates++
+	r.recorded = append(r.recorded, change)
 	r.stages[s.ID] = s
 	return s, nil
 }
 
-func (r *fakeRepo) LeavePlanning(_ context.Context, s domain.Stage, change domain.Change) (domain.Stage, error) {
+func (r *fakeRepo) LeavePlanning(_ context.Context, s domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error) {
+	r.recorded = append(r.recorded, statusChange)
 	r.changes = append(r.changes, change)
 	s.AddReason, s.AddRequestedBy = "", ""
 	r.stages[s.ID] = s

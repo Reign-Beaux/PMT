@@ -17,19 +17,24 @@ import (
 	"pmt/internal/features/projects/queries/checkworking"
 	"pmt/internal/features/projects/queries/get"
 	"pmt/internal/features/projects/queries/list"
+	"pmt/internal/features/projects/queries/liststatuschanges"
 	"pmt/internal/features/projects/store"
 	"pmt/internal/features/projects/store/sqlcgen"
 )
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB) {
 	repo := store.NewProjects(db)
+	statusChanges := store.NewStatusChanges(db)
 
 	createProject := create.New(repo)
 	createProject.Register(mux)
 	createProject.RegisterTool(tools)
 
-	changeStatus := changestatus.New(repo)
+	changeStatus := changestatus.New(struct {
+		*store.Projects
+		*store.StatusChanges
+	}{repo, statusChanges})
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
@@ -46,6 +51,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX) {
 	listProjects := list.New(repo)
 	listProjects.Register(mux)
 	listProjects.RegisterTool(tools)
+
+	listStatusChanges := liststatuschanges.New(statusChanges)
+	listStatusChanges.Register(mux)
+	listStatusChanges.RegisterTool(tools)
 }
 
 // Checker permite a otras features saber qué admite un proyecto según su status.

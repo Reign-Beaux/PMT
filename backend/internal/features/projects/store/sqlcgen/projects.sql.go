@@ -112,6 +112,27 @@ func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
 	return items, nil
 }
 
+const lockProject = `-- name: LockProject :one
+SELECT id, name, description, created_at, updated_at, status, product_version FROM projects
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockProject(ctx context.Context, id uuid.UUID) (Project, error) {
+	row := q.db.QueryRow(ctx, lockProject, id)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.ProductVersion,
+	)
+	return i, err
+}
+
 const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, description = $3, product_version = $4, updated_at = now()

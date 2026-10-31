@@ -8,18 +8,21 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/bugs/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Bug, error)
-	UpdateStatus(ctx context.Context, b domain.Bug) (domain.Bug, error)
+	ChangeStatus(ctx context.Context, b domain.Bug, change domain.StatusChange) (domain.Bug, error)
 }
 
 // Command contiene los datos de entrada.
 type Command struct {
 	ID     uuid.UUID     `json:"-"`
 	Status domain.Status `json:"status"`
+	Reason string        `json:"reason"`
+	Actor  kernel.Actor  `json:"-"`
 }
 
 // Result es el bug con su nuevo status.
@@ -51,11 +54,13 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	from := bug.Status
 	if err := bug.ChangeStatus(cmd.Status); err != nil {
 		return Result{}, err
 	}
 
-	updated, err := h.repo.UpdateStatus(ctx, bug)
+	statusChange := domain.NewStatusChange(bug.ID, from, bug.Status, cmd.Actor, cmd.Reason)
+	updated, err := h.repo.ChangeStatus(ctx, bug, statusChange)
 	if err != nil {
 		return Result{}, err
 	}

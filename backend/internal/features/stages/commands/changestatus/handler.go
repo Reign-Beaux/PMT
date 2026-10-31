@@ -8,13 +8,14 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Stage, error)
-	UpdateStatus(ctx context.Context, s domain.Stage) (domain.Stage, error)
-	LeavePlanning(ctx context.Context, s domain.Stage, change domain.Change) (domain.Stage, error)
+	ChangeStatus(ctx context.Context, s domain.Stage, change domain.StatusChange) (domain.Stage, error)
+	LeavePlanning(ctx context.Context, s domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error)
 }
 
 // TaskChecker indica si todas las tareas de una etapa están terminadas.
@@ -27,6 +28,8 @@ type TaskChecker interface {
 type Command struct {
 	ID     uuid.UUID     `json:"-"`
 	Status domain.Status `json:"status"`
+	Reason string        `json:"reason"`
+	Actor  kernel.Actor  `json:"-"`
 }
 
 // Result es la etapa con su nuevo status.
@@ -62,15 +65,17 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	from := s.Status
 	if err := s.ChangeStatus(cmd.Status); err != nil {
 		return Result{}, err
 	}
+	statusChange := domain.NewStatusChange(s.ID, from, s.Status, cmd.Actor, cmd.Reason)
 	if s.InOwnPlanning() {
 		change, err := domain.NewChange(s, domain.ChangeAdd, s.AddReason, s.AddRequestedBy)
 		if err != nil {
 			return Result{}, err
 		}
-		updated, err := h.repo.LeavePlanning(ctx, s, change)
+		updated, err := h.repo.LeavePlanning(ctx, s, change, statusChange)
 		if err != nil {
 			return Result{}, err
 		}
@@ -86,7 +91,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		}
 	}
 
-	updated, err := h.repo.UpdateStatus(ctx, s)
+	updated, err := h.repo.ChangeStatus(ctx, s, statusChange)
 	if err != nil {
 		return Result{}, err
 	}

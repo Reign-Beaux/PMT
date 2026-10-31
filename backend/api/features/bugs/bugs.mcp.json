@@ -162,12 +162,16 @@
     }
   },
   {
-    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. No depende del status del proyecto. Usa list_bugs para obtener el ID del bug y su status actual.",
+    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. No depende del status del proyecto. Usa list_bugs para obtener el ID del bug y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "bug_id": {
           "description": "UUID del bug",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio de status; queda en el historial",
           "type": "string"
         },
         "status": {
@@ -299,6 +303,78 @@
       },
       "required": [
         "bugs"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista el historial inmutable de cambios de status de un bug por orden de fecha: desde, hacia, actor, perfil, fecha y motivo. Funciona aunque el bug esté retirado o eliminado. Sin cambios devuelve una lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug; sirve aunque ya no exista",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bug_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_bug_status_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "bug_id": {
+                "type": "string"
+              },
+              "changed_at": {
+                "type": "string"
+              },
+              "from_status": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "to_status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "bug_id",
+              "from_status",
+              "to_status",
+              "actor_name",
+              "actor_profile",
+              "reason",
+              "changed_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "changes"
       ],
       "type": "object"
     }

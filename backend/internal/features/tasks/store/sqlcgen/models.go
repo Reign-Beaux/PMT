@@ -11,6 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Agent struct {
+	ID        uuid.UUID
+	Name      string
+	Profile   string
+	TokenHash []byte
+	RevokedAt pgtype.Timestamptz
+	CreatedAt time.Time
+}
+
 type Bug struct {
 	ID               uuid.UUID
 	ProjectID        uuid.UUID
@@ -23,6 +32,17 @@ type Bug struct {
 	UpdatedAt        time.Time
 }
 
+type BugStatusChange struct {
+	ID           uuid.UUID
+	BugID        uuid.UUID
+	FromStatus   string
+	ToStatus     string
+	ActorName    string
+	ActorProfile string
+	Reason       string
+	ChangedAt    time.Time
+}
+
 type Project struct {
 	ID             uuid.UUID
 	Name           string
@@ -31,6 +51,17 @@ type Project struct {
 	UpdatedAt      time.Time
 	Status         string
 	ProductVersion string
+}
+
+type ProjectStatusChange struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	FromStatus   string
+	ToStatus     string
+	ActorName    string
+	ActorProfile string
+	Reason       string
+	ChangedAt    time.Time
 }
 
 type Stage struct {
@@ -59,6 +90,17 @@ type StageChange struct {
 	ChangedAt   time.Time
 }
 
+type StageStatusChange struct {
+	ID           uuid.UUID
+	StageID      uuid.UUID
+	FromStatus   string
+	ToStatus     string
+	ActorName    string
+	ActorProfile string
+	Reason       string
+	ChangedAt    time.Time
+}
+
 type Task struct {
 	ID          uuid.UUID
 	StageID     uuid.UUID
@@ -80,4 +122,15 @@ type TaskChange struct {
 	Reason      string
 	RequestedBy string
 	ChangedAt   time.Time
+}
+
+type TaskStatusChange struct {
+	ID           uuid.UUID
+	TaskID       uuid.UUID
+	FromStatus   string
+	ToStatus     string
+	ActorName    string
+	ActorProfile string
+	Reason       string
+	ChangedAt    time.Time
 }

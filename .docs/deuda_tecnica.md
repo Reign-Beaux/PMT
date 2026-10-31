@@ -2,7 +2,7 @@
 
 | Prioridad | Deuda | Riesgo | Cuándo resolverla |
 | --- | --- | --- | --- |
-| Alta | Las herramientas MCP y la API no conocen al `Actor`: no hay autenticación, autorización ni auditoría. | Cualquier agente puede hacerlo todo, sin registro. | Con la feature `agents`, antes del CRUD de tareas. |
+| Alta | Ya hay tokens y `Actor`, pero sin token se sigue entrando como `sin-autenticar` y ninguna operación limita por perfil. | Cualquier agente puede hacerlo todo; solo queda registrado quién cambió cada status. | Con las reglas por perfil de las transiciones. |
 | Media | OpenAPI sin validación contra el código. | Construir el frontend sobre un contrato desalineado. | Antes del frontend, empezando por una prueba que compare las rutas registradas contra el OpenAPI. |
 | Media | `store` sin pruebas automáticas contra PostgreSQL. | Errores como el código 23001 solo aparecen en pruebas manuales. | Antes de que `tasks` tenga transiciones. |
 | Baja | Las creaciones simultáneas de etapas en un proyecto reciben 409 y deben reintentarse; en una prueba, 13 de 20. | Las creaciones fallan si quien llama no reintenta. | Si varios agentes crean etapas a la vez. |

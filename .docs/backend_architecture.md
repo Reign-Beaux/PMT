@@ -194,7 +194,7 @@ Cada feature corresponde a un agregado principal:
 | `projects` | Proyectos. |
 | `stages` | Etapas de un proyecto. |
 | `tasks` | Tareas, estados, asignaciones y propuestas de cambio. |
-| `agents` | Agentes, perfiles y credenciales. |
+| `agents` | Agentes, perfiles y tokens. Sin REST ni MCP: se administra con `pmt-server agent`. |
 | `reviews` | Revisiones de CR y hallazgos. |
 | `qa` | Planes QAP, casos y ejecuciones de QA. |
 | `activity` | Auditoría, comentarios y bloqueos. |
@@ -254,12 +254,33 @@ Ninguna otra feature importa `imports`, así que no hay ciclos. La excepción se
 ## Identidad y permisos
 
 - Cada agente tiene su propio token, que determina su `Actor`: agente y perfil.
-- El usuario humano también es un `Actor`, con su propio perfil.
-- El `Actor` se pasa explícitamente a cada handler.
+- El usuario humano también es un `Actor`, con su propio token y el perfil `User`.
+- El `Actor` se pasa explícitamente a cada handler, en el `Command`. Nunca es argumento de una herramienta ni del cuerpo REST.
 - Cada agente recibe por MCP solo las herramientas de su perfil, lo que además reduce su contexto.
 - Ese filtrado no sustituye la autorización: la validación real ocurre siempre en `domain` o en el handler.
 
 Las responsabilidades de cada perfil están definidas en `perfiles.md`.
+
+### Tokens
+
+`agents` guarda en una fila nombre, perfil, `token_hash` y `revoked_at`. El token son 32 bytes aleatorios en hexadecimal y solo se guarda su SHA-256, suficiente por su entropía. El perfil no cambia. Un agente no se borra, se revoca, porque el historial conserva su nombre.
+
+Los tokens se administran solo por línea de comandos, para que ningún agente pueda emitirlos. Se ejecutan desde `backend/`, leen `config.yaml` o `DATABASE_URL` sin escribirlos, y `create` y `rotate` escriben solo el token en la salida estándar:
+
+```text
+pmt-server agent create --name NOMBRE --profile PERFIL
+pmt-server agent rotate --name NOMBRE
+pmt-server agent revoke --name NOMBRE
+pmt-server agent list
+```
+
+`internal/app/app.go` monta `/api/` y `/mcp` con `rest.Authenticate` y `mcp.Authenticate`. Ambas reciben un `kernel.Authenticator`, que implementa `agents/queries/authenticate`, de modo que `platform` no importa features. MCP usa `auth.RequireBearerToken` del SDK y lleva el `Actor` en `TokenInfo`, de donde lo lee `platformmcp.ActorFrom(req)`. REST lo lleva en el contexto, de donde lo lee `rest.ActorFrom(ctx)`.
+
+**Los clientes:** `.mcp.json` está versionado y compartido, así que solo contiene `Authorization: Bearer ${PMT_TOKEN:-}`. Cada sesión se lanza con su token en `PMT_TOKEN` y la cabecera se fija al arrancar. Los tokens viven fuera del repo, en `~/.config/pmt/tokens/<nombre>`, con permiso 600. REST recibe la misma cabecera.
+
+**Transición:** un token inválido o revocado responde 401. Sin cabecera, o con `Bearer` vacío, que es lo que envía Claude Code si falta `PMT_TOKEN`, la petición continúa como `kernel.Anonymous` (`sin-autenticar`) y deja `petición sin token` en el log. Esto es temporal: desaparece cuando las transiciones se limiten por perfil.
+
+El token evita errores y deja rastro; no detiene a un agente hostil, porque cualquier proceso con shell en esta máquina puede leer esos ficheros.
 
 ## Estados de un proyecto
 
@@ -325,7 +346,7 @@ Una tabla de transiciones en `tasks/domain` define los cambios permitidos:
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `tasks/commands/changestatus` (`change_task_status`, `PUT /api/tasks/{id}/status`), no con `PUT /api/tasks/{id}`.
 
-Cambiar el status no depende del status del proyecto ni de la etapa, igual que `change_stage_status`. Tampoco es un cambio de contenido: no escribe en `task_changes`, actualiza `status` y `updated_at` y devuelve la última versión. Una tarea retirada responde `NotFound`.
+Cambiar el status no depende del status del proyecto ni de la etapa, igual que `change_stage_status`. Tampoco es un cambio de contenido: no escribe en `task_changes`. Actualiza `status` y `updated_at`, deja su registro en el [historial de status](#historial-de-status) y devuelve la última versión. Una tarea retirada responde `NotFound`.
 
 **Perfiles pendientes:** hoy cualquiera puede ejecutar cualquier transición permitida. Cuando existan `agents` y `Actor`, cada transición se limitará a estos perfiles; la tabla no incluye `cancelled`, cuyo perfil falta por definir:
 
@@ -383,11 +404,28 @@ Fuera de `planning`, las etapas y tareas cambian mediante registros inmutables, 
 - **Inmutabilidad:** triggers de PostgreSQL rechazan `UPDATE`, `DELETE` y `TRUNCATE` en ambas tablas, y `ON DELETE RESTRICT` impide borrar un elemento con historial. No hay consultas, comandos ni rutas que los modifiquen.
 - **Transacción:** `store/changes.go` escribe el registro, y en `retire_*` también `retired_at`, con `pgx.BeginFunc`, porque `kernel.Transactor` sigue pendiente. Bloquea el elemento con `FOR UPDATE` para numerar las versiones.
 
+## Historial de status
+
+Cada cambio de status de un proyecto, etapa, tarea o bug deja un registro inmutable: desde, hacia, actor, perfil, fecha y motivo. No es un cambio de contenido: `stage_changes` y `task_changes` guardan contenido, y estas tablas solo status. Crear un elemento no deja registro, y tampoco `import_*`, porque no hay cambio. Los datos anteriores no tienen relleno: un registro retroactivo inventaría actor y fecha, así que el historial empieza con el primer cambio.
+
+| Tabla | MCP | REST |
+| --- | --- | --- |
+| `project_status_changes` | `list_project_status_changes` | `GET /api/projects/{id}/status-changes` |
+| `stage_status_changes` | `list_stage_status_changes` | `GET /api/stages/{id}/status-changes` |
+| `task_status_changes` | `list_task_status_changes` | `GET /api/tasks/{id}/status-changes` |
+| `bug_status_changes` | `list_bug_status_changes` | `GET /api/bugs/{id}/status-changes` |
+
+- **Sin llave foránea:** las tablas no referencian a su entidad, a diferencia de `stage_changes` y `task_changes`. El usuario pidió que en `planning` se pueda eliminar, y un cambio de status no debe impedirlo: el historial de status no bloquea ningún `delete_*`. Los registros sobreviven al elemento eliminado y se consultan por su ID, por eso `list_*_status_changes` no comprueba que exista y un ID sin registros responde lista vacía.
+- **Actor:** se guarda una copia de nombre y perfil, sin FK a `agents`, para conservar el perfil que tenía al actuar. `sin-autenticar`, con perfil vacío, marca lo hecho sin token.
+- **Inmutabilidad:** triggers con `reject_change_mutation` rechazan `UPDATE`, `DELETE` y `TRUNCATE`.
+- **Transacción:** `store/status_changes.go` hace `FOR UPDATE`, compara el status con el de origen, escribe el registro y actualiza. Si el status cambió entre leerlo y guardarlo, responde `kernel.Conflict` con `el status cambió, vuelve a consultar`, para que `desde` siempre sea cierto. Por eso la regla general de [Concurrencia](#concurrencia) no aplica a los cambios de status.
+- **Motivo:** `reason` es opcional en `change_*_status` por ahora.
+
 ## Planning propio de una etapa
 
 Una etapa pedida con el proyecto en `working` se planea por sí sola, sin que el proyecto cambie de status. Está en **planning propio** si su fila tiene `add_reason` y `add_requested_by`: el status `planning` no basta, porque también lo tienen las etapas definidas en el `planning` del proyecto, que siguen sin poder editarse. `Stage.InOwnPlanning` hace la distinción.
 
-`add_stage` e `import_stage` guardan motivo y solicitante en la fila y no escriben en `stage_changes`, porque el registro es inmutable y `ON DELETE RESTRICT` impediría editar o eliminar la etapa. Al salir, `Changes.LeavePlanning` escribe en una transacción el `add` versión 1 con el contenido definitivo, cambia el status y vuelve a `NULL` ambas columnas. Por eso `changed_at` del `add` es la fecha de salida, y una etapa eliminada en su planning propio no deja rastro. Con el proyecto en otro status, `add_stage` escribe el `add` de inmediato.
+`add_stage` e `import_stage` guardan motivo y solicitante en la fila y no escriben en `stage_changes`, porque el registro es inmutable y `ON DELETE RESTRICT` impediría editar o eliminar la etapa. Al salir, `Changes.LeavePlanning` escribe en una transacción el `add` versión 1 con el contenido definitivo y el registro de status, cambia el status y vuelve a `NULL` ambas columnas. El motivo del registro es el de `change_stage_status`, no `add_reason`. Por eso `changed_at` del `add` es la fecha de salida, y una etapa eliminada en su planning propio no deja rastro. Con el proyecto en otro status, `add_stage` escribe el `add` de inmediato.
 
 Cualquier transición desde `planning` es la salida, y es definitiva: si la etapa vuelve al status `planning`, sigue bajo historial.
 
@@ -476,15 +514,15 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
-- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, las reglas por perfil de las transiciones de `tasks` y `bugs` y las demás features.
-- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen autorización, auditoría ni, salvo los de cambios, transacción. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens y la autenticación de `/api/` y `/mcp`, aún en transición; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Pendiente:** `Transactor`, eliminar el modo de transición de los tokens, auditoría, filtrado de herramientas por perfil, las reglas por perfil de las transiciones de `tasks` y `bugs` y las demás features.
+- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen autorización, auditoría ni, salvo los de cambios y de status, transacción. Deben incorporarlas cuando existan las reglas por perfil y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
 ## Orden de construcción
 
 1. `projects` y `stages`. Hechos, salvo la excepción temporal.
-2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`.
+2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`. Hecho, con el modo de transición.
 3. Reglas por perfil en las transiciones de `tasks` y `bugs`. Sus tablas de transiciones ya existen, adelantadas a `agents`.
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
