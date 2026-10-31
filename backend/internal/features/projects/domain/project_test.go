@@ -81,3 +81,14 @@ func TestUpdateKeepsStatus(t *testing.T) {
 		t.Errorf("status = %s", p.Status)
 	}
 }
+
+func TestEnsurePlanning(t *testing.T) {
+	if err := (Project{Status: StatusPlanning}).EnsurePlanning(); err != nil {
+		t.Errorf("err = %v", err)
+	}
+	for _, status := range []Status{StatusStandBy, StatusInDev, StatusWorking, StatusStopped, StatusCancelled} {
+		if err := (Project{Status: status}).EnsurePlanning(); !errors.Is(err, ErrProjectNotPlanning) {
+			t.Errorf("%s: err = %v", status, err)
+		}
+	}
+}

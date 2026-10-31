@@ -17,6 +17,8 @@ var (
 	ErrProjectNameRequired = kernel.Invalid("el nombre del proyecto es obligatorio")
 	// ErrProjectHasStages indica que el proyecto no se puede eliminar porque tiene etapas.
 	ErrProjectHasStages = kernel.Conflict("el proyecto tiene etapas")
+	// ErrProjectNotPlanning indica que el proyecto ya no admite cambios de definición.
+	ErrProjectNotPlanning = kernel.Conflict("el proyecto no está en planning")
 )
 
 // Project es la raíz del agregado de un proyecto.
@@ -37,6 +39,14 @@ func NewProject(name, description string) (Project, error) {
 		return Project{}, err
 	}
 	return p, nil
+}
+
+// EnsurePlanning devuelve un error si el proyecto no está en planning.
+func (p Project) EnsurePlanning() error {
+	if p.Status != StatusPlanning {
+		return ErrProjectNotPlanning
+	}
+	return nil
 }
 
 // Update cambia los datos editables del proyecto.

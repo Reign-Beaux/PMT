@@ -325,6 +325,20 @@ Una tabla de transiciones en `tasks/domain` define qué perfil puede hacer cada 
 
 Dev corresponde a DevFrontend o DevBackend, según la tarea.
 
+## Regla de planning
+
+Un proyecto solo admite estas operaciones, por REST o por MCP, mientras está en `planning`:
+
+| Agregado | REST | MCP |
+| --- | --- | --- |
+| Proyecto | `PUT` y `DELETE /api/projects/{id}` | `update_project`, `delete_project` |
+| Etapa | `PUT` y `DELETE /api/stages/{id}` | `update_stage`, `delete_stage` |
+| Tarea | `PUT` y `DELETE /api/tasks/{id}` | `update_task`, `delete_task` |
+
+Fuera de `planning` responden `kernel.Conflict` con `el proyecto no está en planning`. Se comprueba después de confirmar que el elemento existe y antes de validar sus datos. Dentro de `planning` siguen vigentes `el proyecto tiene etapas` y `la etapa tiene tareas`.
+
+La regla es `Project.EnsurePlanning`, en `projects/domain`, y la aplican los handlers de `commands/update` y `commands/delete`. `projects` la usa directamente. `stages` define `ProjectChecker`, que implementa `projects.Checker` sobre la query `projects/queries/checkplanning`. `tasks` define `StageChecker`, que implementa `stages.Checker`: busca la etapa y pregunta por su proyecto, de modo que `tasks` no conoce `projects`. `checkplanning` solo lee y delega la decisión en `domain`. Todo se conecta en `registerFeatures`.
+
 ## Transacciones
 
 - Los commands usan la interfaz `kernel.Transactor`, con `WithinTx(ctx, fn)`, implementada en `platform/postgres`.
@@ -354,7 +368,7 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task` y `list_tasks`, y la feature `imports` con la herramienta MCP `import_project`. El `status` de una tarea se devuelve, pero aún no se puede cambiar.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task`, `list_tasks`, `update_task` y `delete_task`, y la feature `imports` con la herramienta MCP `import_project`. Editar y eliminar proyectos, etapas y tareas exige que el proyecto esté en `planning`. El `status` de una tarea se devuelve, pero aún no se puede cambiar.
 - **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages` y `tasks` no tienen autorización, transacción ni auditoría. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.

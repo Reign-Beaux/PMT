@@ -11,7 +11,18 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
+
+var errNotPlanning = kernel.Conflict("el proyecto no está en planning")
+
+type fakeStages struct {
+	err error
+}
+
+func (s fakeStages) EnsureProjectPlanning(context.Context, uuid.UUID) error {
+	return s.err
+}
 
 type fakeRepo struct {
 	tasks map[uuid.UUID]domain.Task
@@ -42,7 +53,7 @@ func (r *fakeRepo) Update(_ context.Context, task domain.Task) (domain.Task, err
 func TestHandleUpdatesTask(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Title: "Probar", Description: "Otra"})
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Title: "Probar", Description: "Otra"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +66,7 @@ func TestHandleUpdatesTask(t *testing.T) {
 func TestHandleKeepsTaskWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: id, Title: " "})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Title: " "})
 
 	if !errors.Is(err, domain.ErrTaskTitleRequired) {
 		t.Fatalf("err = %v", err)
@@ -67,7 +78,7 @@ func TestHandleKeepsTaskWhenInvalid(t *testing.T) {
 
 func TestHandleLastWriteWins(t *testing.T) {
 	repo, id := newRepoWith(t)
-	handler := New(repo)
+	handler := New(repo, fakeStages{})
 	if _, err := handler.Handle(context.Background(), Command{ID: id, Title: "Probar"}); err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +89,32 @@ func TestHandleLastWriteWins(t *testing.T) {
 
 	if repo.tasks[id].Title != "Tarde" {
 		t.Errorf("tarea = %+v", repo.tasks[id])
+	}
+}
+
+func TestHandleRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Title: "Otra"})
+
+	if !errors.Is(err, errNotPlanning) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.tasks[id].Title != "Revisar" {
+		t.Errorf("tarea = %+v", repo.tasks[id])
+	}
+}
+
+func TestRESTRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+	mux := http.NewServeMux()
+	New(repo, fakeStages{err: errNotPlanning}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/tasks/"+id.String(), strings.NewReader(`{"title":"Otra"}`)))
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 	}
 }
 
@@ -101,7 +138,7 @@ func TestREST(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t)
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/tasks/"+tt.id(id), strings.NewReader(tt.body)))

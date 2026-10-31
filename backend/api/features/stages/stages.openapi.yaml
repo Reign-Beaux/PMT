@@ -55,7 +55,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de una etapa
+      summary: Reemplaza los datos editables de una etapa cuyo proyecto está en planning
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
@@ -65,8 +65,10 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina una etapa
+      summary: Elimina una etapa sin tareas cuyo proyecto está en planning
       responses:
         "204":
           description: Etapa eliminada

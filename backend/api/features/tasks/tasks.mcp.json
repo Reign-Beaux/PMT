@@ -129,5 +129,97 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "description": "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo funciona si el proyecto de su etapa está en planning. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Nueva descripción de la tarea",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "UUID de la tarea",
+          "type": "string"
+        },
+        "title": {
+          "description": "Nuevo título de la tarea",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "title",
+        "description"
+      ],
+      "type": "object"
+    },
+    "name": "update_task",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "stage_id",
+        "title",
+        "description",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Elimina una tarea de PMT y devuelve su ID. Solo funciona si el proyecto de su etapa está en planning. Usa list_tasks para obtener el ID de la tarea.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "description": "UUID de la tarea",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "type": "object"
+    },
+    "name": "delete_task",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "deleted_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "deleted_id"
+      ],
+      "type": "object"
+    }
   }
 ]

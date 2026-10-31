@@ -199,5 +199,101 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si su proyecto está en planning. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Nueva descripción de la etapa",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nuevo nombre de la etapa",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "name",
+        "description"
+      ],
+      "type": "object"
+    },
+    "name": "update_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "name",
+        "description",
+        "position",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Elimina una etapa de PMT y devuelve su ID. Solo funciona si su proyecto está en planning y la etapa no tiene tareas. Usa list_stages para obtener el ID de la etapa.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id"
+      ],
+      "type": "object"
+    },
+    "name": "delete_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "deleted_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "deleted_id"
+      ],
+      "type": "object"
+    }
   }
 ]

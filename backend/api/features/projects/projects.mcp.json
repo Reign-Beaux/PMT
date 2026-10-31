@@ -169,5 +169,102 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Solo funciona si el proyecto está en planning. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Nueva descripción del proyecto",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nuevo nombre del proyecto",
+          "type": "string"
+        },
+        "product_version": {
+          "description": "Nueva versión del producto; vacía si no tiene",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "name",
+        "description",
+        "product_version"
+      ],
+      "type": "object"
+    },
+    "name": "update_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "status",
+        "product_version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene etapas. Usa list_projects para obtener el ID del proyecto.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "delete_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "deleted_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "deleted_id"
+      ],
+      "type": "object"
+    }
   }
 ]

@@ -97,6 +97,46 @@ func TestHandleMissingProject(t *testing.T) {
 	}
 }
 
+func TestHandleRejectsOutsidePlanning(t *testing.T) {
+	statuses := []domain.Status{
+		domain.StatusStandBy, domain.StatusInDev, domain.StatusWorking, domain.StatusStopped, domain.StatusCancelled,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			repo, id := newRepoWith(t)
+			p := repo.projects[id]
+			p.Status = status
+			repo.projects[id] = p
+
+			_, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "Otro"})
+
+			if !errors.Is(err, domain.ErrProjectNotPlanning) {
+				t.Fatalf("err = %v", err)
+			}
+			if repo.projects[id].Name != "PMT" {
+				t.Errorf("proyecto = %+v", repo.projects[id])
+			}
+		})
+	}
+}
+
+func TestRESTRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+	p := repo.projects[id]
+	p.Status = domain.StatusStandBy
+	repo.projects[id] = p
+	mux := http.NewServeMux()
+	New(repo).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String(), strings.NewReader(`{"name":"Otro"}`)))
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+	}
+}
+
 func TestREST(t *testing.T) {
 	repo, id := newRepoWith(t)
 	tests := []struct {

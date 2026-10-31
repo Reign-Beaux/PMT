@@ -87,14 +87,18 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina una tarea
+      summary: Elimina una tarea cuyo proyecto está en planning
       responses:
         "204":
           description: Tarea eliminada
         "400":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
 components:
   responses:

@@ -16,6 +16,12 @@ type Repository interface {
 	Update(ctx context.Context, s domain.Stage) (domain.Stage, error)
 }
 
+// ProjectChecker confirma que un proyecto está en planning. Lo implementa la
+// feature projects, conectada en app.
+type ProjectChecker interface {
+	EnsurePlanning(ctx context.Context, projectID uuid.UUID) error
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID          uuid.UUID `json:"-"`
@@ -37,18 +43,22 @@ type Result struct {
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo     Repository
+	projects ProjectChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, projects ProjectChecker) *Handler {
+	return &Handler{repo: repo, projects: projects}
 }
 
 // Handle actualiza la etapa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := h.projects.EnsurePlanning(ctx, s.ProjectID); err != nil {
 		return Result{}, err
 	}
 	if err := s.Update(cmd.Name, cmd.Description); err != nil {

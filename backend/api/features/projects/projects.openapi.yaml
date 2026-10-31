@@ -42,7 +42,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de un proyecto. Un campo omitido queda vacío; status tiene su propia ruta
+      summary: Reemplaza los datos editables de un proyecto en planning. Un campo omitido queda vacío; status tiene su propia ruta
       requestBody:
         $ref: "#/components/requestBodies/ProjectUpdateInput"
       responses:
@@ -52,8 +52,10 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina un proyecto
+      summary: Elimina un proyecto en planning y sin etapas
       responses:
         "204":
           description: Proyecto eliminado

@@ -19,21 +19,26 @@ import (
 )
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// tasks lo aporta la feature tasks, conectada en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks changestatus.TaskChecker) {
+// tasks y projects los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks changestatus.TaskChecker, projects update.ProjectChecker) {
 	repo := store.NewStages(db)
 
 	createStage := create.New(repo)
 	createStage.Register(mux)
 	createStage.RegisterTool(tools)
 
-	update.New(repo).Register(mux)
+	updateStage := update.New(repo, projects)
+	updateStage.Register(mux)
+	updateStage.RegisterTool(tools)
 
 	changeStatus := changestatus.New(repo, tasks)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
-	delete.New(repo).Register(mux)
+	deleteStage := delete.New(repo, projects)
+	deleteStage.Register(mux)
+	deleteStage.RegisterTool(tools)
+
 	get.New(repo).Register(mux)
 
 	listStages := list.New(repo)
@@ -41,18 +46,30 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks chan
 	listStages.RegisterTool(tools)
 }
 
-// Checker permite a otras features confirmar que una etapa existe.
+// Checker permite a otras features confirmar que una etapa existe y que su
+// proyecto está en planning.
 type Checker struct {
-	get *get.Handler
+	get      *get.Handler
+	projects update.ProjectChecker
 }
 
 // NewChecker crea el verificador sobre la query get.
-func NewChecker(db sqlcgen.DBTX) *Checker {
-	return &Checker{get: get.New(store.NewStages(db))}
+func NewChecker(db sqlcgen.DBTX, projects update.ProjectChecker) *Checker {
+	return &Checker{get: get.New(store.NewStages(db)), projects: projects}
 }
 
 // Check devuelve un error de negocio si la etapa no existe.
 func (c *Checker) Check(ctx context.Context, id uuid.UUID) error {
 	_, err := c.get.Handle(ctx, id)
 	return err
+}
+
+// EnsureProjectPlanning devuelve un error de negocio si la etapa no existe o su
+// proyecto no está en planning.
+func (c *Checker) EnsureProjectPlanning(ctx context.Context, id uuid.UUID) error {
+	stage, err := c.get.Handle(ctx, id)
+	if err != nil {
+		return err
+	}
+	return c.projects.EnsurePlanning(ctx, stage.ProjectID)
 }

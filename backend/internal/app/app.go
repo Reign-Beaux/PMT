@@ -52,8 +52,10 @@ func Run() error {
 
 // registerFeatures registra las rutas REST y las herramientas MCP de cada feature.
 func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool) {
+	projectChecker := projects.NewChecker(pool)
+
 	projects.Register(mux, tools, pool)
-	stages.Register(mux, tools, pool, tasks.NewChecker(pool))
-	tasks.Register(mux, tools, pool, stages.NewChecker(pool))
+	stages.Register(mux, tools, pool, tasks.NewChecker(pool), projectChecker)
+	tasks.Register(mux, tools, pool, stages.NewChecker(pool, projectChecker))
 	imports.Register(tools, pool)
 }

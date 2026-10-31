@@ -5,24 +5,41 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
+	"pmt/internal/features/tasks/domain"
 )
 
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
+	Get(ctx context.Context, id uuid.UUID) (domain.Task, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// StageChecker confirma que el proyecto de una etapa está en planning. Lo
+// implementa la feature stages, conectada en app.
+type StageChecker interface {
+	EnsureProjectPlanning(ctx context.Context, stageID uuid.UUID) error
 }
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo   Repository
+	stages StageChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, stages StageChecker) *Handler {
+	return &Handler{repo: repo, stages: stages}
 }
 
 // Handle elimina la tarea.
 func (h *Handler) Handle(ctx context.Context, id uuid.UUID) error {
+	t, err := h.repo.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := h.stages.EnsureProjectPlanning(ctx, t.StageID); err != nil {
+		return err
+	}
 	return h.repo.Delete(ctx, id)
 }

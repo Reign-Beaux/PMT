@@ -11,7 +11,18 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
+
+var errNotPlanning = kernel.Conflict("el proyecto no está en planning")
+
+type fakeProjects struct {
+	err error
+}
+
+func (p fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
+	return p.err
+}
 
 type fakeRepo struct {
 	stages map[uuid.UUID]domain.Stage
@@ -42,7 +53,7 @@ func (r *fakeRepo) Update(_ context.Context, s domain.Stage) (domain.Stage, erro
 func TestHandleUpdatesStage(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "Desarrollo", Description: "Otra"})
+	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Name: "Desarrollo", Description: "Otra"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -55,13 +66,39 @@ func TestHandleUpdatesStage(t *testing.T) {
 func TestHandleKeepsStageWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: id, Name: " "})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Name: " "})
 
 	if !errors.Is(err, domain.ErrStageNameRequired) {
 		t.Fatalf("err = %v", err)
 	}
 	if repo.stages[id].Name != "Diseño" {
 		t.Errorf("etapa = %+v", repo.stages[id])
+	}
+}
+
+func TestHandleRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Name: "Otra"})
+
+	if !errors.Is(err, errNotPlanning) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.stages[id].Name != "Diseño" {
+		t.Errorf("etapa = %+v", repo.stages[id])
+	}
+}
+
+func TestRESTRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+	mux := http.NewServeMux()
+	New(repo, fakeProjects{err: errNotPlanning}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String(), strings.NewReader(`{"name":"Otra"}`)))
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 	}
 }
 
@@ -84,7 +121,7 @@ func TestREST(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, fakeProjects{}).Register(mux)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+tt.id, strings.NewReader(tt.body)))

@@ -18,17 +18,29 @@ import (
 	"pmt/internal/features/tasks/store/sqlcgen"
 )
 
+// StageChecker reúne lo que las slices piden a la feature stages.
+type StageChecker interface {
+	list.StageChecker
+	update.StageChecker
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature.
 // stages lo aporta la feature stages, conectada en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, stages list.StageChecker) {
+func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, stages StageChecker) {
 	repo := store.NewTasks(db)
 
 	createTask := create.New(repo)
 	createTask.Register(mux)
 	createTask.RegisterTool(tools)
 
-	update.New(repo).Register(mux)
-	delete.New(repo).Register(mux)
+	updateTask := update.New(repo, stages)
+	updateTask.Register(mux)
+	updateTask.RegisterTool(tools)
+
+	deleteTask := delete.New(repo, stages)
+	deleteTask.Register(mux)
+	deleteTask.RegisterTool(tools)
+
 	get.New(repo).Register(mux)
 
 	listTasks := list.New(repo, stages)
