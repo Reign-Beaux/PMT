@@ -48,12 +48,18 @@ var statusTransitions = map[Status][]Status{
 }
 
 // ChangeStatus pasa el bug a otro estado si la transición está permitida.
-func (b *Bug) ChangeStatus(status Status) error {
+func (b *Bug) ChangeStatus(status Status, actor kernel.Actor, reason string) error {
 	if _, known := statusTransitions[status]; !known {
 		return ErrBugStatusInvalid
 	}
 	if !slices.Contains(statusTransitions[b.Status], status) {
 		return ErrBugStatusTransition
+	}
+	if !slices.Contains(statusProfiles[b.Status][status], actor.Profile) {
+		return kernel.ErrTransitionForbidden
+	}
+	if err := ensureReason(b.Status, status, reason); err != nil {
+		return err
 	}
 	b.Status = status
 	return nil

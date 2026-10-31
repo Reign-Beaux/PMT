@@ -53,7 +53,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	from := p.Status
-	if err := p.ChangeStatus(cmd.Status); err != nil {
+	if err := p.ChangeStatus(cmd.Status, cmd.Actor, cmd.Reason); err != nil {
 		return Result{}, err
 	}
 

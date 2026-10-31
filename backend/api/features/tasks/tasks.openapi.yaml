@@ -16,6 +16,13 @@ paths:
           format: uuid
     get:
       summary: Lista las tareas sin retirar de una etapa por fecha de creación
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filtra por este status.
+          schema:
+            type: string
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -210,6 +217,12 @@ paths:
                 properties:
                   error:
                     type: string
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           description: Tarea inexistente o retirada
           content:
@@ -297,6 +310,46 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/assignee:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Pone o cambia el dueño de una tarea ya tomada
+      description: Solo el TL de la etapa. El agente debe estar activo y en el equipo. Se rechaza en backlog, ready, done y cancelled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [agent]
+              properties:
+                agent:
+                  type: string
+                  description: Nombre del dev.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Tarea con su nuevo dueño
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/tasks/{id}/status-changes:
     parameters:
@@ -464,6 +517,9 @@ components:
         status:
           type: string
           enum: [backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done, cancelled]
+        assignee:
+          type: string
+          description: Dev dueño de la tarea. Ausente si nadie la ha tomado.
         created_at:
           type: string
           format: date-time

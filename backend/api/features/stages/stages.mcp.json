@@ -139,7 +139,7 @@
     }
   },
   {
-    "description": "Lista las etapas de un proyecto de PMT, ordenadas por posición. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
+    "description": "Lista las etapas de un proyecto de PMT, ordenadas por posición, con su TL y su equipo. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -175,6 +175,18 @@
               },
               "id": {
                 "type": "string"
+              },
+              "lead": {
+                "type": "string"
+              },
+              "members": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
               },
               "name": {
                 "type": "string"
@@ -713,6 +725,150 @@
       },
       "required": [
         "changes"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Añade un dev al equipo de una etapa de PMT. Solo el TL de la etapa. El agente debe estar activo y ser DevFrontend o DevBackend. Solo los devs del equipo toman las tareas de la etapa.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "description": "Nombre del agente con perfil DevFrontend o DevBackend",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "agent"
+      ],
+      "type": "object"
+    },
+    "name": "add_stage_member",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "lead": {
+          "type": "string"
+        },
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "lead",
+        "members"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Fija o reemplaza el TL responsable de una etapa de PMT. Solo PP o el usuario. El agente debe estar activo y tener perfil TL. Solo ese TL inicia la etapa, arma su equipo y cierra sus tareas. Usa list_stages para obtener el ID de la etapa.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "description": "Nombre del agente con perfil TL",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "agent"
+      ],
+      "type": "object"
+    },
+    "name": "assign_stage_lead",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "lead": {
+          "type": "string"
+        },
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "lead",
+        "members"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Quita un dev del equipo de una etapa de PMT. Solo el TL de la etapa. Se rechaza si el dev tiene tareas abiertas en ella: reasígnalas antes con assign_task.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "description": "Nombre del dev",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "agent"
+      ],
+      "type": "object"
+    },
+    "name": "remove_stage_member",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "lead": {
+          "type": "string"
+        },
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "lead",
+        "members"
       ],
       "type": "object"
     }

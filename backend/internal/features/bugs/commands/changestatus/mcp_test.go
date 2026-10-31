@@ -18,6 +18,7 @@ func connect(t *testing.T, repo Repository) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
+	platformmcp.ActAs(server, actorFor(""))
 	New(repo).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()

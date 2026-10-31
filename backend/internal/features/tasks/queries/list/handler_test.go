@@ -2,6 +2,7 @@ package list
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,10 +14,12 @@ import (
 )
 
 type fakeReader struct {
-	tasks []domain.Task
+	tasks  []domain.Task
+	status domain.Status
 }
 
-func (r *fakeReader) List(context.Context, uuid.UUID) ([]domain.Task, error) {
+func (r *fakeReader) ListByStatus(_ context.Context, _ uuid.UUID, status domain.Status) ([]domain.Task, error) {
+	r.status = status
 	return r.tasks, nil
 }
 
@@ -67,12 +70,31 @@ func TestRESTReturnsNotFoundForMissingStage(t *testing.T) {
 func TestHandleKeepsOrder(t *testing.T) {
 	reader := &fakeReader{tasks: []domain.Task{{Title: "A"}, {Title: "B"}}}
 
-	items, err := New(reader, fakeStages{}).Handle(context.Background(), uuid.New())
+	items, err := New(reader, fakeStages{}).Handle(context.Background(), uuid.New(), "")
 
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) != 2 || items[1].Title != "B" {
 		t.Errorf("items = %+v", items)
+	}
+}
+
+func TestHandleFiltersByStatus(t *testing.T) {
+	reader := &fakeReader{}
+
+	if _, err := New(reader, fakeStages{}).Handle(context.Background(), uuid.New(), domain.StatusInReview); err != nil {
+		t.Fatal(err)
+	}
+	if reader.status != domain.StatusInReview {
+		t.Errorf("status = %s", reader.status)
+	}
+}
+
+func TestHandleRejectsUnknownStatus(t *testing.T) {
+	_, err := New(&fakeReader{}, fakeStages{}).Handle(context.Background(), uuid.New(), "archived")
+
+	if !errors.Is(err, domain.ErrTaskStatusInvalid) {
+		t.Fatalf("err = %v", err)
 	}
 }

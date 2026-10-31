@@ -42,12 +42,18 @@ var statusTransitions = map[Status][]Status{
 }
 
 // ChangeStatus pasa el proyecto a otro estado si la transición está permitida.
-func (p *Project) ChangeStatus(status Status) error {
+func (p *Project) ChangeStatus(status Status, actor kernel.Actor, reason string) error {
 	if _, known := statusTransitions[status]; !known {
 		return ErrProjectStatusInvalid
 	}
 	if !slices.Contains(statusTransitions[p.Status], status) {
 		return ErrProjectStatusTransition
+	}
+	if !slices.Contains(statusProfiles[p.Status][status], actor.Profile) {
+		return kernel.ErrTransitionForbidden
+	}
+	if err := ensureReason(p.Status, status, reason); err != nil {
+		return err
 	}
 	p.Status = status
 	return nil

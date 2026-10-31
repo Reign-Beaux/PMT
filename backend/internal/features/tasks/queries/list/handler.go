@@ -12,7 +12,7 @@ import (
 
 // Reader es la lectura que necesita la operación.
 type Reader interface {
-	List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, error)
+	ListByStatus(ctx context.Context, stageID uuid.UUID, status domain.Status) ([]domain.Task, error)
 }
 
 // StageChecker confirma que una etapa existe. Lo implementa la feature stages,
@@ -30,6 +30,7 @@ type Item struct {
 	Status      domain.Status `json:"status"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
+	Assignee    string        `json:"assignee,omitempty"`
 }
 
 // Handler ejecuta la operación.
@@ -44,12 +45,16 @@ func New(reader Reader, stages StageChecker) *Handler {
 }
 
 // Handle devuelve las tareas de la etapa, de la más antigua a la más reciente.
-func (h *Handler) Handle(ctx context.Context, stageID uuid.UUID) ([]Item, error) {
+// Un status vacío no filtra.
+func (h *Handler) Handle(ctx context.Context, stageID uuid.UUID, status domain.Status) ([]Item, error) {
+	if status != "" && !domain.IsKnownStatus(status) {
+		return nil, domain.ErrTaskStatusInvalid
+	}
 	if err := h.stages.Check(ctx, stageID); err != nil {
 		return nil, err
 	}
 
-	tasks, err := h.reader.List(ctx, stageID)
+	tasks, err := h.reader.ListByStatus(ctx, stageID, status)
 	if err != nil {
 		return nil, err
 	}

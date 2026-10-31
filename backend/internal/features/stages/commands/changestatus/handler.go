@@ -45,6 +45,9 @@ type Result struct {
 
 	AddReason      string `json:"add_reason,omitempty"`
 	AddRequestedBy string `json:"add_requested_by,omitempty"`
+
+	Lead    string   `json:"lead,omitempty"`
+	Members []string `json:"members,omitempty"`
 }
 
 // Handler ejecuta la operación.
@@ -66,7 +69,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	from := s.Status
-	if err := s.ChangeStatus(cmd.Status); err != nil {
+	if err := s.ChangeStatus(cmd.Status, cmd.Actor, cmd.Reason); err != nil {
 		return Result{}, err
 	}
 	statusChange := domain.NewStatusChange(s.ID, from, s.Status, cmd.Actor, cmd.Reason)

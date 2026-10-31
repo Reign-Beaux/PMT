@@ -48,7 +48,7 @@ func TestChangeStatusTransitions(t *testing.T) {
 			t.Run(fmt.Sprintf("%s a %s", from, to), func(t *testing.T) {
 				bug := Bug{Status: from}
 
-				err := bug.ChangeStatus(to)
+				err := bug.ChangeStatus(to, allowedActor(bug.Status, to), "motivo")
 
 				if allowed[from][to] {
 					if err != nil || bug.Status != to {
@@ -68,7 +68,7 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 	for _, status := range []Status{"", "archived", "REPORTED", " confirmed "} {
 		bug := Bug{Status: StatusReported}
 
-		if err := bug.ChangeStatus(status); !errors.Is(err, ErrBugStatusInvalid) {
+		if err := bug.ChangeStatus(status, allowedActor(bug.Status, status), "motivo"); !errors.Is(err, ErrBugStatusInvalid) {
 			t.Errorf("status %q: err = %v", status, err)
 		}
 		if bug.Status != StatusReported {

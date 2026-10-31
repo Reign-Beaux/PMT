@@ -9,25 +9,31 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"pmt/internal/features/stages/commands/add"
+	"pmt/internal/features/stages/commands/addmember"
+	"pmt/internal/features/stages/commands/assignlead"
 	"pmt/internal/features/stages/commands/changestatus"
 	"pmt/internal/features/stages/commands/create"
 	"pmt/internal/features/stages/commands/delete"
+	"pmt/internal/features/stages/commands/removemember"
 	"pmt/internal/features/stages/commands/retire"
 	"pmt/internal/features/stages/commands/revise"
 	"pmt/internal/features/stages/commands/update"
 	"pmt/internal/features/stages/queries/checktasks"
+	"pmt/internal/features/stages/queries/checkteam"
 	"pmt/internal/features/stages/queries/get"
 	"pmt/internal/features/stages/queries/list"
 	"pmt/internal/features/stages/queries/listchanges"
 	"pmt/internal/features/stages/queries/liststatuschanges"
 	"pmt/internal/features/stages/store"
 	"pmt/internal/features/stages/store/sqlcgen"
+	"pmt/internal/kernel"
 )
 
 // TaskChecker reúne lo que las slices piden a la feature tasks.
 type TaskChecker interface {
 	changestatus.TaskChecker
 	retire.TaskChecker
+	removemember.TaskChecker
 }
 
 // ProjectChecker reúne lo que las slices piden a la feature projects.
@@ -36,9 +42,15 @@ type ProjectChecker interface {
 	update.ProjectChecker
 }
 
+// AgentChecker reúne lo que las slices piden a la feature agents.
+type AgentChecker interface {
+	assignlead.AgentChecker
+	addmember.AgentChecker
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// tasks y projects los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker) {
+// tasks, projects y agents los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker) {
 	repo := store.NewStages(db)
 	changes := store.NewChanges(db)
 	statusChanges := store.NewStatusChanges(db)
@@ -58,6 +70,18 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	}{repo, changes, statusChanges}, tasks)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
+
+	assignLead := assignlead.New(repo, agents)
+	assignLead.Register(mux)
+	assignLead.RegisterTool(tools)
+
+	addMember := addmember.New(repo, agents)
+	addMember.Register(mux)
+	addMember.RegisterTool(tools)
+
+	removeMember := removemember.New(repo, tasks)
+	removeMember.Register(mux)
+	removeMember.RegisterTool(tools)
 
 	deleteStage := delete.New(repo, projects)
 	deleteStage.Register(mux)
@@ -104,12 +128,18 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 type Checker struct {
 	get   *get.Handler
 	tasks *checktasks.Handler
+	team  *checkteam.Handler
 }
 
 // NewChecker crea el verificador sobre las queries get y checktasks.
 func NewChecker(db sqlcgen.DBTX, projects ProjectChecker) *Checker {
 	repo := store.NewStages(db)
-	return &Checker{get: get.New(repo), tasks: checktasks.New(repo, projects)}
+	return &Checker{get: get.New(repo), tasks: checktasks.New(repo, projects), team: checkteam.New(repo)}
+}
+
+// Team devuelve el TL y los devs de la etapa.
+func (c *Checker) Team(ctx context.Context, id uuid.UUID) (kernel.Team, error) {
+	return c.team.Handle(ctx, id)
 }
 
 // Check devuelve un error de negocio si la etapa no existe.

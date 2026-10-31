@@ -17,6 +17,11 @@ type Repository interface {
 	ChangeStatus(ctx context.Context, task domain.Task, change domain.StatusChange) (domain.Task, error)
 }
 
+// StageChecker da el equipo de una etapa. Lo implementa la feature stages.
+type StageChecker interface {
+	Team(ctx context.Context, id uuid.UUID) (kernel.Team, error)
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID     uuid.UUID     `json:"-"`
@@ -34,16 +39,18 @@ type Result struct {
 	Status      domain.Status `json:"status"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
+	Assignee    string        `json:"assignee,omitempty"`
 }
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo   Repository
+	stages StageChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, stages StageChecker) *Handler {
+	return &Handler{repo: repo, stages: stages}
 }
 
 // Handle cambia el status de la tarea. Una tarea retirada no se encuentra.
@@ -53,7 +60,14 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	from := task.Status
-	if err := task.ChangeStatus(cmd.Status); err != nil {
+	if err := task.EnsureProfile(cmd.Status, cmd.Actor); err != nil {
+		return Result{}, err
+	}
+	team, err := h.stages.Team(ctx, task.StageID)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := task.ChangeStatus(cmd.Status, cmd.Actor, cmd.Reason, team); err != nil {
 		return Result{}, err
 	}
 

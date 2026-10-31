@@ -31,9 +31,9 @@ func TestAuthenticate(t *testing.T) {
 		status int
 		actor  kernel.Actor
 	}{
-		{"sin cabecera", "", http.StatusOK, kernel.Anonymous},
-		{"variable vacía", "Bearer", http.StatusOK, kernel.Anonymous},
-		{"vacío con espacio", "Bearer ", http.StatusOK, kernel.Anonymous},
+		{"sin cabecera", "", http.StatusOK, kernel.Owner},
+		{"variable vacía", "Bearer", http.StatusOK, kernel.Owner},
+		{"vacío con espacio", "Bearer ", http.StatusOK, kernel.Owner},
 		{"válido", "Bearer bueno", http.StatusOK, testActor},
 		{"inválido", "Bearer malo", http.StatusUnauthorized, kernel.Actor{}},
 		{"revocado", "Bearer revocado", http.StatusUnauthorized, kernel.Actor{}},

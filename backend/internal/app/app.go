@@ -63,10 +63,11 @@ func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authentica
 // registerFeatures registra las rutas REST y las herramientas MCP de cada feature.
 func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool) {
 	projectChecker := projects.NewChecker(pool)
+	agentChecker := agents.NewChecker(pool)
 
 	projects.Register(mux, tools, pool)
-	stages.Register(mux, tools, pool, tasks.NewChecker(pool), projectChecker)
-	tasks.Register(mux, tools, pool, stages.NewChecker(pool, projectChecker))
+	stages.Register(mux, tools, pool, tasks.NewChecker(pool), projectChecker, agentChecker)
+	tasks.Register(mux, tools, pool, stages.NewChecker(pool, projectChecker), agentChecker)
 	imports.Register(tools, pool)
 	bugs.Register(mux, tools, pool, projectChecker)
 }

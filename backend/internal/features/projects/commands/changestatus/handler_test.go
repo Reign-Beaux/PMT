@@ -47,7 +47,7 @@ func (r *fakeRepo) ChangeStatus(_ context.Context, p domain.Project, change doma
 func TestHandleChangesStatus(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy})
+	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t)
 
-			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status})
+			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -87,7 +87,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 func TestHandleMissingProject(t *testing.T) {
 	repo, _ := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy})
+	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
 
 	if !errors.Is(err, domain.ErrProjectNotFound) {
 		t.Fatalf("err = %v", err)

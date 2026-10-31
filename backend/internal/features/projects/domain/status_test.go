@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"pmt/internal/kernel"
 )
 
 func TestChangeStatusTransitions(t *testing.T) {
@@ -22,7 +24,7 @@ func TestChangeStatusTransitions(t *testing.T) {
 			t.Run(fmt.Sprintf("%s a %s", from, to), func(t *testing.T) {
 				p := Project{Status: from}
 
-				err := p.ChangeStatus(to)
+				err := p.ChangeStatus(to, kernel.Owner, "motivo")
 
 				if allowed[from][to] {
 					if err != nil || p.Status != to {
@@ -42,7 +44,7 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 	for _, status := range []Status{"", "archived", "PLANNING", " planning "} {
 		p := Project{Status: StatusPlanning}
 
-		if err := p.ChangeStatus(status); !errors.Is(err, ErrProjectStatusInvalid) {
+		if err := p.ChangeStatus(status, kernel.Owner, "motivo"); !errors.Is(err, ErrProjectStatusInvalid) {
 			t.Errorf("status %q: err = %v", status, err)
 		}
 		if p.Status != StatusPlanning {

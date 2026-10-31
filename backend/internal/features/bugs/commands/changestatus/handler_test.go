@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/bugs/domain"
+	"pmt/internal/platform/rest"
 )
 
 type fakeRepo struct {
@@ -50,7 +51,7 @@ func (r *fakeRepo) ChangeStatus(_ context.Context, bug domain.Bug, change domain
 func TestHandleChangesStatus(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusReported)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusConfirmed})
+	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusConfirmed, Actor: actorFor(domain.StatusConfirmed), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +79,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t, domain.StatusReported)
 
-			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status})
+			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -93,7 +94,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 func TestHandleNotFound(t *testing.T) {
 	repo, _ := newRepoWith(t, domain.StatusReported)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusConfirmed})
+	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusConfirmed, Actor: actorFor(domain.StatusConfirmed), Reason: "motivo"})
 
 	if !errors.Is(err, domain.ErrBugNotFound) {
 		t.Fatalf("err = %v", err)
@@ -127,7 +128,7 @@ func TestRest(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPut, tt.path(id), strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
-			mux.ServeHTTP(rec, req)
+			mux.ServeHTTP(rec, req.WithContext(rest.WithActor(req.Context(), actorFor(""))))
 
 			if rec.Code != tt.want {
 				t.Fatalf("código = %d, cuerpo = %s", rec.Code, rec.Body)

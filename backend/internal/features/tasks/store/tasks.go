@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"pmt/internal/features/tasks/domain"
 	"pmt/internal/features/tasks/store/sqlcgen"
@@ -56,7 +57,12 @@ func (s *Tasks) Get(ctx context.Context, id uuid.UUID) (domain.Task, error) {
 
 // List devuelve la última versión de las tareas sin retirar de una etapa, de la más antigua a la más reciente.
 func (s *Tasks) List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, error) {
-	rows, err := s.queries.ListTasks(ctx, stageID)
+	return s.ListByStatus(ctx, stageID, "")
+}
+
+// ListByStatus es List filtrada por status. Un status vacío no filtra.
+func (s *Tasks) ListByStatus(ctx context.Context, stageID uuid.UUID, status domain.Status) ([]domain.Task, error) {
+	rows, err := s.queries.ListTasks(ctx, sqlcgen.ListTasksParams{StageID: stageID, Status: string(status)})
 	if err != nil {
 		return nil, fmt.Errorf("listar tareas: %w", err)
 	}
@@ -83,11 +89,39 @@ func (s *Tasks) Update(ctx context.Context, task domain.Task) (domain.Task, erro
 	return toDomain(row), nil
 }
 
+// UpdateAssignee guarda el dueño de una tarea sin retirar y devuelve su última versión.
+func (s *Tasks) UpdateAssignee(ctx context.Context, task domain.Task) (domain.Task, error) {
+	row, err := s.queries.UpdateTaskAssignee(ctx, sqlcgen.UpdateTaskAssigneeParams{
+		ID:       task.ID,
+		Assignee: pgtype.Text{String: task.Assignee, Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("actualizar dueño de tarea: %w", err)
+	}
+	return toDomain(sqlcgen.Task(row)), nil
+}
+
+// HasOpenAssigned indica si el agente tiene tareas sin terminar en la etapa.
+func (s *Tasks) HasOpenAssigned(ctx context.Context, stageID uuid.UUID, agent string) (bool, error) {
+	has, err := s.queries.HasOpenAssignedTasks(ctx, sqlcgen.HasOpenAssignedTasksParams{
+		StageID:  stageID,
+		Assignee: pgtype.Text{String: agent, Valid: true},
+	})
+	if err != nil {
+		return false, fmt.Errorf("consultar tareas asignadas: %w", err)
+	}
+	return has, nil
+}
+
 // UpdateStatus guarda el status de una tarea sin retirar y devuelve su última versión.
 func (s *Tasks) UpdateStatus(ctx context.Context, task domain.Task) (domain.Task, error) {
 	row, err := s.queries.UpdateTaskStatus(ctx, sqlcgen.UpdateTaskStatusParams{
-		ID:     task.ID,
-		Status: string(task.Status),
+		ID:       task.ID,
+		Status:   string(task.Status),
+		Assignee: task.Assignee,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Task{}, domain.ErrTaskNotFound
@@ -131,5 +165,6 @@ func toDomain(row sqlcgen.Task) domain.Task {
 		Status:      domain.Status(row.Status),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
+		Assignee:    row.Assignee.String,
 	}
 }

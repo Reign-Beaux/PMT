@@ -32,9 +32,9 @@ func TestChangeStatusTransitions(t *testing.T) {
 	for _, from := range statuses {
 		for _, to := range statuses {
 			t.Run(fmt.Sprintf("%s a %s", from, to), func(t *testing.T) {
-				s := Stage{Status: from}
+				s := Stage{Status: from, Lead: "tl"}
 
-				err := s.ChangeStatus(to)
+				err := s.ChangeStatus(to, allowedActor(s, to), "motivo")
 
 				if allowed[from][to] {
 					if err != nil || s.Status != to {
@@ -54,7 +54,7 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 	for _, status := range []Status{"", "archived", "PLANNING", " planning "} {
 		s := Stage{Status: StatusPlanning}
 
-		if err := s.ChangeStatus(status); !errors.Is(err, ErrStageStatusInvalid) {
+		if err := s.ChangeStatus(status, allowedActor(s, status), "motivo"); !errors.Is(err, ErrStageStatusInvalid) {
 			t.Errorf("status %q: err = %v", status, err)
 		}
 		if s.Status != StatusPlanning {

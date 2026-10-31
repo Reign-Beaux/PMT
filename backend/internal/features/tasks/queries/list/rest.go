@@ -3,6 +3,7 @@ package list
 import (
 	"net/http"
 
+	"pmt/internal/features/tasks/domain"
 	"pmt/internal/platform/rest"
 )
 
@@ -18,7 +19,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.Handle(r.Context(), stageID)
+	items, err := h.Handle(r.Context(), stageID, domain.Status(r.URL.Query().Get("status")))
 	if err != nil {
 		rest.WriteError(w, err)
 		return

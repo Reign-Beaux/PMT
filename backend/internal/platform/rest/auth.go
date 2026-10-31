@@ -3,7 +3,6 @@ package rest
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 
@@ -13,14 +12,13 @@ import (
 type actorKey struct{}
 
 // Authenticate resuelve el Actor de cada petición y lo deja en su contexto. Un
-// token inválido o revocado responde 401. Una petición sin token continúa como
-// kernel.Anonymous, solo durante la transición a los tokens.
+// token inválido o revocado responde 401. Una petición sin token es del usuario,
+// kernel.Owner.
 func Authenticate(authenticator kernel.Authenticator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := BearerToken(r)
 			if token == "" {
-				log.Printf("petición sin token: %s %s", r.Method, r.URL.Path)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -35,17 +33,22 @@ func Authenticate(authenticator kernel.Authenticator) func(http.Handler) http.Ha
 				WriteError(w, err)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), actorKey{}, actor)))
+			next.ServeHTTP(w, r.WithContext(WithActor(r.Context(), actor)))
 		})
 	}
 }
 
-// ActorFrom devuelve el Actor de la petición, o kernel.Anonymous si no lo tiene.
+// WithActor deja el Actor en el contexto.
+func WithActor(ctx context.Context, actor kernel.Actor) context.Context {
+	return context.WithValue(ctx, actorKey{}, actor)
+}
+
+// ActorFrom devuelve el Actor de la petición, o kernel.Owner si no lo tiene.
 func ActorFrom(ctx context.Context) kernel.Actor {
 	if actor, ok := ctx.Value(actorKey{}).(kernel.Actor); ok {
 		return actor
 	}
-	return kernel.Anonymous
+	return kernel.Owner
 }
 
 // BearerToken devuelve el token de la cabecera Authorization. Sin cabecera, o con

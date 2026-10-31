@@ -3,6 +3,7 @@ package kernel
 import (
 	"context"
 	"errors"
+	"slices"
 )
 
 // Profile es el perfil con el que actúa quien hace una petición.
@@ -28,9 +29,30 @@ type Actor struct {
 	Profile Profile
 }
 
-// Anonymous es el actor de una petición sin token, admitida solo durante la
-// transición a los tokens.
-var Anonymous = Actor{Name: "sin-autenticar"}
+// Owner es el usuario humano: el actor de toda petición sin token. No tiene fila
+// en agents, por lo que no puede ser TL, miembro de un equipo ni dueño de una tarea.
+var Owner = Actor{Name: "saul", Profile: ProfileUser}
+
+// IsDev indica si el perfil es de desarrollo, sea frontend o backend.
+func (p Profile) IsDev() bool {
+	return p == ProfileDevFrontend || p == ProfileDevBackend
+}
+
+// Team es el equipo de una etapa: su TL responsable y sus devs.
+type Team struct {
+	Lead    string
+	Members []string
+}
+
+// IsLead indica si el actor es el TL de la etapa.
+func (t Team) IsLead(actor Actor) bool {
+	return t.Lead != "" && t.Lead == actor.Name
+}
+
+// HasMember indica si el agente pertenece al equipo de devs de la etapa.
+func (t Team) HasMember(name string) bool {
+	return slices.Contains(t.Members, name)
+}
 
 // ErrUnauthenticated indica que el token no corresponde a un agente activo.
 var ErrUnauthenticated = errors.New("token inválido")

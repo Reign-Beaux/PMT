@@ -1,6 +1,6 @@
 # Perfiles de agentes
 
-La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFrontend y DevBackend para separar responsabilidades y reducir el contexto que necesita cada perfil. Esta definición queda documentada aquí; su implementación en el backend está pendiente.
+La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFrontend y DevBackend para separar responsabilidades y reducir el contexto que necesita cada perfil. Las transiciones por perfil y la asignación ya están en el backend; ver `backend_architecture.md`.
 
 | Perfil | Nombre | Qué hace |
 |---|---|---|
@@ -12,6 +12,8 @@ La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFro
 | **CR** | Code Reviewer | Revisa la lógica, integridad y calidad del código, incluyendo prácticas como SOLID y DRY. Registra hallazgos, solicita correcciones, verifica su resolución y aprueba la revisión de código. |
 | **QAP** | Quality Assurance Planning | Diseña y versiona planes de pruebas para casos que combinan cambios de frontend y backend. Vincula tareas, define casos de prueba y envía el plan al TL para su aprobación. |
 | **QA** | Quality Assurance | Verifica el funcionamiento mediante pruebas y evidencias. Ejecuta planes aprobados, comprueba persistencia y realiza exploración y regresión cuando corresponde. Registra hallazgos, solicita correcciones y aprueba QA; después queda pendiente el cierre del TL. |
+
+El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP y PC, y no aprueba por CR, QA ni TL. PC solo detiene y reanuda etapas y proyectos.
 
 Los perfiles definen responsabilidades; el modelo de IA se configura por separado para cada agente.
 

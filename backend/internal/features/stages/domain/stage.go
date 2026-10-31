@@ -27,6 +27,18 @@ var (
 	ErrStageInOwnPlanning = kernel.Conflict("la etapa está en su propio planning")
 	// ErrStageLeftPlanning indica que otra operación sacó a la etapa de su planning propio al mismo tiempo.
 	ErrStageLeftPlanning = kernel.Conflict("la etapa ya salió de su planning propio")
+	// ErrAssignLeadForbidden indica que el perfil no puede asignar el TL.
+	ErrAssignLeadForbidden = kernel.Forbidden("tu perfil no puede asignar el TL de una etapa")
+	// ErrAgentNotLead indica que el agente propuesto como responsable no es TL.
+	ErrAgentNotLead = kernel.Invalid("el agente no tiene perfil TL")
+	// ErrAgentNotDev indica que el agente propuesto para el equipo no es dev.
+	ErrAgentNotDev = kernel.Invalid("el agente no tiene perfil DevFrontend ni DevBackend")
+	// ErrMemberExists indica que el agente ya pertenece al equipo.
+	ErrMemberExists = kernel.Conflict("el agente ya está en el equipo de la etapa")
+	// ErrMemberNotFound indica que el agente no pertenece al equipo.
+	ErrMemberNotFound = kernel.NotFound("el agente no está en el equipo de la etapa")
+	// ErrMemberHasTasks indica que el dev aún tiene tareas abiertas en la etapa.
+	ErrMemberHasTasks = kernel.Conflict("el agente tiene tareas abiertas en la etapa: reasígnalas antes")
 )
 
 // Stage es la raíz del agregado de una etapa. Referencia a su proyecto por ID.
@@ -44,6 +56,9 @@ type Stage struct {
 
 	AddReason      string
 	AddRequestedBy string
+
+	Lead    string
+	Members []string
 }
 
 // NewStage crea una etapa válida en su estado inicial. La posición se asigna al guardarla.
@@ -66,6 +81,27 @@ func NewOwnPlanningStage(projectID uuid.UUID, name, description, reason, request
 		return Stage{}, err
 	}
 	return s, nil
+}
+
+// Team devuelve el equipo de la etapa.
+func (s Stage) Team() kernel.Team {
+	return kernel.Team{Lead: s.Lead, Members: s.Members}
+}
+
+// EnsureLead devuelve un error si el actor no es el TL de la etapa.
+func (s Stage) EnsureLead(actor kernel.Actor) error {
+	if actor.Profile != kernel.ProfileTL || !s.Team().IsLead(actor) {
+		return kernel.ErrNotStageLead
+	}
+	return nil
+}
+
+// EnsureCanAssignLead devuelve un error si el perfil no puede asignar el TL.
+func EnsureCanAssignLead(actor kernel.Actor) error {
+	if actor.Profile != kernel.ProfilePP && actor.Profile != kernel.ProfileUser {
+		return ErrAssignLeadForbidden
+	}
+	return nil
 }
 
 // InOwnPlanning indica si la etapa se está planeando por sí sola. El status

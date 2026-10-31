@@ -45,12 +45,15 @@ var statusTransitions = map[Status][]Status{
 
 // ChangeStatus pasa la etapa a otro estado si la transición está permitida.
 // La regla de cierre depende de las tareas, por lo que la aplica el handler.
-func (s *Stage) ChangeStatus(status Status) error {
+func (s *Stage) ChangeStatus(status Status, actor kernel.Actor, reason string) error {
 	if _, known := statusTransitions[status]; !known {
 		return ErrStageStatusInvalid
 	}
 	if !slices.Contains(statusTransitions[s.Status], status) {
 		return ErrStageStatusTransition
+	}
+	if err := s.ensureAllowed(status, actor, reason); err != nil {
+		return err
 	}
 	s.Status = status
 	return nil

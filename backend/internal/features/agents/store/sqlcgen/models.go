@@ -76,6 +76,7 @@ type Stage struct {
 	RetiredAt      pgtype.Timestamptz
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
+	Lead           pgtype.Text
 }
 
 type StageChange struct {
@@ -88,6 +89,13 @@ type StageChange struct {
 	Reason      string
 	RequestedBy string
 	ChangedAt   time.Time
+}
+
+type StageMember struct {
+	StageID uuid.UUID
+	Agent   string
+	AddedBy string
+	AddedAt time.Time
 }
 
 type StageStatusChange struct {
@@ -110,6 +118,7 @@ type Task struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	RetiredAt   pgtype.Timestamptz
+	Assignee    pgtype.Text
 }
 
 type TaskChange struct {

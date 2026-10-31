@@ -9,12 +9,14 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"pmt/internal/features/tasks/commands/add"
+	"pmt/internal/features/tasks/commands/assign"
 	"pmt/internal/features/tasks/commands/changestatus"
 	"pmt/internal/features/tasks/commands/create"
 	"pmt/internal/features/tasks/commands/delete"
 	"pmt/internal/features/tasks/commands/retire"
 	"pmt/internal/features/tasks/commands/revise"
 	"pmt/internal/features/tasks/commands/update"
+	"pmt/internal/features/tasks/queries/checkassigned"
 	"pmt/internal/features/tasks/queries/checkdone"
 	"pmt/internal/features/tasks/queries/get"
 	"pmt/internal/features/tasks/queries/hasactive"
@@ -30,11 +32,18 @@ type StageChecker interface {
 	add.StageChecker
 	create.StageChecker
 	list.StageChecker
+	changestatus.StageChecker
+	assign.StageChecker
+}
+
+// AgentChecker reúne lo que las slices piden a la feature agents.
+type AgentChecker interface {
+	assign.AgentChecker
 }
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// stages lo aporta la feature stages, conectada en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageChecker) {
+// stages y agents los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageChecker, agents AgentChecker) {
 	repo := store.NewTasks(db)
 	changes := store.NewChanges(db)
 	statusChanges := store.NewStatusChanges(db)
@@ -54,9 +63,13 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	changeStatus := changestatus.New(struct {
 		*store.Tasks
 		*store.StatusChanges
-	}{repo, statusChanges})
+	}{repo, statusChanges}, stages)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
+
+	assignTask := assign.New(repo, stages, agents)
+	assignTask.Register(mux)
+	assignTask.RegisterTool(tools)
 
 	get.New(repo).Register(mux)
 
@@ -96,17 +109,23 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 type Checker struct {
 	checkDone *checkdone.Handler
 	hasActive *hasactive.Handler
+	assigned  *checkassigned.Handler
 }
 
 // NewChecker crea el verificador sobre las queries checkdone y hasactive.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewTasks(db)
-	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo)}
+	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo)}
 }
 
 // AllDone indica si todas las tareas de la etapa están en done.
 func (c *Checker) AllDone(ctx context.Context, stageID uuid.UUID) (bool, error) {
 	return c.checkDone.Handle(ctx, stageID)
+}
+
+// HasOpenAssigned indica si el agente tiene tareas sin terminar en la etapa.
+func (c *Checker) HasOpenAssigned(ctx context.Context, stageID uuid.UUID, agent string) (bool, error) {
+	return c.assigned.Handle(ctx, stageID, agent)
 }
 
 // HasActive indica si la etapa tiene tareas sin retirar.

@@ -6,7 +6,7 @@ WHERE project_id = @project_id::uuid
 RETURNING *;
 
 -- name: GetStage :one
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -22,7 +22,7 @@ WHERE id = $1 AND retired_at IS NULL
 FOR UPDATE;
 
 -- name: ListStages :many
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -46,7 +46,7 @@ WITH updated AS (
     WHERE stages.id = $1
     RETURNING *
 )
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
 FROM updated s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -68,3 +68,28 @@ WHERE id = $1;
 UPDATE stages
 SET status = $2, add_reason = NULL, add_requested_by = NULL, updated_at = now()
 WHERE id = $1;
+
+-- name: UpdateStageLead :execrows
+UPDATE stages
+SET lead = $2, updated_at = now()
+WHERE id = $1 AND retired_at IS NULL;
+
+-- name: AddStageMember :exec
+INSERT INTO stage_members (stage_id, agent, added_by)
+VALUES ($1, $2, $3);
+
+-- name: RemoveStageMember :execrows
+DELETE FROM stage_members
+WHERE stage_id = $1 AND agent = $2;
+
+-- name: ListStageMembers :many
+SELECT agent FROM stage_members
+WHERE stage_id = $1
+ORDER BY added_at, agent;
+
+-- name: ListProjectStageMembers :many
+SELECT m.stage_id, m.agent
+FROM stage_members m
+JOIN stages s ON s.id = m.stage_id
+WHERE s.project_id = $1
+ORDER BY m.added_at, m.agent;

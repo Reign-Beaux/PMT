@@ -24,6 +24,7 @@ type Result struct {
 	Status      domain.Status `json:"status"`
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
+	Assignee    string        `json:"assignee,omitempty"`
 }
 
 // Handler ejecuta la operación.

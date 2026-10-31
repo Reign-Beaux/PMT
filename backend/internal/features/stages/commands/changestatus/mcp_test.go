@@ -18,6 +18,7 @@ func connect(t *testing.T, repo Repository, tasks TaskChecker) *sdk.ClientSessio
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
+	platformmcp.ActAs(server, actorFor(domain.StatusInDev))
 	New(repo, tasks).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()
@@ -60,9 +61,9 @@ func TestToolRequiresStageIDAndStatus(t *testing.T) {
 }
 
 func TestToolChangesStatus(t *testing.T) {
-	repo, id := newRepoWith(t, domain.StatusPlanning)
+	repo, id := newRepoWith(t, domain.StatusStandBy)
 
-	result := call(t, connect(t, repo, &fakeTasks{}), map[string]any{"stage_id": id.String(), "status": "stand_by"})
+	result := call(t, connect(t, repo, &fakeTasks{}), map[string]any{"stage_id": id.String(), "status": "in_dev"})
 
 	if result.IsError {
 		t.Fatalf("resultado = %+v", result)
@@ -71,10 +72,10 @@ func TestToolChangesStatus(t *testing.T) {
 	if err := json.Unmarshal([]byte(result.Content[0].(*sdk.TextContent).Text), &output); err != nil {
 		t.Fatal(err)
 	}
-	if output.ID != id.String() || output.Status != "stand_by" || output.Name != "Diseño" {
+	if output.ID != id.String() || output.Status != "in_dev" || output.Name != "Diseño" {
 		t.Errorf("salida = %+v", output)
 	}
-	if repo.stages[id].Status != domain.StatusStandBy {
+	if repo.stages[id].Status != domain.StatusInDev {
 		t.Errorf("etapa = %+v", repo.stages[id])
 	}
 }

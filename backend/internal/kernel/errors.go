@@ -44,3 +44,13 @@ func Conflict(message string) *Error {
 func Forbidden(message string) *Error {
 	return &Error{Kind: KindForbidden, Message: message}
 }
+
+// Errores de autorización y de motivo comunes a las features con status.
+var (
+	// ErrTransitionForbidden indica que el perfil no puede hacer la transición.
+	ErrTransitionForbidden = Forbidden("tu perfil no puede hacer esta transición")
+	// ErrNotStageLead indica que quien actúa no es el TL de la etapa.
+	ErrNotStageLead = Forbidden("no eres el TL de la etapa")
+	// ErrReasonRequired indica que la transición exige un motivo.
+	ErrReasonRequired = Invalid("el motivo es obligatorio en esta transición")
+)

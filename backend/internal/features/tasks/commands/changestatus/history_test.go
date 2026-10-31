@@ -10,9 +10,9 @@ import (
 
 func TestHandleRecordsStatusChange(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusBacklog)
-	actor := kernel.Actor{Name: "agente", Profile: "PP"}
+	actor := kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady, Reason: " motivo ", Actor: actor})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady, Reason: " motivo ", Actor: actor})
 
 	if err != nil {
 		t.Fatal(err)
@@ -24,7 +24,7 @@ func TestHandleRecordsStatusChange(t *testing.T) {
 	if got.TaskID != id || got.From != domain.StatusBacklog || got.To != domain.StatusReady {
 		t.Errorf("registro = %+v", got)
 	}
-	if got.ActorName != "agente" || got.ActorProfile != "PP" || got.Reason != "motivo" {
+	if got.ActorName != "tl" || got.ActorProfile != "TL" || got.Reason != "motivo" {
 		t.Errorf("registro = %+v", got)
 	}
 }
@@ -32,7 +32,7 @@ func TestHandleRecordsStatusChange(t *testing.T) {
 func TestHandleRecordsNothingOnRejectedTransition(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusBacklog)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusBacklog, Actor: kernel.Anonymous})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusBacklog, Actor: kernel.Owner})
 
 	if err == nil {
 		t.Fatal("se esperaba error")

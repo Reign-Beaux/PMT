@@ -32,7 +32,7 @@ func TestHandleRecordsStatusChange(t *testing.T) {
 func TestHandleRecordsNothingOnRejectedTransition(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusPlanning, Actor: kernel.Anonymous})
+	_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusPlanning, Actor: kernel.Owner})
 
 	if err == nil {
 		t.Fatal("se esperaba error")

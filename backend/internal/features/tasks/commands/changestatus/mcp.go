@@ -26,13 +26,14 @@ type toolOutput struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+	Assignee    string `json:"assignee,omitempty"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_task_status",
-		Description: "Cambia el status de una tarea de PMT y devuelve la tarea con su última versión. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. No depende del status del proyecto ni de la etapa y no registra un cambio de contenido; deja un registro inmutable, consultable con list_task_status_changes. Usa list_tasks para obtener el ID de la tarea y su status actual.",
+		Description: "Cambia el status de una tarea de PMT y devuelve la tarea con su última versión. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Cada transición exige un perfil: el TL debe ser el de la etapa, y solo un dev del equipo toma una tarea en ready, que queda a su nombre y solo él mueve. Cancelar y reabrir exigen reason. No depende del status del proyecto ni de la etapa y no registra un cambio de contenido; deja un registro inmutable, consultable con list_task_status_changes. Usa list_tasks para obtener el ID de la tarea y su status actual.",
 	}, h.callTool)
 }
 
@@ -55,5 +56,6 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 		Status:      string(result.Status),
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
+		Assignee:    result.Assignee,
 	}, nil
 }

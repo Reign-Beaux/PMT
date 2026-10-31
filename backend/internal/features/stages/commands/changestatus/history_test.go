@@ -34,7 +34,7 @@ func TestHandleRecordsStatusChange(t *testing.T) {
 func TestHandleRecordsNothingOnRejectedTransition(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusPlanning)
 
-	_, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusPlanning, Actor: kernel.Anonymous})
+	_, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusPlanning, Actor: kernel.Owner})
 
 	if err == nil {
 		t.Fatal("se esperaba error")
@@ -51,7 +51,7 @@ func TestHandleRecordsStatusChangeLeavingOwnPlanning(t *testing.T) {
 	}
 	repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
 
-	_, err = New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Reason: "listo"})
+	_, err = New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Reason: "listo", Actor: actorFor(domain.StatusStandBy)})
 
 	if err != nil {
 		t.Fatal(err)

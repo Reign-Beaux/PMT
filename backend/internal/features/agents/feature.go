@@ -4,11 +4,14 @@
 package agents
 
 import (
+	"context"
+
 	"pmt/internal/features/agents/commands/create"
 	"pmt/internal/features/agents/commands/revoke"
 	"pmt/internal/features/agents/commands/rotate"
 	"pmt/internal/features/agents/queries/authenticate"
 	"pmt/internal/features/agents/queries/list"
+	"pmt/internal/features/agents/queries/lookup"
 	"pmt/internal/features/agents/store"
 	"pmt/internal/features/agents/store/sqlcgen"
 	"pmt/internal/kernel"
@@ -36,4 +39,19 @@ func NewAdmin(db sqlcgen.DBTX) Admin {
 // NewAuthenticator crea el autenticador que usan REST y MCP.
 func NewAuthenticator(db sqlcgen.DBTX) kernel.Authenticator {
 	return authenticate.New(store.NewAgents(db))
+}
+
+// Checker permite a otras features conocer el perfil de un agente activo.
+type Checker struct {
+	lookup *lookup.Handler
+}
+
+// NewChecker crea el verificador sobre la query lookup.
+func NewChecker(db sqlcgen.DBTX) *Checker {
+	return &Checker{lookup: lookup.New(store.NewAgents(db))}
+}
+
+// Profile devuelve el perfil del agente, o un error de negocio si no existe o está revocado.
+func (c *Checker) Profile(ctx context.Context, name string) (kernel.Profile, error) {
+	return c.lookup.Handle(ctx, name)
 }

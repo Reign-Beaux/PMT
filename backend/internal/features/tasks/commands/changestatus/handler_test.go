@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/platform/rest"
 )
 
 // fakeRepo imita al store: Get no encuentra lo retirado y ambas lecturas
@@ -22,6 +23,7 @@ type fakeRepo struct {
 	latest   map[uuid.UUID]domain.Task
 	updates  int
 	recorded []domain.StatusChange
+	onChange func(domain.Task)
 }
 
 func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
@@ -49,6 +51,9 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Task, error) {
 func (r *fakeRepo) ChangeStatus(_ context.Context, task domain.Task, change domain.StatusChange) (domain.Task, error) {
 	r.updates++
 	r.recorded = append(r.recorded, change)
+	if r.onChange != nil {
+		r.onChange(task)
+	}
 	row := r.tasks[task.ID]
 	row.Status = task.Status
 	r.tasks[task.ID] = row
@@ -65,7 +70,7 @@ func (r *fakeRepo) withLatest(task domain.Task) domain.Task {
 func TestHandleChangesStatus(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusBacklog)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady})
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady, Actor: actorFor(domain.StatusReady), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +84,7 @@ func TestHandleReturnsLatestVersion(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusBacklog)
 	repo.latest[id] = domain.Task{Title: "Login v2", Description: "Revisada"}
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady})
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady, Actor: actorFor(domain.StatusReady), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +112,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t, domain.StatusBacklog)
 
-			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status})
+			_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -123,7 +128,7 @@ func TestHandleNotFound(t *testing.T) {
 	t.Run("inexistente", func(t *testing.T) {
 		repo, _ := newRepoWith(t, domain.StatusBacklog)
 
-		_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusReady})
+		_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusReady, Actor: actorFor(domain.StatusReady), Reason: "motivo"})
 
 		if !errors.Is(err, domain.ErrTaskNotFound) {
 			t.Fatalf("err = %v", err)
@@ -134,7 +139,7 @@ func TestHandleNotFound(t *testing.T) {
 		repo, id := newRepoWith(t, domain.StatusBacklog)
 		repo.retired[id] = true
 
-		_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady})
+		_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusReady, Actor: actorFor(domain.StatusReady), Reason: "motivo"})
 
 		if !errors.Is(err, domain.ErrTaskNotFound) {
 			t.Fatalf("err = %v", err)
@@ -165,11 +170,11 @@ func TestRest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t, tt.from)
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, fakeStages{}).Register(mux)
 
 			req := httptest.NewRequest(http.MethodPut, tt.path(id), strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
-			mux.ServeHTTP(rec, req)
+			mux.ServeHTTP(rec, req.WithContext(rest.WithActor(req.Context(), actorFor(""))))
 
 			if rec.Code != tt.want {
 				t.Fatalf("código = %d, cuerpo = %s", rec.Code, rec.Body)

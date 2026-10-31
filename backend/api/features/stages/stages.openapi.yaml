@@ -127,6 +127,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           $ref: "#/components/responses/Error"
         "409":
@@ -259,6 +265,87 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/stages/{id}/lead:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Fija o reemplaza el TL de una etapa
+      description: Solo PP o el usuario. El agente debe estar activo y tener perfil TL.
+      requestBody:
+        $ref: "#/components/requestBodies/AgentInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Añade un dev al equipo de una etapa
+      description: Solo el TL de la etapa. El agente debe estar activo y ser DevFrontend o DevBackend.
+      requestBody:
+        $ref: "#/components/requestBodies/AgentInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/members/{agent}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      summary: Quita un dev del equipo de una etapa
+      description: Solo el TL de la etapa. Se rechaza si el dev tiene tareas abiertas en ella.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/stages/{id}/status-changes:
     parameters:
       - name: id
@@ -289,6 +376,18 @@ components:
       type: http
       scheme: bearer
   requestBodies:
+    AgentInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [agent]
+            properties:
+              agent:
+                type: string
+                description: Nombre del agente.
     StageInput:
       required: true
       content:
@@ -303,6 +402,23 @@ components:
               description:
                 type: string
   responses:
+    Team:
+      description: Equipo de la etapa
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [id, lead, members]
+            properties:
+              id:
+                type: string
+                format: uuid
+              lead:
+                type: string
+              members:
+                type: array
+                items:
+                  type: string
     Unauthorized:
       description: Token inválido o revocado. Sin token, la petición sigue como `sin-autenticar` durante la transición.
       content:
@@ -449,6 +565,14 @@ components:
         add_reason:
           type: string
           description: Motivo del registro add pendiente. Su presencia indica que la etapa está en su planning propio.
+        lead:
+          type: string
+          description: Nombre del TL responsable. Ausente si no tiene.
+        members:
+          type: array
+          description: Nombres de los devs del equipo. Ausente si no tiene.
+          items:
+            type: string
         add_requested_by:
           type: string
           description: Quién pidió la etapa, mientras esté en su planning propio.

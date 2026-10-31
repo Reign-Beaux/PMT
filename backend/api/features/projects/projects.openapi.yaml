@@ -109,6 +109,12 @@ paths:
           $ref: "#/components/responses/Project"
         "400":
           $ref: "#/components/responses/Error"
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404":
           $ref: "#/components/responses/Error"
         "409":

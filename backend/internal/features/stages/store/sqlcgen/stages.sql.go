@@ -13,12 +13,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addStageMember = `-- name: AddStageMember :exec
+INSERT INTO stage_members (stage_id, agent, added_by)
+VALUES ($1, $2, $3)
+`
+
+type AddStageMemberParams struct {
+	StageID uuid.UUID
+	Agent   string
+	AddedBy string
+}
+
+func (q *Queries) AddStageMember(ctx context.Context, arg AddStageMemberParams) error {
+	_, err := q.db.Exec(ctx, addStageMember, arg.StageID, arg.Agent, arg.AddedBy)
+	return err
+}
+
 const createStage = `-- name: CreateStage :one
 INSERT INTO stages (id, project_id, name, description, status, position, add_reason, add_requested_by)
 SELECT $1::uuid, $2::uuid, $3::text, $4::text, $5::text, COALESCE(MAX(position), 0) + 1, NULLIF($6::text, ''), NULLIF($7::text, '')
 FROM stages
 WHERE project_id = $2::uuid
-RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by
+RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead
 `
 
 type CreateStageParams struct {
@@ -54,6 +70,7 @@ func (q *Queries) CreateStage(ctx context.Context, arg CreateStageParams) (Stage
 		&i.RetiredAt,
 		&i.AddReason,
 		&i.AddRequestedBy,
+		&i.Lead,
 	)
 	return i, err
 }
@@ -72,7 +89,7 @@ func (q *Queries) DeleteStage(ctx context.Context, id uuid.UUID) (int64, error) 
 }
 
 const getStage = `-- name: GetStage :one
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -95,6 +112,7 @@ type GetStageRow struct {
 	RetiredAt      pgtype.Timestamptz
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
+	Lead           pgtype.Text
 }
 
 func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (GetStageRow, error) {
@@ -112,6 +130,7 @@ func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (GetStageRow, erro
 		&i.RetiredAt,
 		&i.AddReason,
 		&i.AddRequestedBy,
+		&i.Lead,
 	)
 	return i, err
 }
@@ -132,8 +151,67 @@ func (q *Queries) LeaveStagePlanning(ctx context.Context, arg LeaveStagePlanning
 	return err
 }
 
+const listProjectStageMembers = `-- name: ListProjectStageMembers :many
+SELECT m.stage_id, m.agent
+FROM stage_members m
+JOIN stages s ON s.id = m.stage_id
+WHERE s.project_id = $1
+ORDER BY m.added_at, m.agent
+`
+
+type ListProjectStageMembersRow struct {
+	StageID uuid.UUID
+	Agent   string
+}
+
+func (q *Queries) ListProjectStageMembers(ctx context.Context, projectID uuid.UUID) ([]ListProjectStageMembersRow, error) {
+	rows, err := q.db.Query(ctx, listProjectStageMembers, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectStageMembersRow{}
+	for rows.Next() {
+		var i ListProjectStageMembersRow
+		if err := rows.Scan(&i.StageID, &i.Agent); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStageMembers = `-- name: ListStageMembers :many
+SELECT agent FROM stage_members
+WHERE stage_id = $1
+ORDER BY added_at, agent
+`
+
+func (q *Queries) ListStageMembers(ctx context.Context, stageID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listStageMembers, stageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var agent string
+		if err := rows.Scan(&agent); err != nil {
+			return nil, err
+		}
+		items = append(items, agent)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStages = `-- name: ListStages :many
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -157,6 +235,7 @@ type ListStagesRow struct {
 	RetiredAt      pgtype.Timestamptz
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
+	Lead           pgtype.Text
 }
 
 func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListStagesRow, error) {
@@ -180,6 +259,7 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListSt
 			&i.RetiredAt,
 			&i.AddReason,
 			&i.AddRequestedBy,
+			&i.Lead,
 		); err != nil {
 			return nil, err
 		}
@@ -192,7 +272,7 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListSt
 }
 
 const lockStage = `-- name: LockStage :one
-SELECT id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by FROM stages
+SELECT id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead FROM stages
 WHERE id = $1 AND retired_at IS NULL
 FOR UPDATE
 `
@@ -212,8 +292,27 @@ func (q *Queries) LockStage(ctx context.Context, id uuid.UUID) (Stage, error) {
 		&i.RetiredAt,
 		&i.AddReason,
 		&i.AddRequestedBy,
+		&i.Lead,
 	)
 	return i, err
+}
+
+const removeStageMember = `-- name: RemoveStageMember :execrows
+DELETE FROM stage_members
+WHERE stage_id = $1 AND agent = $2
+`
+
+type RemoveStageMemberParams struct {
+	StageID uuid.UUID
+	Agent   string
+}
+
+func (q *Queries) RemoveStageMember(ctx context.Context, arg RemoveStageMemberParams) (int64, error) {
+	result, err := q.db.Exec(ctx, removeStageMember, arg.StageID, arg.Agent)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const retireStage = `-- name: RetireStage :exec
@@ -231,7 +330,7 @@ const updateStage = `-- name: UpdateStage :one
 UPDATE stages
 SET name = $2, description = $3, updated_at = now()
 WHERE id = $1
-RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by
+RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead
 `
 
 type UpdateStageParams struct {
@@ -255,8 +354,28 @@ func (q *Queries) UpdateStage(ctx context.Context, arg UpdateStageParams) (Stage
 		&i.RetiredAt,
 		&i.AddReason,
 		&i.AddRequestedBy,
+		&i.Lead,
 	)
 	return i, err
+}
+
+const updateStageLead = `-- name: UpdateStageLead :execrows
+UPDATE stages
+SET lead = $2, updated_at = now()
+WHERE id = $1 AND retired_at IS NULL
+`
+
+type UpdateStageLeadParams struct {
+	ID   uuid.UUID
+	Lead pgtype.Text
+}
+
+func (q *Queries) UpdateStageLead(ctx context.Context, arg UpdateStageLeadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateStageLead, arg.ID, arg.Lead)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateStageStatus = `-- name: UpdateStageStatus :one
@@ -264,9 +383,9 @@ WITH updated AS (
     UPDATE stages
     SET status = $2, updated_at = now()
     WHERE stages.id = $1
-    RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by
+    RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead
 )
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
 FROM updated s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -293,6 +412,7 @@ type UpdateStageStatusRow struct {
 	RetiredAt      pgtype.Timestamptz
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
+	Lead           pgtype.Text
 }
 
 func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) (UpdateStageStatusRow, error) {
@@ -310,6 +430,7 @@ func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusPa
 		&i.RetiredAt,
 		&i.AddReason,
 		&i.AddRequestedBy,
+		&i.Lead,
 	)
 	return i, err
 }

@@ -1,10 +1,6 @@
 package domain
 
-import (
-	"slices"
-
-	"pmt/internal/kernel"
-)
+import "pmt/internal/kernel"
 
 var (
 	// ErrTaskStatusInvalid indica que el status no es uno de los valores conocidos.
@@ -26,13 +22,29 @@ var statusTransitions = map[Status][]Status{
 	StatusCancelled:        {StatusBacklog},
 }
 
-// ChangeStatus pasa la tarea a otro estado si la transición está permitida.
-func (t *Task) ChangeStatus(status Status) error {
-	if _, known := statusTransitions[status]; !known {
-		return ErrTaskStatusInvalid
+// IsKnownStatus indica si el valor es un status de tarea.
+func IsKnownStatus(status Status) bool {
+	_, known := statusTransitions[status]
+	return known
+}
+
+// ChangeStatus pasa la tarea a otro estado si la transición está permitida y
+// quien actúa puede hacerla. Tomarla la deja a nombre del dev; reabrirla la libera.
+func (t *Task) ChangeStatus(status Status, actor kernel.Actor, reason string, team kernel.Team) error {
+	if err := t.EnsureProfile(status, actor); err != nil {
+		return err
 	}
-	if !slices.Contains(statusTransitions[t.Status], status) {
-		return ErrTaskStatusTransition
+	if err := t.ensureScope(actor, team); err != nil {
+		return err
+	}
+	if err := ensureReason(t.Status, status, reason); err != nil {
+		return err
+	}
+	switch {
+	case t.Status == StatusReady && status == StatusInProgress:
+		t.Assignee = actor.Name
+	case status == StatusBacklog:
+		t.Assignee = ""
 	}
 	t.Status = status
 	return nil

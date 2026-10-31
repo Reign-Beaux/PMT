@@ -108,7 +108,7 @@ Una slice solo incluye `rest.go` o `mcp.go` si esa operación se expone por ese 
 | `internal/features/<feature>/store/sqlcgen/` | Código generado por `sqlc`. No se edita a mano. |
 | `internal/features/<feature>/commands/<operacion>/` | Una operación que cambia estado. |
 | `internal/features/<feature>/queries/<operacion>/` | Una operación que solo lee. |
-| `internal/kernel/` | Conceptos compartidos con la misma semántica en varias features: `Actor`, `Profile`, `Transactor`, identificadores y errores de negocio (`Invalid`, `NotFound`, `Conflict`), que `platform/rest` traduce a HTTP. |
+| `internal/kernel/` | Conceptos compartidos con la misma semántica en varias features: `Actor`, `Profile`, `Team`, `Transactor`, identificadores y errores de negocio (`Invalid`, `NotFound`, `Conflict`), que `platform/rest` traduce a HTTP. |
 | `internal/platform/rest/` | Servidor HTTP, middleware y manejo técnico de errores. |
 | `internal/platform/mcp/` | Servidor MCP, autenticación y filtrado de herramientas por perfil. Sin lógica de negocio. |
 | `internal/platform/postgres/` | Conexión, transacciones y ejecución de migraciones. |
@@ -166,8 +166,8 @@ El esquema publicado por MCP se infiere, por lo que su fuente de verdad es el c�
 
 ## Errores
 
-- Los errores de negocio se crean con `kernel.Invalid`, `kernel.NotFound` o `kernel.Conflict` y se declaran en `domain/`.
-- Cada adaptador los entrega a `platform/rest.WriteError`, que responde 400, 404 o 409 con el formato `{"error": "mensaje"}`.
+- Los errores de negocio se crean con `kernel.Invalid`, `kernel.NotFound` o `kernel.Conflict` y se declaran en `domain/`; `kernel.Forbidden` marca los de permiso. Los de transición comunes a varias features viven en `kernel`.
+- Cada adaptador los entrega a `platform/rest.WriteError`, que responde 400, 403, 404 o 409 con el formato `{"error": "mensaje"}`.
 - `store` traduce a errores de negocio las violaciones de la base de datos, con `postgres.IsForeignKeyViolation` y `postgres.IsUniqueViolation`.
 - Cualquier otro error se registra en el log y responde 500 con un mensaje genérico, sin exponer su detalle.
 - `platform/mcp.ToolError` aplica la misma regla a las herramientas MCP.
@@ -278,7 +278,7 @@ pmt-server agent list
 
 **Los clientes:** `.mcp.json` está versionado y compartido, así que solo contiene `Authorization: Bearer ${PMT_TOKEN:-}`. Cada sesión se lanza con su token en `PMT_TOKEN` y la cabecera se fija al arrancar. Los tokens viven fuera del repo, en `~/.config/pmt/tokens/<nombre>`, con permiso 600. REST recibe la misma cabecera.
 
-**Transición:** un token inválido o revocado responde 401. Sin cabecera, o con `Bearer` vacío, que es lo que envía Claude Code si falta `PMT_TOKEN`, la petición continúa como `kernel.Anonymous` (`sin-autenticar`) y deja `petición sin token` en el log. Esto es temporal: desaparece cuando las transiciones se limiten por perfil.
+**Sin token:** un token inválido o revocado responde 401. Sin cabecera, o con `Bearer` vacío, que es lo que envía Claude Code si falta `PMT_TOKEN`, actúa el usuario: `kernel.Owner`, `Actor{Name: "saul", Profile: User}`, sin fila en `agents`. Por eso `saul` no puede ser TL, miembro de un equipo ni dueño de una tarea.
 
 El token evita errores y deja rastro; no detiene a un agente hostil, porque cualquier proceso con shell en esta máquina puede leer esos ficheros.
 
@@ -297,6 +297,8 @@ Todo proyecto nace en `planning`. `in_dev` significa que se desarrolla la primer
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `projects/commands/changestatus`, no con `PUT /api/projects/{id}`.
 
+**Perfiles:** PP y `User` hacen todas las transiciones. PC solo detiene y reanuda. Detener, cancelar y reabrir exigen motivo.
+
 ## Estados de una etapa
 
 Toda etapa nace en `planning`. Una tabla de transiciones en `stages/domain` define los cambios permitidos:
@@ -311,6 +313,8 @@ Toda etapa nace en `planning`. Una tabla de transiciones en `stages/domain` defi
 | `cancelled` | `planning` |
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `stages/commands/changestatus`, no con `PUT /api/stages/{id}`.
+
+**Perfiles:** `stand_by → in_dev` e `in_dev → done` son del TL de la etapa; `done → in_dev`, de PP, `User` o ese TL, con motivo. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User`, PC y el TL detienen y reanudan. Detener, cancelar y reabrir exigen motivo.
 
 **Regla de cierre:** una etapa solo pasa a `done` si todas sus tareas están en `done`; si no, la operación responde `kernel.Conflict`. Una etapa sin tareas sí puede pasar a `done`, y reabrirla (`done` → `in_dev`) no consulta las tareas. Como `stages` no importa `tasks`, la slice define la interfaz `changestatus.TaskChecker`, que implementa `tasks.Checker` sobre la query `tasks/queries/checkdone`, conectada en `registerFeatures`.
 
@@ -348,21 +352,42 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 Cambiar el status no depende del status del proyecto ni de la etapa, igual que `change_stage_status`. Tampoco es un cambio de contenido: no escribe en `task_changes`. Actualiza `status` y `updated_at`, deja su registro en el [historial de status](#historial-de-status) y devuelve la última versión. Una tarea retirada responde `NotFound`.
 
-**Perfiles pendientes:** hoy cualquiera puede ejecutar cualquier transición permitida. Cuando existan `agents` y `Actor`, cada transición se limitará a estos perfiles; la tabla no incluye `cancelled`, cuyo perfil falta por definir:
+**Perfiles:** cada transición exige un perfil, en `domain/permissions.go`. Una prueba exige que toda transición tenga perfiles. `User` tiene lo de PP y PC; Dev es DevFrontend o DevBackend.
 
 | Desde | Acción | Perfil | Hacia |
 | --- | --- | --- | --- |
 | `backlog` | Liberar | TL | `ready` |
-| `ready` | Iniciar | Dev | `in_progress` |
-| `in_progress` | Entregar | Dev | `in_review` |
+| `ready` | Tomar | Dev del equipo | `in_progress` |
+| `in_progress` | Entregar | Dev dueño | `in_review` |
 | `in_review` | Aprobar | CR | `in_qa` |
 | `in_review` | Pedir corrección | CR | `changes_requested` |
 | `in_qa` | Pedir corrección | QA | `changes_requested` |
-| `changes_requested` | Reentregar | Dev | `in_review` |
+| `changes_requested` | Reentregar | Dev dueño | `in_review` |
 | `in_qa` | Aprobar | QA | `pending_close` |
 | `pending_close` | Cerrar | TL | `done` |
+| cualquiera menos `done` | Cancelar, con motivo | TL, PP, `User` | `cancelled` |
+| `cancelled` | Reabrir, con motivo | TL, PP, `User` | `backlog` |
 
-Dev corresponde a DevFrontend o DevBackend, según la tarea.
+La validación sigue este orden: status conocido, transición, perfil, ámbito y motivo. El perfil responde `kernel.Forbidden` antes de consultar otra feature. Solo espacios cuenta como motivo vacío.
+
+## Asignación
+
+Cada etapa tiene un TL responsable y un equipo de devs. `stages.lead`, `stage_members.agent` y `tasks.assignee` referencian `agents (name)`, que es único y no cambia: así las salidas muestran el nombre sin que otra feature lea `agents`. No hay historial de asignación: quién tomó una tarea queda en `task_status_changes`.
+
+| Comando MCP | REST | Quién | Efecto |
+| --- | --- | --- | --- |
+| `assign_stage_lead` | `PUT /api/stages/{id}/lead` | PP, `User` | Fija o reemplaza el TL. El agente debe tener perfil TL |
+| `add_stage_member` | `POST /api/stages/{id}/members` | TL de la etapa | Añade un dev |
+| `remove_stage_member` | `DELETE /api/stages/{id}/members/{agent}` | TL de la etapa | `Conflict` si tiene tareas abiertas en la etapa |
+| `assign_task` | `PUT /api/tasks/{id}/assignee` | TL de la etapa | Pone o cambia el dueño de una tarea ya tomada. `Conflict` en `backlog`, `ready`, `done` y `cancelled` |
+
+- **Tomar no es un comando:** `ready → in_progress` deja `assignee` con el nombre del dev, que debe ser del equipo. Después solo ese dev la mueve. `cancelled → backlog` lo limpia.
+- Un dev puede tener varias tareas sin límite fijo. CR, QA y QAP actúan por perfil.
+- Un TL solo actúa sobre su etapa y sus tareas. PP, PC y `User` no tienen ámbito.
+- Solo se asignan agentes activos. Lo ya asignado a un agente revocado no cambia: PP o el TL lo reasignan.
+- Las cuatro operaciones aplican en cualquier status y en el planning propio, porque no son cambios de contenido. Lo retirado responde `NotFound`. `stage_members` se borra en cascada con la etapa, para no impedir `delete_stage`.
+- `import_*` crea sin TL, sin equipo y sin dueño.
+- `tasks` pide `Team` a `stages.Checker`; `stages` pide `HasOpenAssigned` a `tasks.Checker`, y ambas piden `Profile` a `agents.Checker`, sobre `agents/queries/lookup`.
 
 ## Regla de planning
 
@@ -416,10 +441,11 @@ Cada cambio de status de un proyecto, etapa, tarea o bug deja un registro inmuta
 | `bug_status_changes` | `list_bug_status_changes` | `GET /api/bugs/{id}/status-changes` |
 
 - **Sin llave foránea:** las tablas no referencian a su entidad, a diferencia de `stage_changes` y `task_changes`. El usuario pidió que en `planning` se pueda eliminar, y un cambio de status no debe impedirlo: el historial de status no bloquea ningún `delete_*`. Los registros sobreviven al elemento eliminado y se consultan por su ID, por eso `list_*_status_changes` no comprueba que exista y un ID sin registros responde lista vacía.
-- **Actor:** se guarda una copia de nombre y perfil, sin FK a `agents`, para conservar el perfil que tenía al actuar. `sin-autenticar`, con perfil vacío, marca lo hecho sin token.
+- **Actor:** se guarda una copia de nombre y perfil, sin FK a `agents`, para conservar el perfil que tenía al actuar.
 - **Inmutabilidad:** triggers con `reject_change_mutation` rechazan `UPDATE`, `DELETE` y `TRUNCATE`.
 - **Transacción:** `store/status_changes.go` hace `FOR UPDATE`, compara el status con el de origen, escribe el registro y actualiza. Si el status cambió entre leerlo y guardarlo, responde `kernel.Conflict` con `el status cambió, vuelve a consultar`, para que `desde` siempre sea cierto. Por eso la regla general de [Concurrencia](#concurrencia) no aplica a los cambios de status.
-- **Motivo:** `reason` es opcional en `change_*_status` por ahora.
+- **Motivo:** `reason` se exige en las transiciones que indica cada `domain/permissions.go`; en las demás es opcional.
+- **Actor:** `saul`, con perfil `User`, marca lo hecho sin token. `sin-autenticar`, con perfil vacío, solo aparece en registros anteriores a los perfiles.
 
 ## Planning propio de una etapa
 
@@ -483,7 +509,7 @@ Una tabla de transiciones en `bugs/domain` define los cambios permitidos:
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. Un bug inexistente responde `NotFound`. El status solo cambia con la slice `bugs/commands/changestatus` (`change_bug_status`, `PUT /api/bugs/{id}/status`), no con `update_bug`. Cambiar el status no depende del status del proyecto, igual que `change_task_status`, y devuelve el bug completo.
 
-**Perfiles pendientes:** hoy cualquiera puede ejecutar cualquier transición permitida. Las reglas por perfil de los bugs se definirán cuando existan `agents` y `Actor`.
+**Perfiles:** un bug no tiene etapa, así que todo es por perfil, sin asignación. QA confirma; Dev inicia, entrega y reentrega; CR aprueba o pide corrección; QA aprueba o pide corrección en `in_qa`. QA o TL rechazan un bug `reported` y reabren uno `rejected`; solo TL rechaza desde los demás. Rechazar y reabrir exigen motivo.
 
 ## Transacciones
 
@@ -514,16 +540,16 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens y la autenticación de `/api/` y `/mcp`, aún en transición; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
-- **Pendiente:** `Transactor`, eliminar el modo de transición de los tokens, auditoría, filtrado de herramientas por perfil, las reglas por perfil de las transiciones de `tasks` y `bugs` y las demás features.
-- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen autorización, auditoría ni, salvo los de cambios y de status, transacción. Deben incorporarlas cuando existan las reglas por perfil y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones y la asignación de etapas y tareas; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil, las reglas entre status y las demás features.
+- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
 ## Orden de construcción
 
 1. `projects` y `stages`. Hechos, salvo la excepción temporal.
-2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`. Hecho, con el modo de transición.
-3. Reglas por perfil en las transiciones de `tasks` y `bugs`. Sus tablas de transiciones ya existen, adelantadas a `agents`.
+2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`. Hecho.
+3. Reglas por perfil en las transiciones, con asignación. Hecho.
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews` y `qa`.

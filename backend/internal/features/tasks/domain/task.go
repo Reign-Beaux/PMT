@@ -17,6 +17,12 @@ var (
 	ErrTaskTitleRequired = kernel.Invalid("el título de la tarea es obligatorio")
 	// ErrStageNotFound indica que la etapa de la tarea no existe.
 	ErrStageNotFound = kernel.NotFound("etapa no encontrada")
+	// ErrTaskNotTaken indica que la tarea aún no se toma o ya terminó: no admite dueño.
+	ErrTaskNotTaken = kernel.Conflict("solo se asigna una tarea ya tomada y sin terminar")
+	// ErrAssignForbidden indica que el perfil no puede asignar tareas.
+	ErrAssignForbidden = kernel.Forbidden("tu perfil no puede asignar tareas")
+	// ErrAssigneeNotMember indica que el agente no pertenece al equipo de la etapa.
+	ErrAssigneeNotMember = kernel.Conflict("el agente no está en el equipo de la etapa")
 )
 
 // Status es el estado de una tarea.
@@ -52,6 +58,7 @@ type Task struct {
 	Status      Status
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Assignee    string
 }
 
 // NewTask crea una tarea válida en su estado inicial.
@@ -61,6 +68,16 @@ func NewTask(stageID uuid.UUID, title, description string) (Task, error) {
 		return Task{}, err
 	}
 	return t, nil
+}
+
+// Assign cambia el dueño de una tarea ya tomada. Una tarea libre se toma, no se asigna.
+func (t *Task) Assign(agent string) error {
+	switch t.Status {
+	case StatusBacklog, StatusReady, StatusDone, StatusCancelled:
+		return ErrTaskNotTaken
+	}
+	t.Assignee = agent
+	return nil
 }
 
 // Update cambia los datos editables de la tarea.

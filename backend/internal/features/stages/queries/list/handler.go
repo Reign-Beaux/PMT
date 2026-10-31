@@ -28,6 +28,9 @@ type Item struct {
 
 	AddReason      string `json:"add_reason,omitempty"`
 	AddRequestedBy string `json:"add_requested_by,omitempty"`
+
+	Lead    string   `json:"lead,omitempty"`
+	Members []string `json:"members,omitempty"`
 }
 
 // Handler ejecuta la operación.

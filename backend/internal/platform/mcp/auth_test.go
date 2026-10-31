@@ -61,8 +61,8 @@ func TestAuthenticate(t *testing.T) {
 		status int
 		actor  string
 	}{
-		{"sin cabecera", "", http.StatusOK, kernel.Anonymous.Name},
-		{"variable vacía", "Bearer", http.StatusOK, kernel.Anonymous.Name},
+		{"sin cabecera", "", http.StatusOK, kernel.Owner.Name},
+		{"variable vacía", "Bearer", http.StatusOK, kernel.Owner.Name},
 		{"válido", "Bearer bueno", http.StatusOK, testActor.Name},
 		{"inválido", "Bearer malo", http.StatusUnauthorized, ""},
 	}
@@ -101,7 +101,7 @@ func (f authenticatorFunc) Authenticate(ctx context.Context, token string) (kern
 }
 
 func TestActorFromWithoutExtra(t *testing.T) {
-	if got := ActorFrom(&sdk.CallToolRequest{}); got != kernel.Anonymous {
+	if got := ActorFrom(&sdk.CallToolRequest{}); got != kernel.Owner {
 		t.Errorf("actor = %+v", got)
 	}
 }
