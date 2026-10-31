@@ -83,6 +83,21 @@ func (s *Tasks) Update(ctx context.Context, task domain.Task) (domain.Task, erro
 	return toDomain(row), nil
 }
 
+// UpdateStatus guarda el status de una tarea sin retirar y devuelve su última versión.
+func (s *Tasks) UpdateStatus(ctx context.Context, task domain.Task) (domain.Task, error) {
+	row, err := s.queries.UpdateTaskStatus(ctx, sqlcgen.UpdateTaskStatusParams{
+		ID:     task.ID,
+		Status: string(task.Status),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("actualizar status de tarea: %w", err)
+	}
+	return toDomain(sqlcgen.Task(row)), nil
+}
+
 // Delete elimina una tarea.
 func (s *Tasks) Delete(ctx context.Context, id uuid.UUID) error {
 	deleted, err := s.queries.DeleteTask(ctx, id)

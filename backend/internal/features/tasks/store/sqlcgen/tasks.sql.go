@@ -215,3 +215,52 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 	)
 	return i, err
 }
+
+const updateTaskStatus = `-- name: UpdateTaskStatus :one
+WITH updated AS (
+    UPDATE tasks
+    SET status = $2, updated_at = now()
+    WHERE tasks.id = $1 AND tasks.retired_at IS NULL
+    RETURNING id, stage_id, title, description, status, created_at, updated_at, retired_at
+)
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at
+FROM updated s
+LEFT JOIN LATERAL (
+    SELECT title, description FROM task_changes
+    WHERE task_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true
+`
+
+type UpdateTaskStatusParams struct {
+	ID     uuid.UUID
+	Status string
+}
+
+type UpdateTaskStatusRow struct {
+	ID          uuid.UUID
+	StageID     uuid.UUID
+	Title       string
+	Description string
+	Status      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	RetiredAt   pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (UpdateTaskStatusRow, error) {
+	row := q.db.QueryRow(ctx, updateTaskStatus, arg.ID, arg.Status)
+	var i UpdateTaskStatusRow
+	err := row.Scan(
+		&i.ID,
+		&i.StageID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RetiredAt,
+	)
+	return i, err
+}

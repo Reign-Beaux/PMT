@@ -9,6 +9,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"pmt/internal/features/tasks/commands/add"
+	"pmt/internal/features/tasks/commands/changestatus"
 	"pmt/internal/features/tasks/commands/create"
 	"pmt/internal/features/tasks/commands/delete"
 	"pmt/internal/features/tasks/commands/retire"
@@ -47,6 +48,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	deleteTask := delete.New(repo, stages)
 	deleteTask.Register(mux)
 	deleteTask.RegisterTool(tools)
+
+	changeStatus := changestatus.New(repo)
+	changeStatus.Register(mux)
+	changeStatus.RegisterTool(tools)
 
 	get.New(repo).Register(mux)
 

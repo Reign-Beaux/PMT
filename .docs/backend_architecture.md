@@ -309,9 +309,25 @@ Toda tarea nace en `backlog`. Estos son sus status:
 | `done` | Verificada y cerrada. |
 | `cancelled` | Ya no se hará. |
 
-`cancelled` aún no tiene transiciones: ninguna fila de la tabla siguiente entra en ese status ni sale de él.
+Una tabla de transiciones en `tasks/domain` define los cambios permitidos:
 
-Una tabla de transiciones en `tasks/domain` define qué perfil puede hacer cada cambio:
+| Desde | Puede pasar a |
+| --- | --- |
+| `backlog` | `ready`, `cancelled` |
+| `ready` | `in_progress`, `cancelled` |
+| `in_progress` | `in_review`, `cancelled` |
+| `in_review` | `in_qa`, `changes_requested`, `cancelled` |
+| `changes_requested` | `in_review`, `cancelled` |
+| `in_qa` | `pending_close`, `changes_requested`, `cancelled` |
+| `pending_close` | `done`, `cancelled` |
+| `done` | ninguna |
+| `cancelled` | `backlog` |
+
+Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `tasks/commands/changestatus` (`change_task_status`, `PUT /api/tasks/{id}/status`), no con `PUT /api/tasks/{id}`.
+
+Cambiar el status no depende del status del proyecto ni de la etapa, igual que `change_stage_status`. Tampoco es un cambio de contenido: no escribe en `task_changes`, actualiza `status` y `updated_at` y devuelve la última versión. Una tarea retirada responde `NotFound`.
+
+**Perfiles pendientes:** hoy cualquiera puede ejecutar cualquier transición permitida. Cuando existan `agents` y `Actor`, cada transición se limitará a estos perfiles; la tabla no incluye `cancelled`, cuyo perfil falta por definir:
 
 | Desde | Acción | Perfil | Hacia |
 | --- | --- | --- | --- |
@@ -358,7 +374,7 @@ Fuera de `planning`, las etapas y tareas cambian mediante registros inmutables, 
 | Retirar | `retire` | Se marca `retired_at`, sin borrar nada | `retire_stage`, `retire_task` | `POST /api/stages/{id}/retire`, `POST /api/tasks/{id}/retire` |
 
 - **Versiones:** `version` numera los cambios desde 1; una tarea con dos cambios tiene exactamente 2 registros. Lo agregado con `add_*` tiene su registro `add` como versión 1. Solo se versionan nombre o título y descripción.
-- **Lectura:** toda lectura devuelve la última versión: el contenido del cambio más reciente, o el de la fila si no tiene cambios. `GetStage`, `GetTask`, `ListStages`, `ListTasks` y `UpdateStageStatus` lo resuelven con `LEFT JOIN LATERAL`. `status`, `position` y `updated_at` salen siempre de la fila. La fila solo se escribe en `planning` o en el planning propio, y sin cambios, porque `update_*` y `delete_*` rechazan lo que tiene historial.
+- **Lectura:** toda lectura devuelve la última versión: el contenido del cambio más reciente, o el de la fila si no tiene cambios. `GetStage`, `GetTask`, `ListStages`, `ListTasks`, `UpdateStageStatus` y `UpdateTaskStatus` lo resuelven con `LEFT JOIN LATERAL`. `status`, `position` y `updated_at` salen siempre de la fila. La fila solo se escribe en `planning` o en el planning propio, y sin cambios, porque `update_*` y `delete_*` rechazan lo que tiene historial.
 - **Historial:** `list_stage_changes` (`GET /api/projects/{project_id}/stage-changes?stage_id=`) y `list_task_changes` (`GET /api/stages/{stage_id}/task-changes?task_id=`). Para cada elemento con al menos un cambio devuelven `original` (contenido de la fila, con `created_at`) y `changes` en orden de `version`. Se consulta por padre porque lo retirado no aparece en `list_*`. Sin registros responde lista vacía.
 - **Retirado:** `GetStage`, `GetTask`, `ListStages` y `ListTasks` lo excluyen, así que responde `NotFound` en todas las operaciones y el retiro no se deshace. Su `status` y su `position` no cambian. `position` nunca se renumera ni se reutiliza.
 - **Cierre:** las tareas retiradas no cuentan para pasar a `done`; las agregadas nacen en `backlog` y sí cuentan. Agregar a una etapa en `done` no la reabre.
@@ -442,8 +458,8 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST y las herramientas MCP `create_task`, `list_tasks`, `update_task` y `delete_task`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug` y `list_bugs`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio. El `status` de una tarea o de un bug se devuelve, pero aún no se puede cambiar.
-- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, la tabla de transiciones de `tasks` y las demás features.
+- **Implementado:** configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug` y `list_bugs`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio. El `status` de un bug se devuelve, pero aún no se puede cambiar.
+- **Pendiente:** `Actor`, `Profile`, `Transactor`, autenticación, auditoría, filtrado de herramientas por perfil, las reglas por perfil de las transiciones de `tasks` y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen autorización, auditoría ni, salvo los de cambios, transacción. Deben incorporarlas cuando existan `agents` y `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
@@ -451,7 +467,7 @@ Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
 1. `projects` y `stages`. Hechos, salvo la excepción temporal.
 2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`.
-3. Tabla de transiciones de `tasks`. Su CRUD ya existe, adelantado a `agents`.
+3. Reglas por perfil en las transiciones de `tasks`. Su CRUD y su tabla de transiciones ya existen, adelantados a `agents`.
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews` y `qa`.

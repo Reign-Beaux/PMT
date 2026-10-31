@@ -37,6 +37,22 @@ SET title = $2, description = $3, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateTaskStatus :one
+WITH updated AS (
+    UPDATE tasks
+    SET status = $2, updated_at = now()
+    WHERE tasks.id = $1 AND tasks.retired_at IS NULL
+    RETURNING *
+)
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at
+FROM updated s
+LEFT JOIN LATERAL (
+    SELECT title, description FROM task_changes
+    WHERE task_id = s.id
+    ORDER BY version DESC
+    LIMIT 1
+) c ON true;
+
 -- name: DeleteTask :execrows
 DELETE FROM tasks
 WHERE id = $1;

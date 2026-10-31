@@ -152,6 +152,62 @@ paths:
                   $ref: "#/components/schemas/History"
         "400":
           $ref: "#/components/responses/Error"
+  /api/tasks/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de una tarea
+      description: Solo admite las transiciones permitidas. No depende del status del proyecto ni de la etapa, no escribe en task_changes y devuelve la última versión de la tarea. Aún no hay reglas por perfil.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done, cancelled]
+      responses:
+        "200":
+          $ref: "#/components/responses/Task"
+        "400":
+          description: Identificador inválido o status desconocido
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+        "404":
+          description: Tarea inexistente o retirada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+        "409":
+          description: Transición no permitida, incluida la del status a sí mismo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
   /api/tasks/{id}/revise:
     parameters:
       - name: id
