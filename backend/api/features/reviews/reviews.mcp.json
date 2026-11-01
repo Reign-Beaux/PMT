@@ -1,6 +1,6 @@
 [
   {
-    "description": "Cierra un hallazgo abierto, con motivo obligatorio. fixed: CR o QA, cuando verificaron la corrección. dismissed: el TL de la etapa de la tarea, o un TL si es de un bug; exige que la tarea siga existiendo. Un hallazgo cerrado no se vuelve a cerrar ni se reabre. No cambia el status del elemento. Usa list_findings para obtener su ID.",
+    "description": "Cierra un hallazgo abierto, con motivo obligatorio. fixed: CR o QA, cuando verificaron la corrección. dismissed: el TL de la etapa de la tarea, o un TL si es de un bug o si la tarea se retiró o se eliminó. Un hallazgo cerrado no se vuelve a cerrar ni se reabre. No cambia el status del elemento. Usa list_findings para obtener su ID.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -139,27 +139,27 @@
     }
   },
   {
-    "description": "Lista los hallazgos de una tarea o un bug por fecha. Con pending, solo los abiertos, bloqueantes primero. Disponible para todos los perfiles. No comprueba que el elemento exista: sin hallazgos responde lista vacía.",
+    "description": "Lista por fecha los hallazgos de una tarea o un bug, con item_kind e item_id, o los de todas las tareas de una etapa, con stage_id; exactamente uno de los dos modos. Cada hallazgo indica su item_kind e item_id. Los bugs no tienen etapa. Con pending, solo los abiertos, bloqueantes primero. Disponible para todos los perfiles. No comprueba que el elemento o la etapa existan: sin hallazgos responde lista vacía.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "item_id": {
-          "description": "UUID de la tarea o el bug",
+          "description": "UUID de la tarea o el bug. Va con item_kind, sin stage_id",
           "type": "string"
         },
         "item_kind": {
-          "description": "Tipo de elemento: task o bug",
+          "description": "Tipo de elemento: task o bug. Va con item_id, sin stage_id",
           "type": "string"
         },
         "pending": {
           "description": "Solo los abiertos, bloqueantes primero",
           "type": "boolean"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa: lista los hallazgos de sus tareas, incluidas las retiradas. Va sin item_kind ni item_id",
+          "type": "string"
         }
       },
-      "required": [
-        "item_kind",
-        "item_id"
-      ],
       "type": "object"
     },
     "name": "list_findings",
@@ -197,12 +197,20 @@
               "id": {
                 "type": "string"
               },
+              "item_id": {
+                "type": "string"
+              },
+              "item_kind": {
+                "type": "string"
+              },
               "status": {
                 "type": "string"
               }
             },
             "required": [
               "id",
+              "item_kind",
+              "item_id",
               "description",
               "blocking",
               "status",

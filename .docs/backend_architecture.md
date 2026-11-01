@@ -384,7 +384,7 @@ Cambiar el status depende del proyecto y de la etapa; ver [Reglas entre status](
 | `in_review` | Aprobar un cambio interno, con motivo | CR | `pending_close` |
 | `in_qa` | Pedir corrección | QA | `changes_requested` |
 | `changes_requested` | Retomar | Dev dueño | `in_dev` |
-| `in_qa` | Aprobar | QA | `pending_close` |
+| `in_qa` | Aprobar, con motivo | QA | `pending_close` |
 | `pending_close` | Cerrar | TL | `done` |
 | `pending_close` | Devolver, con motivo | TL | `in_review`, `in_qa` |
 | cualquiera menos `done` | Cancelar, con motivo | TL, PP, `User` | `cancelled` |
@@ -520,7 +520,7 @@ Cada cambio de status de un proyecto, etapa, tarea o bug deja un registro inmuta
 - **Actor:** se guarda una copia de nombre y perfil, sin FK a `agents`, para conservar el perfil que tenía al actuar.
 - **Inmutabilidad:** triggers con `reject_change_mutation` rechazan `UPDATE`, `DELETE` y `TRUNCATE`.
 - **Transacción:** `store/status_changes.go` hace `FOR UPDATE`, compara el status con el de origen, escribe el registro y actualiza. Si el status cambió entre leerlo y guardarlo, responde `kernel.Conflict` con `el status cambió, vuelve a consultar`, para que `desde` siempre sea cierto. Por eso la regla general de [Concurrencia](#concurrencia) no aplica a los cambios de status.
-- **Motivo:** `reason` se exige en las transiciones que indica cada `domain/permissions.go`; en las demás es opcional.
+- **Motivo:** `reason` se exige en las transiciones que indica cada `domain/permissions.go`; en las demás es opcional. Al aprobar en QA, tarea o bug, lleva la evidencia. En un lote el motivo es uno para todas: si la evidencia difiere, QA usa llamadas individuales.
 - **Actor:** `saul`, con perfil `User`, marca lo hecho sin token. `sin-autenticar`, con perfil vacío, solo aparece en registros anteriores a los perfiles. Los registros anteriores a la migración 00015 conservan `in_progress`, que era el valor real al escribirlos.
 
 ## Planning propio de una etapa
@@ -587,7 +587,7 @@ Una tabla de transiciones en `bugs/domain` define los cambios permitidos:
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. Un bug inexistente responde `NotFound`. El status solo cambia con la slice `bugs/commands/changestatus` (`change_bug_status`, `PUT /api/bugs/{id}/status`), no con `update_bug`. Cambiar el status exige el proyecto en `working` (regla 15) y devuelve el bug completo.
 
-**Perfiles:** un bug no tiene etapa, así que todo es por perfil, sin asignación. QA confirma; Dev inicia, entrega y retoma; CR aprueba, pide corrección o lleva un cambio interno a `pending_close`; QA aprueba o pide corrección en `in_qa`; el TL cierra o devuelve a `in_review` o `in_qa`. QA o TL rechazan un bug `reported` y reabren uno `rejected`; solo TL rechaza desde los demás. Rechazar, reabrir, `in_review → pending_close` y devolver exigen motivo.
+**Perfiles:** un bug no tiene etapa, así que todo es por perfil, sin asignación. QA confirma; Dev inicia, entrega y retoma; CR aprueba, pide corrección o lleva un cambio interno a `pending_close`; QA aprueba o pide corrección en `in_qa`; el TL cierra o devuelve a `in_review` o `in_qa`. QA o TL rechazan un bug `reported` y reabren uno `rejected`; solo TL rechaza desde los demás. Rechazar, reabrir, `in_review → pending_close`, `in_qa → pending_close` y devolver exigen motivo.
 
 ## Hallazgos
 
@@ -596,14 +596,15 @@ Un hallazgo es algo que CR o QA encontró en una tarea o un bug. Lo guarda `find
 | Comando MCP | REST | Quién | Efecto |
 | --- | --- | --- | --- |
 | `create_finding` | `POST /api/findings` | CR, QA | Registra el hallazgo. El elemento debe existir, sin retirar |
-| `close_finding` | `PUT /api/findings/{id}/close` | `fixed`: CR, QA. `dismissed`: TL de la etapa, o TL en bugs | Cierra con `resolution` y motivo obligatorio |
-| `list_findings` | `GET /api/findings?item_kind=&item_id=&pending=` | Todos | Por fecha. Con `pending=true`, solo los abiertos, bloqueantes primero |
+| `close_finding` | `PUT /api/findings/{id}/close` | `fixed`: CR, QA. `dismissed`: TL de la etapa, o cualquier TL en bugs o si la tarea ya no existe | Cierra con `resolution` y motivo obligatorio |
+| `list_findings` | `GET /api/findings?item_kind=&item_id=&stage_id=&pending=` | Todos | Por fecha, de una tarea o un bug, o de una etapa con `stage_id`: exactamente un modo, si no `kernel.Invalid`. Con `pending=true`, solo los abiertos, bloqueantes primero. Cada hallazgo indica su `item_kind` e `item_id` |
 
 - **No frenan el flujo:** no tocan el status del elemento, y QA puede aprobar con hallazgos abiertos. CR y QA lo devuelven con `change_tasks_status` o `change_bug_status`.
 - **Sin llave foránea:** igual que el [historial de status](#historial-de-status), para no impedir `delete_task`. La existencia se valida al crear, y `list_findings` no la comprueba: responde lista vacía.
+- **Por etapa:** incluye las tareas retiradas, porque sus hallazgos sobreviven, pero no las eliminadas, porque ya nada las liga a la etapa. Los bugs no tienen etapa y se consultan por `item_id`.
 - **Validación de `close_finding`:** resolución conocida, abierto, perfil, ámbito y motivo. Solo espacios cuenta como motivo vacío. Cerrar uno cerrado responde `kernel.Conflict`; el `UPDATE` exige `status = 'open'`, así que de dos cierres simultáneos el segundo también. `User` no registra ni cierra hallazgos: no tiene lo de CR, QA ni TL.
-- **Tarea que ya no existe:** descartar exige saber su etapa, así que responde `NotFound` si la tarea se retiró o se eliminó. `fixed` no consulta la tarea.
-- **Colaboración:** `tasks.Checker` da `StageOf`, `stages.Checker` da `Team` y `bugs.Checker` da `Check`, sobre `bugs/queries/get`. Todo se conecta en `registerFeatures`.
+- **Tarea que ya no existe:** si la tarea se retiró o se eliminó ya no se sabe quién era su TL, así que `dismissed` lo puede hacer cualquier TL, con motivo. Solo `NotFound` activa esta excepción: otro error de la consulta se propaga. `fixed` no consulta la tarea.
+- **Colaboración:** `tasks.Checker` da `StageOf` y `TaskIDs`, sobre `tasks/queries/listids`; `stages.Checker` da `Team` y `bugs.Checker` da `Check`, sobre `bugs/queries/get`. Todo se conecta en `registerFeatures`.
 
 ## Planes QAP
 
@@ -659,7 +660,7 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 
 1. `mcp.go` recibe la llamada y `platform/mcp` resuelve el `Actor`.
 2. `handler.go` pide al store bloquear las tareas por orden de ID.
-3. Con lo leído, `domain` valida para cada una la transición `in_qa → pending_close` y que el `Actor` sea QA.
+3. Con lo leído, `domain` valida para cada una la transición `in_qa → pending_close`, que el `Actor` sea QA y que haya motivo.
 4. El handler consulta a `stages` el equipo y las reglas entre status.
 5. El store escribe un registro de status por tarea y el nuevo status, y la transacción confirma todo junto.
 

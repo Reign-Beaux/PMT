@@ -124,6 +124,30 @@ func (q *Queries) HasOpenAssignedTasks(ctx context.Context, arg HasOpenAssignedT
 	return exists, err
 }
 
+const listTaskIDs = `-- name: ListTaskIDs :many
+SELECT id FROM tasks WHERE stage_id = $1 ORDER BY id
+`
+
+func (q *Queries) ListTaskIDs(ctx context.Context, stageID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listTaskIDs, stageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTasks = `-- name: ListTasks :many
 SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee
 FROM tasks s

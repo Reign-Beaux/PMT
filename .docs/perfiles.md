@@ -30,7 +30,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | 9 | TL | a `done`, o con motivo a `in_review` o `in_qa` | Cierra o devuelve |
 | 10 | TL | `change_stage_status` a `done` | Cierra la etapa; con la última de la versión 1, el proyecto pasa solo a `working`. Cancelar la última abierta, potestad de PP o `User`, o retirarla, tiene el mismo efecto si otra quedó en `done` |
 
-**Hallazgos:** CR y QA los registran con `create_finding`, indicando si son bloqueantes, y los cierran como `fixed` con `close_finding`. El TL de la etapa, o un TL en bugs, los descarta como `dismissed`. Ambos cierres exigen motivo. Todos los perfiles los consultan con `list_findings`. No frenan transiciones: la decisión de devolver es de CR o QA.
+**Hallazgos:** CR y QA los registran con `create_finding`, indicando si son bloqueantes, y los cierran como `fixed` con `close_finding`. El TL de la etapa, o cualquier TL si es un bug o si la tarea se retiró o se eliminó, los descarta como `dismissed`. Ambos cierres exigen motivo. Todos los perfiles los consultan con `list_findings`, por tarea, por bug o por etapa. No frenan transiciones: la decisión de devolver es de CR o QA.
 
 **Planes QAP:** QAP crea el plan con `create_test_plan`, lo versiona con `revise_test_plan` y lo envía con `submit_test_plan`. El TL de la etapa lo aprueba con `approve_test_plan` o lo devuelve con correcciones con `return_test_plan`; un plan devuelto exige una versión nueva antes de reenviarse. QA y los demás perfiles los consultan con `list_test_plans` y `list_test_plan_versions`. No frenan transiciones, y el script de Playwright y los resultados no se guardan en PMT.
 
@@ -53,7 +53,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 3. **Iniciar la etapa:** el TL inicia la primera sin esperar otra orden. Si la etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
 4. **Tomar tareas:** al entregar una tarea, el dev toma la siguiente en `ready` de su etapa que no dependa de otra abierta.
 5. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL da aviso a QAP si toca frontend; si no, a QA.
-6. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. Desde la fase 2, PMT exige ese motivo.
+6. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
 7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready` y da aviso al dev, porque ese cierre puede destrabar una tarea cuando el turno del dev ya terminó.
 8. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar. Después inicia la siguiente etapa, desde el paso 3.
 

@@ -3,6 +3,7 @@ package close
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +18,8 @@ type Repository interface {
 	Close(ctx context.Context, f domain.Finding) (domain.Finding, error)
 }
 
-// TaskChecker da la etapa de una tarea. Lo implementa la feature tasks.
+// TaskChecker da la etapa de una tarea, o NotFound si se retiró o se eliminó. Lo
+// implementa la feature tasks.
 type TaskChecker interface {
 	StageOf(ctx context.Context, taskID uuid.UUID) (uuid.UUID, error)
 }
@@ -90,8 +92,14 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	return Result(closed), nil
 }
 
+// ensureStageLead exige al TL de la etapa. Si la tarea ya no existe, tampoco se sabe
+// quién era su TL, así que basta el perfil, ya validado.
 func (h *Handler) ensureStageLead(ctx context.Context, taskID uuid.UUID, actor kernel.Actor) error {
 	stageID, err := h.tasks.StageOf(ctx, taskID)
+	var business *kernel.Error
+	if errors.As(err, &business) && business.Kind == kernel.KindNotFound {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

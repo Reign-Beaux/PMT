@@ -38,6 +38,8 @@ var (
 	ErrFindingNotFound = kernel.NotFound("hallazgo no encontrado")
 	// ErrItemKindInvalid indica que el tipo de elemento no es uno de los conocidos.
 	ErrItemKindInvalid = kernel.Invalid("item_kind desconocido: usa task o bug")
+	// ErrListModeInvalid indica que la consulta no eligió exactamente un modo.
+	ErrListModeInvalid = kernel.Invalid("indica stage_id para una etapa, o item_kind con item_id para una tarea o un bug, sin combinarlos")
 	// ErrDescriptionRequired indica que la descripción está vacía.
 	ErrDescriptionRequired = kernel.Invalid("la descripción del hallazgo es obligatoria")
 	// ErrBlockingRequired indica que no se dijo si el hallazgo es bloqueante.

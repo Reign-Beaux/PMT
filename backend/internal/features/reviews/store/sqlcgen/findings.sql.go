@@ -163,6 +163,45 @@ func (q *Queries) ListFindings(ctx context.Context, arg ListFindingsParams) ([]F
 	return items, nil
 }
 
+const listFindingsByItems = `-- name: ListFindingsByItems :many
+SELECT id, item_kind, item_id, description, blocking, status, actor_name, actor_profile, closed_by, close_reason, created_at, closed_at FROM findings
+WHERE item_kind = 'task' AND item_id = ANY($1::uuid[])
+ORDER BY created_at, id
+`
+
+func (q *Queries) ListFindingsByItems(ctx context.Context, itemIds []uuid.UUID) ([]Finding, error) {
+	rows, err := q.db.Query(ctx, listFindingsByItems, itemIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Finding{}
+	for rows.Next() {
+		var i Finding
+		if err := rows.Scan(
+			&i.ID,
+			&i.ItemKind,
+			&i.ItemID,
+			&i.Description,
+			&i.Blocking,
+			&i.Status,
+			&i.ActorName,
+			&i.ActorProfile,
+			&i.ClosedBy,
+			&i.CloseReason,
+			&i.CreatedAt,
+			&i.ClosedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingFindings = `-- name: ListPendingFindings :many
 SELECT id, item_kind, item_id, description, blocking, status, actor_name, actor_profile, closed_by, close_reason, created_at, closed_at FROM findings
 WHERE item_kind = $1 AND item_id = $2 AND status = 'open'
@@ -176,6 +215,45 @@ type ListPendingFindingsParams struct {
 
 func (q *Queries) ListPendingFindings(ctx context.Context, arg ListPendingFindingsParams) ([]Finding, error) {
 	rows, err := q.db.Query(ctx, listPendingFindings, arg.ItemKind, arg.ItemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Finding{}
+	for rows.Next() {
+		var i Finding
+		if err := rows.Scan(
+			&i.ID,
+			&i.ItemKind,
+			&i.ItemID,
+			&i.Description,
+			&i.Blocking,
+			&i.Status,
+			&i.ActorName,
+			&i.ActorProfile,
+			&i.ClosedBy,
+			&i.CloseReason,
+			&i.CreatedAt,
+			&i.ClosedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingFindingsByItems = `-- name: ListPendingFindingsByItems :many
+SELECT id, item_kind, item_id, description, blocking, status, actor_name, actor_profile, closed_by, close_reason, created_at, closed_at FROM findings
+WHERE item_kind = 'task' AND item_id = ANY($1::uuid[]) AND status = 'open'
+ORDER BY blocking DESC, created_at, id
+`
+
+func (q *Queries) ListPendingFindingsByItems(ctx context.Context, itemIds []uuid.UUID) ([]Finding, error) {
+	rows, err := q.db.Query(ctx, listPendingFindingsByItems, itemIds)
 	if err != nil {
 		return nil, err
 	}

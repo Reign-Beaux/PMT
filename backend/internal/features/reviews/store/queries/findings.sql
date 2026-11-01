@@ -21,3 +21,13 @@ ORDER BY created_at, id;
 SELECT * FROM findings
 WHERE item_kind = $1 AND item_id = $2 AND status = 'open'
 ORDER BY blocking DESC, created_at, id;
+
+-- name: ListFindingsByItems :many
+SELECT * FROM findings
+WHERE item_kind = 'task' AND item_id = ANY(@item_ids::uuid[])
+ORDER BY created_at, id;
+
+-- name: ListPendingFindingsByItems :many
+SELECT * FROM findings
+WHERE item_kind = 'task' AND item_id = ANY(@item_ids::uuid[]) AND status = 'open'
+ORDER BY blocking DESC, created_at, id;

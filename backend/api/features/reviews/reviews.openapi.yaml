@@ -40,17 +40,26 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     get:
-      summary: Lista los hallazgos de una tarea o un bug
-      description: Por fecha. Con `pending=true`, solo los abiertos, bloqueantes primero. No comprueba que el elemento exista.
+      summary: Lista los hallazgos de una tarea, un bug o una etapa
+      description: Por fecha. Exactamente un modo, `stage_id` o `item_kind` con `item_id`; si no, 400. Por etapa incluye las tareas retiradas; los bugs no tienen etapa. Con `pending=true`, solo los abiertos, bloqueantes primero. No comprueba que el elemento o la etapa existan.
       parameters:
         - name: item_kind
           in: query
-          required: true
+          required: false
+          description: Va con `item_id`, sin `stage_id`.
           schema:
             $ref: "#/components/schemas/ItemKind"
         - name: item_id
           in: query
-          required: true
+          required: false
+          description: Va con `item_kind`, sin `stage_id`.
+          schema:
+            type: string
+            format: uuid
+        - name: stage_id
+          in: query
+          required: false
+          description: Va sin `item_kind` ni `item_id`.
           schema:
             type: string
             format: uuid
@@ -82,7 +91,7 @@ paths:
           format: uuid
     put:
       summary: Cierra un hallazgo abierto
-      description: "`fixed`: CR o QA. `dismissed`: el TL de la etapa de la tarea, o un TL si es de un bug; si la tarea ya no existe o está retirada, responde 404. El motivo es obligatorio. Un hallazgo cerrado responde 409."
+      description: "`fixed`: CR o QA. `dismissed`: el TL de la etapa de la tarea, o un TL si es de un bug o si la tarea se retiró o se eliminó. El motivo es obligatorio. Un hallazgo cerrado responde 409."
       requestBody:
         required: true
         content:

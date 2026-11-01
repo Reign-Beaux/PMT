@@ -90,3 +90,6 @@ SELECT EXISTS (
     WHERE stage_id = $1 AND assignee = $2 AND retired_at IS NULL
       AND status NOT IN ('done', 'cancelled')
 );
+
+-- name: ListTaskIDs :many
+SELECT id FROM tasks WHERE stage_id = $1 ORDER BY id;

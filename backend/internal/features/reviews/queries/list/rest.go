@@ -17,21 +17,29 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	itemID, err := uuid.Parse(query.Get("item_id"))
-	if err != nil {
-		rest.WriteError(w, kernel.Invalid("item_id inválido"))
-		return
+	values := r.URL.Query()
+	query := Query{ItemKind: domain.ItemKind(values.Get("item_kind"))}
+	var err error
+	if raw := values.Get("item_id"); raw != "" {
+		if query.ItemID, err = uuid.Parse(raw); err != nil {
+			rest.WriteError(w, kernel.Invalid("item_id inválido"))
+			return
+		}
 	}
-	pending := false
-	if raw := query.Get("pending"); raw != "" {
-		if pending, err = strconv.ParseBool(raw); err != nil {
+	if raw := values.Get("stage_id"); raw != "" {
+		if query.StageID, err = uuid.Parse(raw); err != nil {
+			rest.WriteError(w, kernel.Invalid("stage_id inválido"))
+			return
+		}
+	}
+	if raw := values.Get("pending"); raw != "" {
+		if query.Pending, err = strconv.ParseBool(raw); err != nil {
 			rest.WriteError(w, kernel.Invalid("pending inválido"))
 			return
 		}
 	}
 
-	items, err := h.Handle(r.Context(), domain.ItemKind(query.Get("item_kind")), itemID, pending)
+	items, err := h.Handle(r.Context(), query)
 	if err != nil {
 		rest.WriteError(w, err)
 		return

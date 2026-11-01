@@ -60,6 +60,15 @@ func (s *Tasks) List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, err
 	return s.ListByStatus(ctx, stageID, "")
 }
 
+// ListIDs devuelve los ID de las tareas de una etapa, incluidas las retiradas.
+func (s *Tasks) ListIDs(ctx context.Context, stageID uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := s.queries.ListTaskIDs(ctx, stageID)
+	if err != nil {
+		return nil, fmt.Errorf("listar ID de tareas: %w", err)
+	}
+	return ids, nil
+}
+
 // ListByStatus es List filtrada por status. Un status vacío no filtra.
 func (s *Tasks) ListByStatus(ctx context.Context, stageID uuid.UUID, status domain.Status) ([]domain.Task, error) {
 	rows, err := s.queries.ListTasks(ctx, sqlcgen.ListTasksParams{StageID: stageID, Status: string(status)})

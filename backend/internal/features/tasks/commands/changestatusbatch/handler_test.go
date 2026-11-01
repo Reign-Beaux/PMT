@@ -126,6 +126,7 @@ func TestHandleRejectsWholeBatch(t *testing.T) {
 	closed := kernel.Conflict("etapa cerrada")
 	other, otherIDs := newTasks(uuid.New(), domain.StatusInReview)
 	retired := uuid.New()
+	qa := kernel.Actor{Name: "qa", Profile: kernel.ProfileQA}
 
 	tests := []struct {
 		name     string
@@ -141,6 +142,8 @@ func TestHandleRejectsWholeBatch(t *testing.T) {
 		{"una sin poder avanzar", []domain.Status{domain.StatusInReview, domain.StatusBacklog}, nil, nil, fakeStages{team: team}, domain.StatusInQA, "", cr, domain.ErrTaskStatusTransition},
 		{"perfil incorrecto", []domain.Status{domain.StatusInReview}, nil, nil, fakeStages{team: team}, domain.StatusInQA, "", dev, kernel.ErrTransitionForbidden},
 		{"sin motivo", []domain.Status{domain.StatusInReview, domain.StatusInReview}, nil, nil, fakeStages{team: team}, domain.StatusPendingClose, "", cr, kernel.ErrReasonRequired},
+		{"QA sin motivo", []domain.Status{domain.StatusInQA, domain.StatusInQA}, nil, nil, fakeStages{team: team}, domain.StatusPendingClose, "", qa, kernel.ErrReasonRequired},
+		{"QA con solo espacios", []domain.Status{domain.StatusInQA}, nil, nil, fakeStages{team: team}, domain.StatusPendingClose, "  ", qa, kernel.ErrReasonRequired},
 		{"regla entre status", []domain.Status{domain.StatusInReview}, nil, nil, fakeStages{team: team, err: closed}, domain.StatusInQA, "", cr, closed},
 		{"de otra etapa", []domain.Status{domain.StatusInReview}, otherIDs, other, fakeStages{team: team}, domain.StatusInQA, "", cr, domain.ErrTaskNotFound},
 		{"retirada", []domain.Status{domain.StatusInReview}, []uuid.UUID{retired}, nil, fakeStages{team: team}, domain.StatusInQA, "", cr, domain.ErrTaskNotFound},

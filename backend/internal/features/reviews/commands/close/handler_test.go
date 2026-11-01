@@ -57,6 +57,15 @@ func (f *fakeScope) Team(context.Context, uuid.UUID) (kernel.Team, error) {
 	return kernel.Team{Lead: tl.Name}, nil
 }
 
+// failingTasks falla por algo distinto a que la tarea no exista.
+type failingTasks struct {
+	err error
+}
+
+func (f failingTasks) StageOf(context.Context, uuid.UUID) (uuid.UUID, error) {
+	return uuid.Nil, f.err
+}
+
 func openFinding(kind domain.ItemKind) domain.Finding {
 	return domain.Finding{ID: uuid.New(), ItemKind: kind, ItemID: uuid.New(), Status: domain.StatusOpen}
 }
@@ -112,7 +121,8 @@ func TestHandleRejects(t *testing.T) {
 		{"resolución desconocida", openFinding(domain.ItemTask), "open", cr, "M", false, domain.ErrResolutionInvalid, 0},
 		{"sin motivo", openFinding(domain.ItemTask), domain.StatusFixed, cr, "  ", false, domain.ErrCloseReasonRequired, 0},
 		{"TL ajeno sin motivo: primero el ámbito", openFinding(domain.ItemTask), domain.StatusDismissed, otherTL, "", false, kernel.ErrNotStageLead, 1},
-		{"tarea que ya no existe", openFinding(domain.ItemTask), domain.StatusDismissed, tl, "M", true, errGone, 1},
+		{"tarea que ya no existe, sin motivo", openFinding(domain.ItemTask), domain.StatusDismissed, otherTL, " ", true, domain.ErrCloseReasonRequired, 1},
+		{"tarea que ya no existe, CR descarta", openFinding(domain.ItemTask), domain.StatusDismissed, cr, "M", true, domain.ErrDismissForbidden, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,6 +138,34 @@ func TestHandleRejects(t *testing.T) {
 				t.Errorf("cerrados = %d, consultas = %d", len(repo.closed), scope.calls)
 			}
 		})
+	}
+}
+
+func TestHandleDismissesWhenTaskIsGone(t *testing.T) {
+	for _, actor := range []kernel.Actor{tl, otherTL} {
+		repo := &fakeRepo{finding: openFinding(domain.ItemTask)}
+		scope := &fakeScope{gone: true}
+
+		result, err := New(repo, scope, scope).Handle(context.Background(), Command{ID: repo.finding.ID, Resolution: domain.StatusDismissed, Reason: "Motivo", Actor: actor})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Status != domain.StatusDismissed || result.ClosedBy != actor.Name || len(repo.closed) != 1 {
+			t.Errorf("result = %+v, cerrados = %d", result, len(repo.closed))
+		}
+	}
+}
+
+func TestHandlePropagatesTaskFailure(t *testing.T) {
+	want := errors.New("base caída")
+	repo := &fakeRepo{finding: openFinding(domain.ItemTask)}
+	tasks := failingTasks{err: want}
+
+	_, err := New(repo, tasks, &fakeScope{}).Handle(context.Background(), Command{ID: repo.finding.ID, Resolution: domain.StatusDismissed, Reason: "M", Actor: otherTL})
+
+	if !errors.Is(err, want) || len(repo.closed) != 0 {
+		t.Fatalf("err = %v, cerrados = %d", err, len(repo.closed))
 	}
 }
 

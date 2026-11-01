@@ -16,7 +16,7 @@ type toolInput struct {
 	StageID string   `json:"stage_id" jsonschema:"UUID de la etapa"`
 	TaskIDs []string `json:"task_ids" jsonschema:"UUID de las tareas, todas de esa etapa y sin repetir"`
 	Status  string   `json:"status" jsonschema:"Nuevo status de todas: backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done o cancelled"`
-	Reason  string   `json:"reason,omitempty" jsonschema:"Motivo del cambio de status; es el mismo para todas y queda en el historial"`
+	Reason  string   `json:"reason,omitempty" jsonschema:"Motivo del cambio de status; es el mismo para todas y queda en el historial. Si la evidencia de QA difiere, usa change_task_status por tarea"`
 }
 
 type toolTask struct {

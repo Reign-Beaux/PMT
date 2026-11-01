@@ -13,9 +13,15 @@ import (
 	"pmt/internal/features/reviews/store/sqlcgen"
 )
 
+// TaskChecker reúne lo que las slices piden a la feature tasks.
+type TaskChecker interface {
+	create.TaskChecker
+	list.TaskLister
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature. tasks,
 // bugs y stages los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks create.TaskChecker, bugs create.BugChecker, stages closefinding.StageChecker) {
+func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks TaskChecker, bugs create.BugChecker, stages closefinding.StageChecker) {
 	repo := store.NewFindings(db)
 
 	createFinding := create.New(repo, tasks, bugs)
@@ -26,7 +32,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db sqlcgen.DBTX, tasks crea
 	closeFinding.Register(mux)
 	closeFinding.RegisterTool(tools)
 
-	listFindings := list.New(repo)
+	listFindings := list.New(repo, tasks)
 	listFindings.Register(mux)
 	listFindings.RegisterTool(tools)
 }

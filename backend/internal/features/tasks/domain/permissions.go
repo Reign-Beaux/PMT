@@ -39,7 +39,7 @@ var statusProfiles = map[Status]map[Status][]kernel.Profile{
 
 func reasonRequired(from, to Status) bool {
 	return to == StatusCancelled || (from == StatusCancelled && to == StatusBacklog) ||
-		(from == StatusInReview && to == StatusPendingClose) ||
+		to == StatusPendingClose ||
 		(from == StatusPendingClose && (to == StatusInReview || to == StatusInQA))
 }
 

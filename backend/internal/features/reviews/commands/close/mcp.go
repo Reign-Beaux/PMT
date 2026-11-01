@@ -32,7 +32,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "close_finding",
-		Description: "Cierra un hallazgo abierto, con motivo obligatorio. fixed: CR o QA, cuando verificaron la corrección. dismissed: el TL de la etapa de la tarea, o un TL si es de un bug; exige que la tarea siga existiendo. Un hallazgo cerrado no se vuelve a cerrar ni se reabre. No cambia el status del elemento. Usa list_findings para obtener su ID.",
+		Description: "Cierra un hallazgo abierto, con motivo obligatorio. fixed: CR o QA, cuando verificaron la corrección. dismissed: el TL de la etapa de la tarea, o un TL si es de un bug o si la tarea se retiró o se eliminó. Un hallazgo cerrado no se vuelve a cerrar ni se reabre. No cambia el status del elemento. Usa list_findings para obtener su ID.",
 	}, h.callTool)
 }
 

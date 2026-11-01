@@ -13,13 +13,16 @@ import (
 )
 
 type toolInput struct {
-	ItemKind string `json:"item_kind" jsonschema:"Tipo de elemento: task o bug"`
-	ItemID   string `json:"item_id" jsonschema:"UUID de la tarea o el bug"`
+	ItemKind string `json:"item_kind,omitempty" jsonschema:"Tipo de elemento: task o bug. Va con item_id, sin stage_id"`
+	ItemID   string `json:"item_id,omitempty" jsonschema:"UUID de la tarea o el bug. Va con item_kind, sin stage_id"`
+	StageID  string `json:"stage_id,omitempty" jsonschema:"UUID de la etapa: lista los hallazgos de sus tareas, incluidas las retiradas. Va sin item_kind ni item_id"`
 	Pending  bool   `json:"pending,omitempty" jsonschema:"Solo los abiertos, bloqueantes primero"`
 }
 
 type toolFinding struct {
 	ID           string `json:"id"`
+	ItemKind     string `json:"item_kind"`
+	ItemID       string `json:"item_id"`
 	Description  string `json:"description"`
 	Blocking     bool   `json:"blocking"`
 	Status       string `json:"status"`
@@ -39,17 +42,25 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "list_findings",
-		Description: "Lista los hallazgos de una tarea o un bug por fecha. Con pending, solo los abiertos, bloqueantes primero. Disponible para todos los perfiles. No comprueba que el elemento exista: sin hallazgos responde lista vacía.",
+		Description: "Lista por fecha los hallazgos de una tarea o un bug, con item_kind e item_id, o los de todas las tareas de una etapa, con stage_id; exactamente uno de los dos modos. Cada hallazgo indica su item_kind e item_id. Los bugs no tienen etapa. Con pending, solo los abiertos, bloqueantes primero. Disponible para todos los perfiles. No comprueba que el elemento o la etapa existan: sin hallazgos responde lista vacía.",
 	}, h.callTool)
 }
 
 func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
-	itemID, err := uuid.Parse(input.ItemID)
-	if err != nil {
-		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("item_id inválido"))
+	query := Query{ItemKind: domain.ItemKind(input.ItemKind), Pending: input.Pending}
+	var err error
+	if input.ItemID != "" {
+		if query.ItemID, err = uuid.Parse(input.ItemID); err != nil {
+			return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("item_id inválido"))
+		}
+	}
+	if input.StageID != "" {
+		if query.StageID, err = uuid.Parse(input.StageID); err != nil {
+			return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("stage_id inválido"))
+		}
 	}
 
-	items, err := h.Handle(ctx, domain.ItemKind(input.ItemKind), itemID, input.Pending)
+	items, err := h.Handle(ctx, query)
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}
@@ -58,6 +69,8 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 	for _, item := range items {
 		finding := toolFinding{
 			ID:           item.ID.String(),
+			ItemKind:     string(item.ItemKind),
+			ItemID:       item.ItemID.String(),
 			Description:  item.Description,
 			Blocking:     item.Blocking,
 			Status:       string(item.Status),

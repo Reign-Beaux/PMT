@@ -94,6 +94,27 @@ func (s *Findings) List(ctx context.Context, kind domain.ItemKind, itemID uuid.U
 	return findings, nil
 }
 
+// ListByTasks devuelve los hallazgos de varias tareas, en el mismo orden que List.
+func (s *Findings) ListByTasks(ctx context.Context, taskIDs []uuid.UUID, pending bool) ([]domain.Finding, error) {
+	var (
+		rows []sqlcgen.Finding
+		err  error
+	)
+	if pending {
+		rows, err = s.queries.ListPendingFindingsByItems(ctx, taskIDs)
+	} else {
+		rows, err = s.queries.ListFindingsByItems(ctx, taskIDs)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("listar hallazgos: %w", err)
+	}
+	findings := make([]domain.Finding, 0, len(rows))
+	for _, row := range rows {
+		findings = append(findings, toDomain(row))
+	}
+	return findings, nil
+}
+
 func toDomain(row sqlcgen.Finding) domain.Finding {
 	f := domain.Finding{
 		ID:           row.ID,

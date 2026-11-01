@@ -24,6 +24,7 @@ import (
 	"pmt/internal/features/tasks/queries/hasactive"
 	"pmt/internal/features/tasks/queries/list"
 	"pmt/internal/features/tasks/queries/listchanges"
+	"pmt/internal/features/tasks/queries/listids"
 	"pmt/internal/features/tasks/queries/liststatuschanges"
 	"pmt/internal/features/tasks/store"
 	"pmt/internal/features/tasks/store/sqlcgen"
@@ -119,12 +120,13 @@ type Checker struct {
 	assigned  *checkassigned.Handler
 	release   *checkrelease.Handler
 	get       *get.Handler
+	listIDs   *listids.Handler
 }
 
 // NewChecker crea el verificador sobre las queries checkdone y hasactive.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewTasks(db)
-	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo), release: checkrelease.New(repo), get: get.New(repo)}
+	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo), release: checkrelease.New(repo), get: get.New(repo), listIDs: listids.New(repo)}
 }
 
 // EnsureClosable devuelve un error de negocio si las tareas de la etapa no permiten cerrarla.
@@ -153,6 +155,11 @@ func (c *Checker) StageOf(ctx context.Context, taskID uuid.UUID) (uuid.UUID, err
 		return uuid.Nil, err
 	}
 	return task.StageID, nil
+}
+
+// TaskIDs devuelve los ID de las tareas de una etapa, incluidas las retiradas.
+func (c *Checker) TaskIDs(ctx context.Context, stageID uuid.UUID) ([]uuid.UUID, error) {
+	return c.listIDs.Handle(ctx, stageID)
 }
 
 // HasActive indica si la etapa tiene tareas sin retirar.

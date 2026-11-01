@@ -30,7 +30,7 @@ var statusProfiles = map[Status]map[Status][]kernel.Profile{
 
 func ensureReason(from, to Status, reason string) error {
 	required := to == StatusRejected || (from == StatusRejected && to == StatusReported) ||
-		(from == StatusInReview && to == StatusPendingClose) ||
+		to == StatusPendingClose ||
 		(from == StatusPendingClose && (to == StatusInReview || to == StatusInQA))
 	if required && strings.TrimSpace(reason) == "" {
 		return kernel.ErrReasonRequired
