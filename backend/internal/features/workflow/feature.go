@@ -1,5 +1,6 @@
 // Package workflow compone las operaciones que mueven varios agregados en una
 // transacción: release_project, start_stage y el cierre y el retiro de una etapa.
+// También compone la lectura get_project_progress.
 package workflow
 
 import (
@@ -9,6 +10,7 @@ import (
 
 	"pmt/internal/features/workflow/commands/releaseproject"
 	"pmt/internal/features/workflow/commands/startstage"
+	"pmt/internal/features/workflow/queries/progress"
 	"pmt/internal/features/workflow/store"
 )
 
@@ -24,6 +26,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks releasep
 	start := startstage.New(repo)
 	start.Register(mux)
 	start.RegisterTool(tools)
+
+	report := progress.New(repo)
+	report.Register(mux)
+	report.RegisterTool(tools)
 }
 
 // NewCloser crea lo que stages usa para cerrar una etapa. stages no importa esta

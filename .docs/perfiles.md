@@ -60,7 +60,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 **En todo momento:**
 
 - **Registro:** desde la fase 3, el TL registra con `add_comment` la decisión del paso 5 y las demás que no sean una transición, y PC los bloqueos. No se copian los avisos.
-- **Avance:** PC revisa `list_stages` y `list_tasks` de cada etapa, nunca solo proyecto y etapas. Desde la fase 1 usa `get_project_progress`.
+- **Avance:** PC revisa siempre `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
 - **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y da aviso a quien le toque seguir, o informa al usuario si nadie puede seguir.
 - **Detener:** el usuario o PC pueden detener una etapa o el proyecto en cualquier paso.
 - **Limpieza:** quien levanta un proceso lo baja.

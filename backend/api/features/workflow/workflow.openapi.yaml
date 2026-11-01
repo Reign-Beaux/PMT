@@ -93,6 +93,30 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/projects/{id}/progress:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Muestra el avance de un proyecto
+      description: Solo lectura, para todos los perfiles. Devuelve las etapas por posición, con TL, equipo, conteo por status y tareas, y las señales de un posible atasco. Lo retirado no aparece. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Avance del proyecto.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Progress"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     bearerAuth:
@@ -124,6 +148,87 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    Progress:
+      type: object
+      required: [project, stages, signals]
+      properties:
+        project:
+          type: object
+          required: [id, name, status, last_change_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            status:
+              type: string
+            last_change_at:
+              type: string
+              format: date-time
+              description: Última actualización del proyecto, de sus etapas o de sus tareas sin retirar.
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgressStage"
+        signals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgressSignal"
+    ProgressStage:
+      type: object
+      required: [id, name, status, members, counts, tasks]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+        lead:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+        counts:
+          type: object
+          description: Tareas por status; solo los status presentes.
+          additionalProperties:
+            type: integer
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgressTask"
+    ProgressTask:
+      type: object
+      required: [id, title, status, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+        assignee:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    ProgressSignal:
+      type: object
+      required: [code, stage_id, stage_name]
+      properties:
+        code:
+          type: string
+          enum: [ready_without_work, stage_not_closed, stage_not_started]
+        stage_id:
+          type: string
+          format: uuid
+        stage_name:
+          type: string
     Moved:
       type: object
       required: [id, status]

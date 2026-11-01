@@ -126,5 +126,163 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "description": "Muestra el avance de un proyecto de PMT en una sola llamada: sus etapas por posición, con TL, equipo, conteo por status y tareas, y las señales de un posible atasco. Solo lectura, para todos los perfiles. Lo retirado no aparece. Señales: ready_without_work, etapa en in_dev con tareas en ready y ninguna en curso; stage_not_closed, etapa en in_dev con todas sus tareas en done o cancelled y al menos una en done; stage_not_started, proyecto en stand_by, in_dev o working, ninguna etapa en in_dev y alguna en stand_by, y nombra la primera por posición. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed. Son hechos, sin umbrales de tiempo. Usa list_projects para obtener el ID del proyecto.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_project_progress",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "last_change_at": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "status",
+            "last_change_at"
+          ],
+          "type": "object"
+        },
+        "signals": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "stage_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "stage_id",
+              "stage_name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "stages": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "counts": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "lead": {
+                "type": "string"
+              },
+              "members": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tasks": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assignee": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "status",
+              "members",
+              "counts",
+              "tasks"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "project",
+        "stages",
+        "signals"
+      ],
+      "type": "object"
+    }
   }
 ]

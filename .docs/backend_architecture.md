@@ -200,7 +200,7 @@ Cada feature corresponde a un agregado principal:
 | `activity` | Auditoría, comentarios y bloqueos. |
 | `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
 | `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
-| `workflow` | Operaciones que mueven varios agregados en una transacción: `release_project`, `start_stage` y el cierre y el retiro de una etapa. No tiene agregado propio. |
+| `workflow` | Operaciones que mueven varios agregados en una transacción: `release_project`, `start_stage` y el cierre y el retiro de una etapa. También compone la lectura `get_project_progress`. No tiene agregado propio. |
 
 Las dependencias entre features van, en general, en este sentido:
 
@@ -258,6 +258,7 @@ Ninguna otra feature importa `imports`, así que no hay ciclos. El formato del f
 - `workflow/store` usa el `store` de `projects`, `stages` y `tasks` sobre una sola `pgx.Tx`. `pgx.Tx` tiene `Begin`, así que `NewStatusChanges(tx)` funciona: sus `BeginFunc` internos son savepoints y conservan el `FOR UPDATE` y la comparación de origen.
 - `stages/commands/changestatus` cierra una etapa con `CloseStage`, y `stages/commands/retire` la retira con `RetireStage`, que `app` conecta con `workflow.NewCloser`: `stages` no importa `workflow`.
 - El bloqueo sigue siempre el orden proyecto, etapa y tareas por ID.
+- `workflow/queries/progress` es su excepción de lectura: lee proyecto, etapas y tareas con `Project`, `Stages` y `Tasks` de `workflow/store`, sin bloquear filas. Las señales son hechos sobre los status, no reglas: no impiden ninguna operación.
 
 ## Identidad y permisos
 
@@ -447,6 +448,22 @@ Son todo o nada, en una transacción, con un registro de status por elemento.
 | `change_tasks_status` | `PUT /api/stages/{stage_id}/tasks/status` | Según cada transición | Un `status` y un `reason` para varias tareas de una etapa, sin repetir. Cada una valida lo mismo que `change_task_status` y puede tener otro origen |
 
 `change_tasks_status` es una slice de `tasks`; los otros dos, de `workflow`. Bloquea con `WHERE id = ANY($1) ORDER BY id FOR UPDATE`, para que dos lotes no se bloqueen entre sí, y decide con lo leído tras bloquear. Lista vacía o repetida: `Invalid`. Tarea de otra etapa o retirada: `NotFound`. El error conserva su tipo con `kernel.Prefix` y antepone `tarea <id>: `. Los bugs no tienen lote.
+
+## Avance del proyecto
+
+`get_project_progress` (`GET /api/projects/{id}/progress`) muestra en una llamada lo que antes pedía cruzar `list_stages` y `list_tasks`. Es de solo lectura y para todos los perfiles. Un proyecto inexistente responde `NotFound`, y lo retirado no aparece.
+
+- **Proyecto:** `id`, `name`, `status` y `last_change_at`, la última `updated_at` del proyecto, de sus etapas o de sus tareas sin retirar. `revise_*` no toca la fila, así que no la mueve.
+- **Etapas,** por posición: `id`, `name`, `status`, `lead`, `members`, `counts` por status, solo los presentes, y `tasks` con `id`, `title`, `status`, `assignee` y `updated_at`.
+- **Señales:** `signals` lista hechos, con `code`, `stage_id` y `stage_name`, sin umbrales de tiempo. PMT no avisa ni sabe si un agente trabaja: quien consulta decide.
+
+| Señal | Condición |
+| --- | --- |
+| `ready_without_work` | Etapa en `in_dev` con tareas `ready` y ninguna en `in_dev`, `in_review`, `changes_requested`, `in_qa` o `pending_close` |
+| `stage_not_closed` | Etapa en `in_dev` con todas sus tareas activas en `done` o `cancelled` y al menos una en `done` |
+| `stage_not_started` | Proyecto en `stand_by`, `in_dev` o `working`, ninguna etapa en `in_dev` y alguna en `stand_by`; nombra la primera por posición |
+
+Con el proyecto en `stopped` o `cancelled` no se emiten `ready_without_work` ni `stage_not_closed`.
 
 ## Regla de planning
 
@@ -650,7 +667,7 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, y `get_project_progress`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
 - **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 
