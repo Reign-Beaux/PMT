@@ -44,6 +44,8 @@ var (
 	ErrBlockingRequired = kernel.Invalid("blocking es obligatorio")
 	// ErrResolutionInvalid indica que la resolución no es una de las conocidas.
 	ErrResolutionInvalid = kernel.Invalid("resolution desconocida: usa fixed o dismissed")
+	// ErrCloseReasonRequired indica que el cierre no trae motivo.
+	ErrCloseReasonRequired = kernel.Invalid("el motivo del cierre es obligatorio")
 	// ErrFindingClosed indica que el hallazgo ya se cerró.
 	ErrFindingClosed = kernel.Conflict("el hallazgo ya está cerrado")
 	// ErrCreateForbidden indica que el perfil no registra hallazgos.
@@ -139,7 +141,7 @@ func (f *Finding) Close(resolution Status, actor kernel.Actor, reason string) er
 	}
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
-		return kernel.ErrReasonRequired
+		return ErrCloseReasonRequired
 	}
 	f.Status = resolution
 	f.ClosedBy = actor.Name

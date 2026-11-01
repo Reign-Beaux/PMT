@@ -32,6 +32,8 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 **Hallazgos:** CR y QA los registran con `create_finding`, indicando si son bloqueantes, y los cierran como `fixed` con `close_finding`. El TL de la etapa, o un TL en bugs, los descarta como `dismissed`. Ambos cierres exigen motivo. Todos los perfiles los consultan con `list_findings`. No frenan transiciones: la decisión de devolver es de CR o QA.
 
+**Planes QAP:** QAP crea el plan con `create_test_plan`, lo versiona con `revise_test_plan` y lo envía con `submit_test_plan`. El TL de la etapa lo aprueba con `approve_test_plan` o lo devuelve con correcciones con `return_test_plan`; un plan devuelto exige una versión nueva antes de reenviarse. QA y los demás perfiles los consultan con `list_test_plans` y `list_test_plan_versions`. No frenan transiciones, y el script de Playwright y los resultados no se guardan en PMT.
+
 **Camino que termina en CR:** un cambio interno va de `in_review` a `pending_close` sin pasar por QA, y lo cierra el TL.
 
 **Criterio de QA:** aplica cuando el cambio altera algo observable desde fuera: pantalla, respuesta MCP o API, resultado de un worker o datos guardados. No aplica si es interno y el comportamiento sigue igual: refactor, limpieza o renombre.

@@ -61,3 +61,12 @@ sql:
         out: internal/features/reviews/store/sqlcgen
         sql_package: pgx/v5
         emit_empty_slices: true
+  - engine: postgresql
+    schema: internal/platform/postgres/migrations
+    queries: internal/features/qa/store/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/features/qa/store/sqlcgen
+        sql_package: pgx/v5
+        emit_empty_slices: true

@@ -22,7 +22,7 @@ var (
 	// ErrStageHasTasks indica que la etapa no se puede eliminar porque tiene tareas, incluidas las retiradas.
 	ErrStageHasTasks = kernel.Conflict("la etapa tiene tareas, activas o retiradas")
 	// ErrStageHasActiveTasks indica que la etapa no se puede retirar porque tiene tareas sin retirar.
-	ErrStageHasActiveTasks = kernel.Conflict("la etapa tiene tareas activas")
+	ErrStageHasActiveTasks = kernel.Conflict("la etapa tiene tareas sin retirar")
 	// ErrStageInOwnPlanning indica que la etapa aún se planea por sí sola y no admite cambios con historial.
 	ErrStageInOwnPlanning = kernel.Conflict("la etapa está en su propio planning")
 	// ErrStageLeftPlanning indica que otra operación sacó a la etapa de su planning propio al mismo tiempo.

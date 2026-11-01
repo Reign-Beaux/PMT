@@ -50,7 +50,7 @@ func New(repo Repository, tasks TaskChecker) *Handler {
 	return &Handler{repo: repo, tasks: tasks}
 }
 
-// Handle registra el retiro. Una etapa con tareas activas no se retira.
+// Handle registra el retiro. Una etapa con tareas sin retirar no se retira.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	stage, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {

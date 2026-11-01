@@ -110,7 +110,7 @@ func TestHandleRejects(t *testing.T) {
 		{"TL marca corregido", openFinding(domain.ItemTask), domain.StatusFixed, tl, "M", false, domain.ErrFixForbidden, 0},
 		{"ya cerrado", closed, domain.StatusFixed, cr, "M", false, domain.ErrFindingClosed, 0},
 		{"resolución desconocida", openFinding(domain.ItemTask), "open", cr, "M", false, domain.ErrResolutionInvalid, 0},
-		{"sin motivo", openFinding(domain.ItemTask), domain.StatusFixed, cr, "  ", false, kernel.ErrReasonRequired, 0},
+		{"sin motivo", openFinding(domain.ItemTask), domain.StatusFixed, cr, "  ", false, domain.ErrCloseReasonRequired, 0},
 		{"TL ajeno sin motivo: primero el ámbito", openFinding(domain.ItemTask), domain.StatusDismissed, otherTL, "", false, kernel.ErrNotStageLead, 1},
 		{"tarea que ya no existe", openFinding(domain.ItemTask), domain.StatusDismissed, tl, "M", true, errGone, 1},
 	}

@@ -16,6 +16,7 @@ import (
 	"pmt/internal/features/bugs"
 	"pmt/internal/features/imports"
 	"pmt/internal/features/projects"
+	"pmt/internal/features/qa"
 	"pmt/internal/features/reviews"
 	"pmt/internal/features/stages"
 	"pmt/internal/features/tasks"
@@ -76,4 +77,5 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	workflow.Register(mux, tools, pool, taskChecker)
 	bugs.Register(mux, tools, pool, projectChecker)
 	reviews.Register(mux, tools, pool, taskChecker, bugs.NewChecker(pool), stageChecker)
+	qa.Register(mux, tools, pool, taskChecker, stageChecker)
 }

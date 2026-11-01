@@ -68,7 +68,7 @@ func TestClose(t *testing.T) {
 		{"CR no descarta", StatusOpen, StatusDismissed, cr, "No aplica", ErrDismissForbidden},
 		{"User no descarta", StatusOpen, StatusDismissed, us, "No aplica", ErrDismissForbidden},
 		{"resolución desconocida", StatusOpen, "open", cr, "Listo", ErrResolutionInvalid},
-		{"sin motivo", StatusOpen, StatusFixed, cr, "   ", kernel.ErrReasonRequired},
+		{"sin motivo", StatusOpen, StatusFixed, cr, "   ", ErrCloseReasonRequired},
 		{"ya corregido", StatusFixed, StatusDismissed, tl, "No aplica", ErrFindingClosed},
 		{"ya descartado", StatusDismissed, StatusFixed, cr, "Listo", ErrFindingClosed},
 	}

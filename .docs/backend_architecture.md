@@ -196,7 +196,7 @@ Cada feature corresponde a un agregado principal:
 | `tasks` | Tareas, estados, asignaciones y propuestas de cambio. |
 | `agents` | Agentes, perfiles y tokens. Sin REST ni MCP: se administra con `pmt-server agent`. |
 | `reviews` | Hallazgos de CR y QA sobre tareas y bugs. |
-| `qa` | Planes QAP, casos y ejecuciones de QA. |
+| `qa` | Planes QAP, con sus versiones y tareas vinculadas. |
 | `activity` | Auditoría, comentarios y bloqueos. |
 | `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
 | `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
@@ -483,7 +483,7 @@ Fuera de `planning`, las etapas y tareas cambian mediante registros inmutables, 
 - **Historial:** `list_stage_changes` (`GET /api/projects/{project_id}/stage-changes?stage_id=`) y `list_task_changes` (`GET /api/stages/{stage_id}/task-changes?task_id=`). Para cada elemento con al menos un cambio devuelven `original` (contenido de la fila, con `created_at`) y `changes` en orden de `version`. Se consulta por padre porque lo retirado no aparece en `list_*`. Sin registros responde lista vacía.
 - **Retirado:** `GetStage`, `GetTask`, `ListStages` y `ListTasks` lo excluyen, así que responde `NotFound` en todas las operaciones y el retiro no se deshace. Su `status` y su `position` no cambian. `position` nunca se renumera ni se reutiliza.
 - **Cierre:** las tareas retiradas no cuentan para pasar a `done`; las agregadas nacen en `backlog` y sí cuentan. Agregar a una etapa en `done` no la reabre.
-- **Retirar una etapa:** con tareas activas responde `kernel.Conflict`. `stages` define `retire.TaskChecker`, que implementa `tasks.Checker` sobre `tasks/queries/hasactive`. El retiro pasa por `RetireStage`, de `workflow`, y puede disparar el paso a `working`; ver [movimientos automáticos](#estados-de-un-proyecto).
+- **Retirar una etapa:** con tareas sin retirar, aunque estén en `done` o `cancelled`, responde `kernel.Conflict`. `stages` define `retire.TaskChecker`, que implementa `tasks.Checker` sobre `tasks/queries/hasactive`. El retiro pasa por `RetireStage`, de `workflow`, y puede disparar el paso a `working`; ver [movimientos automáticos](#estados-de-un-proyecto).
 - **Status del proyecto:** `add_*`, `revise_*` y `retire_*` funcionan con cualquiera, salvo sobre una etapa en su planning propio. Así, un elemento con historial se sigue pudiendo cambiar si el proyecto vuelve a `planning`.
 - **Inmutabilidad:** triggers de PostgreSQL rechazan `UPDATE`, `DELETE` y `TRUNCATE` en ambas tablas, y `ON DELETE RESTRICT` impide borrar un elemento con historial. No hay consultas, comandos ni rutas que los modifiquen.
 - **Transacción:** `store/changes.go` escribe el registro, y en `retire_*` también `retired_at`, con `pgx.BeginFunc`, porque `kernel.Transactor` sigue pendiente. Bloquea el elemento con `FOR UPDATE` para numerar las versiones.
@@ -588,6 +588,39 @@ Un hallazgo es algo que CR o QA encontró en una tarea o un bug. Lo guarda `find
 - **Tarea que ya no existe:** descartar exige saber su etapa, así que responde `NotFound` si la tarea se retiró o se eliminó. `fixed` no consulta la tarea.
 - **Colaboración:** `tasks.Checker` da `StageOf`, `stages.Checker` da `Team` y `bugs.Checker` da `Check`, sobre `bugs/queries/get`. Todo se conecta en `registerFeatures`.
 
+## Planes QAP
+
+QAP diseña y versiona un plan de pruebas por etapa, el TL lo aprueba y QA lo ejecuta. El script de Playwright y los resultados no se guardan en PMT.
+
+`test_plans` guarda la cabecera y la última revisión del TL; `test_plan_versions`, el contenido de cada versión, y `test_plan_tasks`, las tareas vinculadas ahora.
+
+| Desde | Operación | Hacia |
+| --- | --- | --- |
+| Nuevo | `create_test_plan` | `draft`, versión 1 |
+| `draft`, `returned`, `approved` | `revise_test_plan` | `draft`, versión nueva |
+| `draft` | `submit_test_plan` | `submitted` |
+| `submitted` | `approve_test_plan` | `approved` |
+| `submitted` | `return_test_plan` | `returned` |
+
+| Comando MCP | REST | Quién | Efecto |
+| --- | --- | --- | --- |
+| `create_test_plan` | `POST /api/stages/{stage_id}/test-plans` | QAP | Versión 1, con al menos una tarea de esa etapa. El contenido puede quedar vacío hasta enviarlo |
+| `revise_test_plan` | `POST /api/test-plans/{id}/revise` | QAP | Versión nueva con motivo obligatorio; reemplaza las tareas |
+| `submit_test_plan` | `POST /api/test-plans/{id}/submit` | QAP | Envía al TL. `happy_path` y `error_cases` no pueden estar vacíos |
+| `approve_test_plan` | `POST /api/test-plans/{id}/approve` | TL de la etapa | Aprueba la última versión y limpia las correcciones |
+| `return_test_plan` | `POST /api/test-plans/{id}/return` | TL de la etapa | Devuelve con `review_notes` obligatorio |
+| `list_test_plans` | `GET /api/stages/{stage_id}/test-plans?task_id=` | Todos | Con última versión, tareas, status y última revisión |
+| `list_test_plan_versions` | `GET /api/test-plans/{id}/versions` | Todos | Todas las versiones |
+
+- **Un plan devuelto** no se reenvía: `submit_test_plan` responde `kernel.Conflict` hasta que exista una versión nueva. Revisar en `submitted` también responde `kernel.Conflict`. Revisar uno aprobado lo devuelve a `draft`, y debe aprobarse otra vez.
+- **Última revisión:** `review_notes` y `reviewed_by` son los de la última decisión del TL y sobreviven a `revise_test_plan`, para que QAP y el TL vean qué se pidió.
+- **No frena el flujo:** como los hallazgos, un plan no bloquea transiciones. QA puede aprobar una tarea sin plan. Los bugs no tienen plan.
+- **Validación:** status, perfil, ámbito y datos, en ese orden. El ámbito se consulta solo si el perfil ya pasó. `User` no gestiona ni decide planes.
+- **Sin llave foránea:** `stage_id` y `task_id` no referencian a su entidad, igual que los [hallazgos](#hallazgos), para no impedir `delete_stage` ni `delete_task`. La existencia se valida al crear y al revisar, y las listas responden vacío si no hay planes.
+- **Inmutabilidad:** triggers con `reject_change_mutation` protegen `test_plan_versions`.
+- **Transacción:** `store/plans.go` bloquea el plan con `FOR UPDATE` y decide con lo leído tras bloquear, así que de dos decisiones simultáneas la segunda responde `kernel.Conflict`, y dos revisiones no compiten por el número de versión.
+- **Colaboración:** `tasks.Checker` da `StageOf` y `stages.Checker` da `Check` y `Team`. Todo se conecta en `registerFeatures`.
+
 ## Transacciones
 
 - Los commands usan la interfaz `kernel.Transactor`, con `WithinTx(ctx, fn)`, implementada en `platform/postgres`.
@@ -617,7 +650,7 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, y la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
 - **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 
@@ -629,7 +662,7 @@ Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews`. Hecho.
-7. `qa`.
+7. `qa`. Hecho.
 
 Una operación debe funcionar de entrada a salida antes de extender el patrón a otras.
 

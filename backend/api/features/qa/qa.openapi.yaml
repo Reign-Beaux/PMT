@@ -1,0 +1,316 @@
+openapi: 3.1.0
+info:
+  title: PMT - Planes QAP
+  version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
+paths:
+  /api/stages/{stage_id}/test-plans:
+    parameters:
+      - $ref: "#/components/parameters/StageID"
+    post:
+      summary: Crea un plan de pruebas en draft, versión 1
+      description: Solo QAP. Exige al menos una tarea, sin repetir, de esa etapa y sin retirar. `happy_path` y `error_cases` pueden quedar vacíos hasta enviarlo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title, task_ids]
+              properties:
+                title:
+                  type: string
+                happy_path:
+                  type: string
+                error_cases:
+                  type: string
+                task_ids:
+                  $ref: "#/components/schemas/TaskIDs"
+      responses:
+        "201":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    get:
+      summary: Lista los planes de una etapa
+      description: Con status, última versión, tareas y última revisión del TL. Con `task_id`, solo los que vinculan esa tarea. No comprueba que la etapa exista.
+      parameters:
+        - name: task_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Planes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/test-plans/{id}/revise:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      summary: Crea una versión nueva y reemplaza las tareas
+      description: Solo QAP, con motivo. Desde `draft`, `returned` o `approved`; deja el plan en `draft`. En `submitted` responde 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, task_ids]
+              properties:
+                happy_path:
+                  type: string
+                error_cases:
+                  type: string
+                reason:
+                  type: string
+                task_ids:
+                  $ref: "#/components/schemas/TaskIDs"
+      responses:
+        "200":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/test-plans/{id}/submit:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      summary: Envía el plan al TL
+      description: Solo QAP y desde `draft`. `happy_path` y `error_cases` no pueden estar vacíos. Un plan devuelto exige antes una versión nueva.
+      responses:
+        "200":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/test-plans/{id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      summary: Aprueba la última versión
+      description: Solo el TL de la etapa, con el plan en `submitted`. Limpia las correcciones anteriores.
+      responses:
+        "200":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/test-plans/{id}/return:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      summary: Devuelve el plan con correcciones
+      description: Solo el TL de la etapa, con el plan en `submitted`. `review_notes` es obligatorio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [review_notes]
+              properties:
+                review_notes:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/test-plans/{id}/versions:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      summary: Lista todas las versiones de un plan
+      description: En orden e inmutables. Un ID sin versiones responde lista vacía.
+      responses:
+        "200":
+          description: Versiones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Version"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StageID:
+      name: stage_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    PlanSummary:
+      description: Plan tras la operación
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PlanSummary"
+    Error:
+      description: Error de negocio
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    Status:
+      type: string
+      enum: [draft, submitted, approved, returned]
+    TaskIDs:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        type: string
+        format: uuid
+    PlanSummary:
+      type: object
+      required: [id, status, version]
+      description: "`reviewed_by` llega al aprobar o devolver; `review_notes`, al devolver."
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/Status"
+        version:
+          type: integer
+        review_notes:
+          type: string
+        reviewed_by:
+          type: string
+    Version:
+      type: object
+      required: [version, happy_path, error_cases, created_by, created_at]
+      properties:
+        version:
+          type: integer
+        happy_path:
+          type: string
+        error_cases:
+          type: string
+        reason:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Plan:
+      type: object
+      required: [id, stage_id, title, status, created_by, version, happy_path, error_cases, task_ids, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stage_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        created_by:
+          type: string
+        review_notes:
+          type: string
+        reviewed_by:
+          type: string
+        version:
+          type: integer
+        happy_path:
+          type: string
+        error_cases:
+          type: string
+        reason:
+          type: string
+        task_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time

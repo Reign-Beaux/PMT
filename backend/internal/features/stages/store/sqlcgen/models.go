@@ -158,3 +158,30 @@ type TaskStatusChange struct {
 	Reason       string
 	ChangedAt    time.Time
 }
+
+type TestPlan struct {
+	ID          uuid.UUID
+	StageID     uuid.UUID
+	Title       string
+	Status      string
+	CreatedBy   string
+	ReviewNotes string
+	ReviewedBy  pgtype.Text
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type TestPlanTask struct {
+	PlanID uuid.UUID
+	TaskID uuid.UUID
+}
+
+type TestPlanVersion struct {
+	PlanID     uuid.UUID
+	Version    int32
+	HappyPath  string
+	ErrorCases string
+	Reason     string
+	CreatedBy  string
+	CreatedAt  time.Time
+}
