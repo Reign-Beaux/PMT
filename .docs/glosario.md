@@ -35,7 +35,16 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Bug** | `Bug` | Fallo reportado en un proyecto, con sus pasos para reproducirlo y la versión de producto donde apareció. Es la raíz de su propio agregado, referencia a su proyecto por ID y no pertenece a ninguna etapa. |
 | **Status de un bug** | `Status` | Estado de un bug: `reported` (reportado, aún sin confirmar), `confirmed` (reproducido, pendiente de corregir), `in_dev` (en corrección), `in_review` (en revisión de código), `changes_requested` (con correcciones pendientes), `in_qa` (en verificación de QA), `pending_close` (aprobado, falta el cierre del TL), `done` (corregido y verificado) o `rejected` (no se corregirá). |
 | **Retirar** | `Retire` | Sacar una etapa o tarea de las consultas registrando un cambio, sin borrar nada. Sigue en el historial y no se deshace. |
-| **Hallazgo** | `Finding` | Algo que CR o QA encontró en una tarea o un bug, bloqueante o no. Nace en `open` y termina en `fixed` o `dismissed`. No cambia el status del elemento ni frena transiciones. |
+| **Hallazgo** | `Finding` | Algo que CR o QA encontró en una tarea o un bug, bloqueante o no. Nace en `open` y termina en `fixed` o `dismissed`. No cambia el status del elemento ni frena transiciones. Es la raíz de su propio agregado y referencia a su tarea o bug por ID. |
+| **Status de un hallazgo** | `Status` | Estado de un hallazgo: `open` (pendiente), `fixed` (corregido y verificado por CR o QA) o `dismissed` (descartado por el TL). No se reabre. |
+| **Hallazgo bloqueante** | `Blocking` | Hallazgo que impide aprobar: se devuelve de inmediato. Los no bloqueantes se devuelven juntos al terminar. |
+| **Resolución** | `Resolution` | Forma de cerrar un hallazgo, `fixed` o `dismissed`, con motivo obligatorio. |
+| **Plan QAP** | `Plan` | Plan de pruebas que QAP diseña para una etapa y vincula a tareas de ella. El TL de la etapa lo aprueba y QA lo ejecuta. No frena transiciones, y los bugs no tienen plan. Es la raíz de su propio agregado y referencia a su etapa y sus tareas por ID. |
+| **Status de un plan** | `Status` | Estado de un plan QAP: `draft` (QAP lo edita), `submitted` (espera la decisión del TL), `approved` (el TL aprobó su última versión) o `returned` (devuelto con correcciones). Un plan devuelto exige una versión nueva antes de reenviarse. |
+| **Versión de un plan** | `Version` | Registro inmutable del contenido de un plan QAP: camino feliz, casos de error, motivo, autor y fecha. Es una entidad del agregado `Plan`. Toda versión nueva deja el plan en `draft`. |
+| **Camino feliz** | `HappyPath` | Casos de un plan QAP en los que todo sale bien. Obligatorio para enviarlo. |
+| **Casos de error** | `ErrorCases` | Casos de un plan QAP en los que algo debe rechazarse o fallar. Obligatorios para enviarlo. |
+| **Correcciones** | `ReviewNotes` | Lo que el TL pide cambiar al devolver un plan QAP. Son obligatorias al devolver, siguen visibles al revisar y aprobar las limpia. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y se comunica con PMT por MCP. |
 | **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DevFrontend, DevBackend, CR, QAP o QA. |
 | **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. Lo resuelve el servidor a partir del token. |
