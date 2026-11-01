@@ -65,7 +65,7 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	projectChecker := projects.NewChecker(pool)
 	agentChecker := agents.NewChecker(pool)
 
-	projects.Register(mux, tools, pool)
+	projects.Register(mux, tools, pool, stages.NewProgress(pool))
 	stages.Register(mux, tools, pool, tasks.NewChecker(pool), projectChecker, agentChecker)
 	tasks.Register(mux, tools, pool, stages.NewChecker(pool, projectChecker), agentChecker)
 	imports.Register(tools, pool)

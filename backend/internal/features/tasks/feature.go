@@ -18,6 +18,7 @@ import (
 	"pmt/internal/features/tasks/commands/update"
 	"pmt/internal/features/tasks/queries/checkassigned"
 	"pmt/internal/features/tasks/queries/checkdone"
+	"pmt/internal/features/tasks/queries/checkrelease"
 	"pmt/internal/features/tasks/queries/get"
 	"pmt/internal/features/tasks/queries/hasactive"
 	"pmt/internal/features/tasks/queries/list"
@@ -105,22 +106,28 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 }
 
 // Checker permite a otras features saber si las tareas de una etapa están
-// terminadas y si tiene tareas sin retirar.
+// terminadas, si tiene tareas sin retirar y si tiene tareas activas.
 type Checker struct {
 	checkDone *checkdone.Handler
 	hasActive *hasactive.Handler
 	assigned  *checkassigned.Handler
+	release   *checkrelease.Handler
 }
 
 // NewChecker crea el verificador sobre las queries checkdone y hasactive.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewTasks(db)
-	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo)}
+	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo), release: checkrelease.New(repo)}
 }
 
 // AllDone indica si todas las tareas de la etapa están en done.
 func (c *Checker) AllDone(ctx context.Context, stageID uuid.UUID) (bool, error) {
 	return c.checkDone.Handle(ctx, stageID)
+}
+
+// EnsureReleasable devuelve un error de negocio si la etapa no tiene tareas activas.
+func (c *Checker) EnsureReleasable(ctx context.Context, stageID uuid.UUID) error {
+	return c.release.Handle(ctx, stageID)
 }
 
 // HasOpenAssigned indica si el agente tiene tareas sin terminar en la etapa.

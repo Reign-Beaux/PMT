@@ -299,6 +299,8 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 **Perfiles:** PP y `User` hacen todas las transiciones. PC solo detiene y reanuda. Detener, cancelar y reabrir exigen motivo.
 
+Cambiar el status depende de las etapas; ver [Reglas entre status](#reglas-entre-status).
+
 ## Estados de una etapa
 
 Toda etapa nace en `planning`. Una tabla de transiciones en `stages/domain` define los cambios permitidos:
@@ -350,7 +352,7 @@ Una tabla de transiciones en `tasks/domain` define los cambios permitidos:
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `tasks/commands/changestatus` (`change_task_status`, `PUT /api/tasks/{id}/status`), no con `PUT /api/tasks/{id}`.
 
-Cambiar el status no depende del status del proyecto ni de la etapa, igual que `change_stage_status`. Tampoco es un cambio de contenido: no escribe en `task_changes`. Actualiza `status` y `updated_at`, deja su registro en el [historial de status](#historial-de-status) y devuelve la última versión. Una tarea retirada responde `NotFound`.
+Cambiar el status depende del proyecto y de la etapa; ver [Reglas entre status](#reglas-entre-status). No es un cambio de contenido: no escribe en `task_changes`. Actualiza `status` y `updated_at`, deja su registro en el [historial de status](#historial-de-status) y devuelve la última versión. Una tarea retirada responde `NotFound`.
 
 **Perfiles:** cada transición exige un perfil, en `domain/permissions.go`. Una prueba exige que toda transición tenga perfiles. `User` tiene lo de PP y PC; Dev es DevFrontend o DevBackend.
 
@@ -368,7 +370,7 @@ Cambiar el status no depende del status del proyecto ni de la etapa, igual que `
 | cualquiera menos `done` | Cancelar, con motivo | TL, PP, `User` | `cancelled` |
 | `cancelled` | Reabrir, con motivo | TL, PP, `User` | `backlog` |
 
-La validación sigue este orden: status conocido, transición, perfil, ámbito y motivo. El perfil responde `kernel.Forbidden` antes de consultar otra feature. Solo espacios cuenta como motivo vacío.
+La validación sigue este orden: status conocido, transición, perfil, ámbito, motivo y reglas entre status. El perfil responde `kernel.Forbidden` antes de consultar otra feature. Solo espacios cuenta como motivo vacío.
 
 ## Asignación
 
@@ -388,6 +390,29 @@ Cada etapa tiene un TL responsable y un equipo de devs. `stages.lead`, `stage_me
 - Las cuatro operaciones aplican en cualquier status y en el planning propio, porque no son cambios de contenido. Lo retirado responde `NotFound`. `stage_members` se borra en cascada con la etapa, para no impedir `delete_stage`.
 - `import_*` crea sin TL, sin equipo y sin dueño.
 - `tasks` pide `Team` a `stages.Checker`; `stages` pide `HasOpenAssigned` a `tasks.Checker`, y ambas piden `Profile` a `agents.Checker`, sobre `agents/queries/lookup`.
+
+## Reglas entre status
+
+Las comprueba el handler después del dominio y antes de escribir. Ninguna escribe en los hijos: detener o cancelar un padre congela lo de abajo porque la regla lo consulta, sin cambiar su status. Una **etapa o tarea activa** es la que no está retirada ni cancelada. Todas responden `kernel.Conflict`.
+
+| Reglas | Slice | Comprobación |
+| --- | --- | --- |
+| 1, 7, 8, 9 | `tasks/commands/changestatus` | Avanzar exige proyecto en `in_dev` o `working`, y etapa en `in_dev` |
+| 2, 3, 8, 9 | Igual | Cancelar y reabrir exigen proyecto ni `stopped` ni `cancelled`, y etapa ni `done` ni `cancelled`. Con la etapa en `stopped` sí se puede |
+| 4 | `stages/commands/changestatus` | `planning → stand_by`: al menos una tarea activa |
+| 5 | Igual | `→ in_dev`, desde cualquier origen: proyecto en `in_dev` o `working` |
+| 10 | Igual | Con proyecto `stopped` o `cancelled`: solo `→ stopped` o `→ cancelled` |
+| 11 | `projects/commands/changestatus` | `planning → stand_by`: al menos una etapa activa y ninguna en `planning` |
+| 12 | Igual | `stand_by → in_dev`: al menos una etapa en `stand_by` |
+| 13, 14 | Igual | `→ working`: al menos una etapa en `done` y las demás sin retirar en `done` o `cancelled`, así que una detenida lo impide |
+| 15 | `bugs/commands/changestatus` | Toda transición: proyecto en `working` |
+
+- Las reglas 4, 11 y 12 solo valen desde el origen que nombran, y no desde `stopped`.
+- `stopped → working` solo aplica la regla 13 si el proyecto nunca estuvo en `working`, según `project_status_changes`. Un proyecto que llegó antes de la fase 1 no tiene ese registro y cumple la regla.
+- Las etapas en planning propio cumplen las reglas 4 y 10 al salir: las comprobaciones van antes de `LeavePlanning`.
+- Las reglas 16 y 17 ya estaban vigentes: los bugs no afectan al cierre, y `add_task` en una etapa `done` no la reabre.
+- `in_dev → working` sigue siendo manual, de PP y `User`.
+- **Colaboración:** `projects.Checker` da `AcceptsWork` e `IsFrozen` (`queries/checkstatus`); `stages.Checker`, `EnsureWorkOpen` y `EnsureTaskCancellable` (`queries/checktasks`); `tasks.Checker`, `EnsureReleasable` (`queries/checkrelease`). `stages.NewProgress` da `EnsureReleasable`, `EnsureStartable` y `EnsureClosed` (`queries/checkprogress`); no depende de `projects`, así que `registerFeatures` lo construye antes y lo pasa a `projects.Register`.
 
 ## Regla de planning
 
@@ -460,9 +485,9 @@ Cualquier transición desde `planning` es la salida, y es definitiva: si la etap
 | `update_stage`, `delete_stage` | Con proyecto en `working` | `el proyecto no está en planning`, o `la etapa tiene historial de cambios` si el proyecto volvió a `planning` |
 | `create_task`, `update_task`, `delete_task` | Con proyecto en `working`, sin registros | Rechazadas, aunque el proyecto vuelva a `planning` |
 | `add_task`, `revise_*`, `retire_*` | `la etapa está en su propio planning` | Permitidas |
-| `change_stage_status` | Escribe el `add` al salir | Sin cambios |
+| `change_stage_status` | Escribe el `add` al salir. Salir a `stand_by` exige una tarea activa | Sin cambios |
 
-- Fuera de `working`, las operaciones permitidas responden `el proyecto no está en working`, aunque el proyecto vuelva a `planning`. `change_stage_status` sigue disponible, así que la etapa no queda atascada.
+- Fuera de `working`, las operaciones permitidas responden `el proyecto no está en working`, aunque el proyecto vuelva a `planning`. `change_stage_status` sigue disponible, así que la etapa no queda atascada; con el proyecto en `stopped` o `cancelled` solo se detiene o se cancela.
 - Las tareas creadas en esta fase quedan como originales en su fila, sin registros.
 - Toda etapa con registro `add` rechaza `create_task`, `update_task` y `delete_task`, aunque el proyecto vuelva a `planning`. `add_reason` y `add_requested_by` aparecen en las salidas solo durante el planning propio.
 - `tasks` lo consulta con `StageChecker`: `EnsureTasksEditable` en `create`, `update` y `delete`, y `EnsureHistoryRule` en `add`, `revise` y `retire`. `stages` pide `IsWorking` y `EnsureWorking` a `projects.Checker`, sobre la query `projects/queries/checkworking`.
@@ -476,7 +501,7 @@ Un bug pertenece a un proyecto, sin etapa: `tasks` no cambia y los bugs no afect
 | --- | --- | --- |
 | `create_bug` | `POST /api/projects/{project_id}/bugs` | Solo `working` |
 | `update_bug` | `PUT /api/bugs/{id}` | Solo `working` |
-| `change_bug_status` | `PUT /api/bugs/{id}/status` | Cualquiera |
+| `change_bug_status` | `PUT /api/bugs/{id}/status` | Solo `working` |
 | `list_bugs` | `GET /api/projects/{project_id}/bugs` | Cualquiera |
 
 Fuera de `working` responden `el proyecto no está en working`. `update_bug` corrige el reporte y no cambia el status. No hay comando para eliminar un bug. `delete_project` se bloquea si el proyecto tiene bugs.
@@ -507,7 +532,7 @@ Una tabla de transiciones en `bugs/domain` define los cambios permitidos:
 | `done` | ninguna |
 | `rejected` | `reported` |
 
-Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. Un bug inexistente responde `NotFound`. El status solo cambia con la slice `bugs/commands/changestatus` (`change_bug_status`, `PUT /api/bugs/{id}/status`), no con `update_bug`. Cambiar el status no depende del status del proyecto, igual que `change_task_status`, y devuelve el bug completo.
+Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. Un bug inexistente responde `NotFound`. El status solo cambia con la slice `bugs/commands/changestatus` (`change_bug_status`, `PUT /api/bugs/{id}/status`), no con `update_bug`. Cambiar el status exige el proyecto en `working` (regla 15) y devuelve el bug completo.
 
 **Perfiles:** un bug no tiene etapa, así que todo es por perfil, sin asignación. QA confirma; Dev inicia, entrega y reentrega; CR aprueba o pide corrección; QA aprueba o pide corrección en `in_qa`. QA o TL rechazan un bug `reported` y reabren uno `rejected`; solo TL rechaza desde los demás. Rechazar y reabrir exigen motivo.
 
@@ -540,8 +565,8 @@ La operación es la slice `qa/commands/approve/`.
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones y la asignación de etapas y tareas; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
-- **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil, las reglas entre status y las demás features.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas y las reglas entre status; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 - **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 

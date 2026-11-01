@@ -18,6 +18,7 @@ import (
 	"pmt/internal/features/stages/commands/retire"
 	"pmt/internal/features/stages/commands/revise"
 	"pmt/internal/features/stages/commands/update"
+	"pmt/internal/features/stages/queries/checkprogress"
 	"pmt/internal/features/stages/queries/checktasks"
 	"pmt/internal/features/stages/queries/checkteam"
 	"pmt/internal/features/stages/queries/get"
@@ -40,6 +41,7 @@ type TaskChecker interface {
 type ProjectChecker interface {
 	add.ProjectChecker
 	update.ProjectChecker
+	checktasks.ProjectChecker
 }
 
 // AgentChecker reúne lo que las slices piden a la feature agents.
@@ -67,7 +69,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 		*store.Stages
 		*store.Changes
 		*store.StatusChanges
-	}{repo, changes, statusChanges}, tasks)
+	}{repo, changes, statusChanges}, tasks, projects)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
@@ -148,6 +150,17 @@ func (c *Checker) Check(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// EnsureWorkOpen devuelve un error de negocio si una tarea de la etapa no puede avanzar.
+func (c *Checker) EnsureWorkOpen(ctx context.Context, id uuid.UUID) error {
+	return c.tasks.EnsureWorkOpen(ctx, id)
+}
+
+// EnsureTaskCancellable devuelve un error de negocio si una tarea de la etapa no
+// se puede cancelar ni reabrir.
+func (c *Checker) EnsureTaskCancellable(ctx context.Context, id uuid.UUID) error {
+	return c.tasks.EnsureTaskCancellable(ctx, id)
+}
+
 // EnsureTasksEditable devuelve un error de negocio si la etapa no existe o sus
 // tareas no se pueden crear, editar ni eliminar directamente.
 func (c *Checker) EnsureTasksEditable(ctx context.Context, id uuid.UUID) error {
@@ -158,4 +171,11 @@ func (c *Checker) EnsureTasksEditable(ctx context.Context, id uuid.UUID) error {
 // en su planning propio, donde sus tareas no admiten cambios con historial.
 func (c *Checker) EnsureHistoryRule(ctx context.Context, id uuid.UUID) error {
 	return c.tasks.EnsureHistoryRule(ctx, id)
+}
+
+// NewProgress crea el verificador que usa projects para saber si sus etapas
+// permiten un cambio de status. No depende de projects, así que app lo construye
+// antes de registrar esa feature.
+func NewProgress(db sqlcgen.DBTX) *checkprogress.Handler {
+	return checkprogress.New(store.NewStages(db))
 }

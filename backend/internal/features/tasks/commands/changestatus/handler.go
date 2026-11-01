@@ -17,9 +17,12 @@ type Repository interface {
 	ChangeStatus(ctx context.Context, task domain.Task, change domain.StatusChange) (domain.Task, error)
 }
 
-// StageChecker da el equipo de una etapa. Lo implementa la feature stages.
+// StageChecker da el equipo de una etapa y dice qué admiten sus tareas según el
+// status de la etapa y del proyecto. Lo implementa la feature stages.
 type StageChecker interface {
 	Team(ctx context.Context, id uuid.UUID) (kernel.Team, error)
+	EnsureWorkOpen(ctx context.Context, id uuid.UUID) error
+	EnsureTaskCancellable(ctx context.Context, id uuid.UUID) error
 }
 
 // Command contiene los datos de entrada.
@@ -53,7 +56,8 @@ func New(repo Repository, stages StageChecker) *Handler {
 	return &Handler{repo: repo, stages: stages}
 }
 
-// Handle cambia el status de la tarea. Una tarea retirada no se encuentra.
+// Handle cambia el status de la tarea si su etapa y su proyecto lo permiten. Una
+// tarea retirada no se encuentra.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	task, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -70,6 +74,9 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := task.ChangeStatus(cmd.Status, cmd.Actor, cmd.Reason, team); err != nil {
 		return Result{}, err
 	}
+	if err := h.ensureRules(ctx, from, task); err != nil {
+		return Result{}, err
+	}
 
 	statusChange := domain.NewStatusChange(task.ID, from, task.Status, cmd.Actor, cmd.Reason)
 	updated, err := h.repo.ChangeStatus(ctx, task, statusChange)
@@ -77,4 +84,12 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	return Result(updated), nil
+}
+
+// ensureRules aplica las reglas entre status, que dependen de la etapa y el proyecto.
+func (h *Handler) ensureRules(ctx context.Context, from domain.Status, task domain.Task) error {
+	if domain.IsCancelOrReopen(from, task.Status) {
+		return h.stages.EnsureTaskCancellable(ctx, task.StageID)
+	}
+	return h.stages.EnsureWorkOpen(ctx, task.StageID)
 }

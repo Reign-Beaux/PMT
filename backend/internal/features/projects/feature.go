@@ -14,6 +14,7 @@ import (
 	"pmt/internal/features/projects/commands/update"
 	"pmt/internal/features/projects/domain"
 	"pmt/internal/features/projects/queries/checkplanning"
+	"pmt/internal/features/projects/queries/checkstatus"
 	"pmt/internal/features/projects/queries/checkworking"
 	"pmt/internal/features/projects/queries/get"
 	"pmt/internal/features/projects/queries/list"
@@ -23,7 +24,8 @@ import (
 )
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB) {
+// stages lo aporta esa feature, conectada en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changestatus.StageProgress) {
 	repo := store.NewProjects(db)
 	statusChanges := store.NewStatusChanges(db)
 
@@ -34,7 +36,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB) {
 	changeStatus := changestatus.New(struct {
 		*store.Projects
 		*store.StatusChanges
-	}{repo, statusChanges})
+	}{repo, statusChanges}, stages)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
@@ -61,12 +63,13 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB) {
 type Checker struct {
 	checkPlanning *checkplanning.Handler
 	checkWorking  *checkworking.Handler
+	checkStatus   *checkstatus.Handler
 }
 
-// NewChecker crea el verificador sobre las queries checkplanning y checkworking.
+// NewChecker crea el verificador sobre las queries checkplanning, checkworking y checkstatus.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewProjects(db)
-	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo)}
+	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo), checkStatus: checkstatus.New(repo)}
 }
 
 // EnsurePlanning devuelve un error de negocio si el proyecto no existe o no está en planning.
@@ -77,6 +80,16 @@ func (c *Checker) EnsurePlanning(ctx context.Context, id uuid.UUID) error {
 // IsWorking indica si el proyecto está en working. Si no existe, devuelve un error de negocio.
 func (c *Checker) IsWorking(ctx context.Context, id uuid.UUID) (bool, error) {
 	return c.checkWorking.Handle(ctx, id)
+}
+
+// AcceptsWork indica si las etapas y tareas del proyecto pueden avanzar.
+func (c *Checker) AcceptsWork(ctx context.Context, id uuid.UUID) (bool, error) {
+	return c.checkStatus.AcceptsWork(ctx, id)
+}
+
+// IsFrozen indica si el proyecto congela sus etapas y tareas.
+func (c *Checker) IsFrozen(ctx context.Context, id uuid.UUID) (bool, error) {
+	return c.checkStatus.IsFrozen(ctx, id)
 }
 
 // EnsureWorking devuelve un error de negocio si el proyecto no existe o no está en working.

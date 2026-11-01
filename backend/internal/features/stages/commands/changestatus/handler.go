@@ -18,10 +18,18 @@ type Repository interface {
 	LeavePlanning(ctx context.Context, s domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error)
 }
 
-// TaskChecker indica si todas las tareas de una etapa están terminadas.
-// Lo implementa la feature tasks.
+// TaskChecker indica si todas las tareas de una etapa están terminadas y si
+// tiene alguna activa. Lo implementa la feature tasks.
 type TaskChecker interface {
 	AllDone(ctx context.Context, stageID uuid.UUID) (bool, error)
+	EnsureReleasable(ctx context.Context, stageID uuid.UUID) error
+}
+
+// ProjectChecker indica qué admite un proyecto según su status. Lo implementa la
+// feature projects.
+type ProjectChecker interface {
+	AcceptsWork(ctx context.Context, projectID uuid.UUID) (bool, error)
+	IsFrozen(ctx context.Context, projectID uuid.UUID) (bool, error)
 }
 
 // Command contiene los datos de entrada.
@@ -52,17 +60,19 @@ type Result struct {
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo  Repository
-	tasks TaskChecker
+	repo     Repository
+	tasks    TaskChecker
+	projects ProjectChecker
 }
 
 // New crea el handler.
-func New(repo Repository, tasks TaskChecker) *Handler {
-	return &Handler{repo: repo, tasks: tasks}
+func New(repo Repository, tasks TaskChecker, projects ProjectChecker) *Handler {
+	return &Handler{repo: repo, tasks: tasks, projects: projects}
 }
 
-// Handle cambia el status de la etapa. Solo la cierra si todas sus tareas están
-// terminadas. Al salir de su planning propio escribe el registro add pendiente.
+// Handle cambia el status de la etapa si su proyecto y sus tareas lo permiten.
+// Solo la cierra si todas sus tareas están terminadas. Al salir de su planning
+// propio escribe el registro add pendiente; ese camino cumple las mismas reglas.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -70,6 +80,9 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	}
 	from := s.Status
 	if err := s.ChangeStatus(cmd.Status, cmd.Actor, cmd.Reason); err != nil {
+		return Result{}, err
+	}
+	if err := h.ensureRules(ctx, from, s); err != nil {
 		return Result{}, err
 	}
 	statusChange := domain.NewStatusChange(s.ID, from, s.Status, cmd.Actor, cmd.Reason)
@@ -99,4 +112,31 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	return Result(updated), nil
+}
+
+// ensureRules aplica las reglas 4, 5 y 10. La 4 solo vale desde planning; la 5,
+// desde cualquier origen.
+func (h *Handler) ensureRules(ctx context.Context, from domain.Status, s domain.Stage) error {
+	if s.Status != domain.StatusStopped && s.Status != domain.StatusCancelled {
+		frozen, err := h.projects.IsFrozen(ctx, s.ProjectID)
+		if err != nil {
+			return err
+		}
+		if frozen {
+			return domain.ErrStageProjectFrozen
+		}
+	}
+	if s.Status == domain.StatusInDev {
+		accepts, err := h.projects.AcceptsWork(ctx, s.ProjectID)
+		if err != nil {
+			return err
+		}
+		if !accepts {
+			return domain.ErrStageProjectNotStarted
+		}
+	}
+	if from == domain.StatusPlanning && s.Status == domain.StatusStandBy {
+		return h.tasks.EnsureReleasable(ctx, s.ID)
+	}
+	return nil
 }

@@ -186,7 +186,7 @@ paths:
           format: uuid
     put:
       summary: Cambia el status de una tarea
-      description: Solo admite las transiciones permitidas. No depende del status del proyecto ni de la etapa, no escribe en task_changes y devuelve la última versión de la tarea. Deja un registro inmutable en el historial de status. Aún no hay reglas por perfil.
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No escribe en task_changes y devuelve la última versión de la tarea. Deja un registro inmutable en el historial de status.
       requestBody:
         required: true
         content:

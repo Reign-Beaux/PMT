@@ -88,6 +88,7 @@ paths:
           format: uuid
     put:
       summary: Cambia el status de un proyecto
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Depende de las etapas; planning → stand_by exige al menos una etapa activa y ninguna en planning; stand_by → in_dev, al menos una en stand_by; llegar a working, al menos una en done y las demás en done o cancelled, salvo al reanudar desde stopped un proyecto que ya estuvo en working.
       requestBody:
         required: true
         content:

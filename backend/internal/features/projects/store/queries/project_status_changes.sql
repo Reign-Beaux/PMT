@@ -6,3 +6,9 @@ VALUES ($1, $2, $3, $4, $5, $6, $7);
 SELECT * FROM project_status_changes
 WHERE project_id = $1
 ORDER BY changed_at, id;
+
+-- name: HasReachedProjectStatus :one
+SELECT EXISTS (
+    SELECT 1 FROM project_status_changes
+    WHERE project_id = $1 AND to_status = $2
+);

@@ -11,7 +11,7 @@ import (
 	"pmt/internal/kernel"
 )
 
-type failingStages struct{}
+type failingStages struct{ fakeStages }
 
 func (failingStages) Team(context.Context, uuid.UUID) (kernel.Team, error) {
 	return kernel.Team{}, errors.New("no debió consultar el equipo")

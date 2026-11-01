@@ -77,7 +77,7 @@ paths:
           format: uuid
     put:
       summary: Cambia el status de un bug
-      description: Solo admite las transiciones permitidas. No depende del status del proyecto y devuelve el bug completo. Deja un registro inmutable en el historial de status. Aún no hay reglas por perfil.
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Exige el proyecto en working y devuelve el bug completo. Deja un registro inmutable en el historial de status.
       requestBody:
         required: true
         content:

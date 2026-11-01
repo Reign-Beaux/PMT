@@ -19,7 +19,7 @@ func connect(t *testing.T, repo Repository, tasks TaskChecker) *sdk.ClientSessio
 	ctx := context.Background()
 	server := platformmcp.NewServer()
 	platformmcp.ActAs(server, actorFor(domain.StatusInDev))
-	New(repo, tasks).RegisterTool(server)
+	New(repo, tasks, workingProject).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverTransport, nil); err != nil {

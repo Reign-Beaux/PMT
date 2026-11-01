@@ -34,6 +34,7 @@ project:
 - `name` o `title` y `description` son obligatorios y no pueden estar vacíos en los tres niveles.
 - `stages` y `tasks` pueden faltar o ser listas vacías.
 - No hay campos de status ni de versión: el proyecto y las etapas nacen en `planning`, las tareas en `backlog` y `product_version` vacía.
+- Lo importado nace sin TL, sin equipo y sin dueño: recibe TL con `assign_stage_lead` y cumple las reglas entre status al liberarse.
 - Una clave desconocida es un error, para detectar erratas.
 
 ## Cómo escribir los textos

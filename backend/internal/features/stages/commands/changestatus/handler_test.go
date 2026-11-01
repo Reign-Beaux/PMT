@@ -59,9 +59,11 @@ func (r *fakeRepo) LeavePlanning(_ context.Context, s domain.Stage, change domai
 // fakeTasks responde como si la etapa tuviera tareas en ese estado. Una etapa
 // sin tareas responde true, igual que una con todas terminadas.
 type fakeTasks struct {
-	allDone bool
-	err     error
-	calls   int
+	allDone    bool
+	err        error
+	calls      int
+	releasable error
+	checks     int
 }
 
 func (f *fakeTasks) AllDone(context.Context, uuid.UUID) (bool, error) {
@@ -69,11 +71,16 @@ func (f *fakeTasks) AllDone(context.Context, uuid.UUID) (bool, error) {
 	return f.allDone, f.err
 }
 
+func (f *fakeTasks) EnsureReleasable(context.Context, uuid.UUID) error {
+	f.checks++
+	return f.releasable
+}
+
 func TestHandleChangesStatus(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusPlanning)
 	tasks := &fakeTasks{}
 
-	result, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
+	result, err := New(repo, tasks, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +109,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 			repo, id := newRepoWith(t, domain.StatusPlanning)
 			tasks := &fakeTasks{allDone: true}
 
-			_, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
+			_, err := New(repo, tasks, workingProject).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -120,7 +127,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 func TestHandleMissingStage(t *testing.T) {
 	repo, _ := newRepoWith(t, domain.StatusPlanning)
 
-	_, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
+	_, err := New(repo, &fakeTasks{}, workingProject).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
 
 	if !errors.Is(err, domain.ErrStageNotFound) {
 		t.Fatalf("err = %v", err)
@@ -131,7 +138,7 @@ func TestHandleClosesStageWhenAllTasksDone(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusInDev)
 	tasks := &fakeTasks{allDone: true}
 
-	result, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
+	result, err := New(repo, tasks, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +151,7 @@ func TestHandleClosesStageWhenAllTasksDone(t *testing.T) {
 func TestHandleKeepsStageOpenWithPendingTasks(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusInDev)
 
-	_, err := New(repo, &fakeTasks{allDone: false}).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
+	_, err := New(repo, &fakeTasks{allDone: false}, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
 
 	if !errors.Is(err, domain.ErrStageTasksPending) {
 		t.Fatalf("err = %v", err)
@@ -158,7 +165,7 @@ func TestHandleKeepsStageOpenWhenCheckFails(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusInDev)
 	failure := errors.New("fallo de lectura")
 
-	_, err := New(repo, &fakeTasks{allDone: true, err: failure}).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
+	_, err := New(repo, &fakeTasks{allDone: true, err: failure}, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
 
 	if !errors.Is(err, failure) {
 		t.Fatalf("err = %v", err)
@@ -172,7 +179,7 @@ func TestHandleReopenDoesNotCheckTasks(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusDone)
 	tasks := &fakeTasks{allDone: false}
 
-	result, err := New(repo, tasks).Handle(context.Background(), Command{ID: id, Status: domain.StatusInDev, Actor: actorFor(domain.StatusInDev), Reason: "motivo"})
+	result, err := New(repo, tasks, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusInDev, Actor: actorFor(domain.StatusInDev), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +214,7 @@ func TestREST(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t, tt.from)
 			mux := http.NewServeMux()
-			New(repo, &fakeTasks{allDone: tt.allDone}).Register(mux)
+			New(repo, &fakeTasks{allDone: tt.allDone}, workingProject).Register(mux)
 			rec := httptest.NewRecorder()
 
 			req := httptest.NewRequest(http.MethodPut, "/api/stages/"+tt.id(id)+"/status", strings.NewReader(tt.body))
@@ -223,7 +230,7 @@ func TestREST(t *testing.T) {
 func TestRESTReturnsWholeStage(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusPlanning)
 	mux := http.NewServeMux()
-	New(repo, &fakeTasks{}).Register(mux)
+	New(repo, &fakeTasks{}, workingProject).Register(mux)
 	rec := httptest.NewRecorder()
 
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`)))
@@ -252,7 +259,7 @@ func TestHandleWritesAddWhenLeavingOwnPlanning(t *testing.T) {
 			s.Name = "Cobros"
 			repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
 
-			result, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: s.ID, Status: status, Actor: actorFor(status), Reason: "motivo"})
+			result, err := New(repo, &fakeTasks{}, workingProject).Handle(context.Background(), Command{ID: s.ID, Status: status, Actor: actorFor(status), Reason: "motivo"})
 
 			if err != nil {
 				t.Fatal(err)
@@ -277,7 +284,7 @@ func TestHandleDoesNotReopenOwnPlanning(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
-	handler := New(repo, &fakeTasks{})
+	handler := New(repo, &fakeTasks{}, workingProject)
 
 	if _, err := handler.Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"}); err != nil {
 		t.Fatal(err)
@@ -295,7 +302,7 @@ func TestHandleDoesNotReopenOwnPlanning(t *testing.T) {
 func TestHandleDoesNotWriteAddForOtherStages(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusPlanning)
 
-	if _, err := New(repo, &fakeTasks{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"}); err != nil {
+	if _, err := New(repo, &fakeTasks{}, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(repo.changes) != 0 {

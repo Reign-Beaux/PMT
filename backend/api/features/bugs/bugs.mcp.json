@@ -162,7 +162,7 @@
     }
   },
   {
-    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. No depende del status del proyecto. Usa list_bugs para obtener el ID del bug y su status actual.",
+    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Usa list_bugs para obtener el ID del bug y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

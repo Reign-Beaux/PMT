@@ -17,6 +17,12 @@ type Repository interface {
 	ChangeStatus(ctx context.Context, b domain.Bug, change domain.StatusChange) (domain.Bug, error)
 }
 
+// ProjectChecker confirma que un proyecto está en working. Lo implementa la
+// feature projects, conectada en app.
+type ProjectChecker interface {
+	EnsureWorking(ctx context.Context, projectID uuid.UUID) error
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID     uuid.UUID     `json:"-"`
@@ -40,15 +46,16 @@ type Result struct {
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo     Repository
+	projects ProjectChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, projects ProjectChecker) *Handler {
+	return &Handler{repo: repo, projects: projects}
 }
 
-// Handle cambia el status del bug.
+// Handle cambia el status del bug. Exige el proyecto en working (regla 15).
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	bug, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -56,6 +63,9 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	}
 	from := bug.Status
 	if err := bug.ChangeStatus(cmd.Status, cmd.Actor, cmd.Reason); err != nil {
+		return Result{}, err
+	}
+	if err := h.projects.EnsureWorking(ctx, bug.ProjectID); err != nil {
 		return Result{}, err
 	}
 

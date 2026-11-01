@@ -73,6 +73,19 @@ func (s *StatusChanges) ListStatusChanges(ctx context.Context, id uuid.UUID) ([]
 	return changes, nil
 }
 
+// HasReachedWorking indica si el historial registra una llegada a working. Lo
+// anterior a la fase 1 no tiene registros, así que cuenta como que nunca llegó.
+func (s *StatusChanges) HasReachedWorking(ctx context.Context, id uuid.UUID) (bool, error) {
+	reached, err := sqlcgen.New(s.db).HasReachedProjectStatus(ctx, sqlcgen.HasReachedProjectStatusParams{
+		ProjectID: id,
+		ToStatus:  string(domain.StatusWorking),
+	})
+	if err != nil {
+		return false, fmt.Errorf("consultar historial de status: %w", err)
+	}
+	return reached, nil
+}
+
 // ensureStatus bloquea la fila y comprueba que su status siga siendo el de origen.
 func ensureStatus(ctx context.Context, queries *sqlcgen.Queries, change domain.StatusChange) error {
 	row, err := queries.LockProject(ctx, change.ProjectID)

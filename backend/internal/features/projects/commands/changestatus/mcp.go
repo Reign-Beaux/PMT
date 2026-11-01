@@ -32,7 +32,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_project_status",
-		Description: "Cambia el status de un proyecto de PMT. Deja un registro inmutable, consultable con list_project_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Usa list_projects para obtener el ID del proyecto y su status actual.",
+		Description: "Cambia el status de un proyecto de PMT. Deja un registro inmutable, consultable con list_project_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende de las etapas: planning → stand_by exige al menos una etapa activa y ninguna en planning; stand_by → in_dev, al menos una en stand_by; llegar a working, al menos una en done y las demás en done o cancelled, salvo al reanudar desde stopped un proyecto que ya estuvo en working. Usa list_projects para obtener el ID del proyecto y su status actual.",
 	}, h.callTool)
 }
 

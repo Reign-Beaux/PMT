@@ -58,6 +58,16 @@ func (p Project) IsWorking() bool {
 	return p.Status == StatusWorking
 }
 
+// AcceptsWork indica si sus etapas y tareas pueden avanzar.
+func (p Project) AcceptsWork() bool {
+	return p.Status == StatusInDev || p.Status == StatusWorking
+}
+
+// IsFrozen indica si el proyecto congela sus etapas y tareas.
+func (p Project) IsFrozen() bool {
+	return p.Status == StatusStopped || p.Status == StatusCancelled
+}
+
 // Update cambia los datos editables del proyecto. Fuera de planning, la versión
 // de producto debe ser la actual.
 func (p *Project) Update(name, description, productVersion string) error {

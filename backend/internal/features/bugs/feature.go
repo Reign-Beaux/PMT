@@ -31,7 +31,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects creat
 	changeStatus := changestatus.New(struct {
 		*store.Bugs
 		*store.StatusChanges
-	}{repo, statusChanges})
+	}{repo, statusChanges}, projects)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 

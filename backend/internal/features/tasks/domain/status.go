@@ -7,6 +7,8 @@ var (
 	ErrTaskStatusInvalid = kernel.Invalid("status desconocido: usa backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done o cancelled")
 	// ErrTaskStatusTransition indica que el status actual no permite pasar al pedido.
 	ErrTaskStatusTransition = kernel.Conflict("transición de status no permitida")
+	// ErrStageNoActiveTasks aplica la regla 4: no se libera una etapa sin trabajo.
+	ErrStageNoActiveTasks = kernel.Conflict("la etapa no tiene tareas activas")
 )
 
 // statusTransitions indica a qué estados puede pasar cada estado.
@@ -26,6 +28,12 @@ var statusTransitions = map[Status][]Status{
 func IsKnownStatus(status Status) bool {
 	_, known := statusTransitions[status]
 	return known
+}
+
+// IsCancelOrReopen indica si la transición cancela o reabre la tarea en lugar de
+// hacerla avanzar. Cada caso sigue sus propias reglas entre status.
+func IsCancelOrReopen(from, to Status) bool {
+	return to == StatusCancelled || from == StatusCancelled
 }
 
 // ChangeStatus pasa la tarea a otro estado si la transición está permitida y

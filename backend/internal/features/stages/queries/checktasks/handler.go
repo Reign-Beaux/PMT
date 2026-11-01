@@ -20,6 +20,8 @@ type Reader interface {
 type ProjectChecker interface {
 	EnsurePlanning(ctx context.Context, projectID uuid.UUID) error
 	EnsureWorking(ctx context.Context, projectID uuid.UUID) error
+	AcceptsWork(ctx context.Context, projectID uuid.UUID) (bool, error)
+	IsFrozen(ctx context.Context, projectID uuid.UUID) (bool, error)
 }
 
 // Handler ejecuta la operación.
@@ -63,4 +65,44 @@ func (h *Handler) EnsureHistoryRule(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	return s.EnsureHistoryRule()
+}
+
+// EnsureWorkOpen aplica las reglas 1, 7, 8 y 9: una tarea solo avanza con el
+// proyecto en in_dev o working y la etapa en in_dev.
+func (h *Handler) EnsureWorkOpen(ctx context.Context, id uuid.UUID) error {
+	s, err := h.reader.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	accepts, err := h.projects.AcceptsWork(ctx, s.ProjectID)
+	if err != nil {
+		return err
+	}
+	if !accepts {
+		return domain.ErrWorkProjectClosed
+	}
+	if s.Status != domain.StatusInDev {
+		return domain.ErrWorkStageClosed
+	}
+	return nil
+}
+
+// EnsureTaskCancellable aplica las reglas 2, 3, 8 y 9 a cancelar y reabrir una
+// tarea. Con la etapa detenida sí se puede.
+func (h *Handler) EnsureTaskCancellable(ctx context.Context, id uuid.UUID) error {
+	s, err := h.reader.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	frozen, err := h.projects.IsFrozen(ctx, s.ProjectID)
+	if err != nil {
+		return err
+	}
+	if frozen {
+		return domain.ErrTasksFrozenByProject
+	}
+	if s.Status == domain.StatusDone || s.Status == domain.StatusCancelled {
+		return domain.ErrTasksFrozenByStage
+	}
+	return nil
 }

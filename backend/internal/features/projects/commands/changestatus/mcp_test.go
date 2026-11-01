@@ -19,7 +19,7 @@ func connect(t *testing.T, repo Repository) *sdk.ClientSession {
 	ctx := context.Background()
 	server := platformmcp.NewServer()
 	platformmcp.ActAs(server, actorFor(""))
-	New(repo).RegisterTool(server)
+	New(repo, &fakeStages{}).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverTransport, nil); err != nil {

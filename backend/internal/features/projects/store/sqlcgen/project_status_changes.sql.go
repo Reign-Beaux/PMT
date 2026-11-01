@@ -39,6 +39,25 @@ func (q *Queries) CreateProjectStatusChange(ctx context.Context, arg CreateProje
 	return err
 }
 
+const hasReachedProjectStatus = `-- name: HasReachedProjectStatus :one
+SELECT EXISTS (
+    SELECT 1 FROM project_status_changes
+    WHERE project_id = $1 AND to_status = $2
+)
+`
+
+type HasReachedProjectStatusParams struct {
+	ProjectID uuid.UUID
+	ToStatus  string
+}
+
+func (q *Queries) HasReachedProjectStatus(ctx context.Context, arg HasReachedProjectStatusParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasReachedProjectStatus, arg.ProjectID, arg.ToStatus)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listProjectStatusChanges = `-- name: ListProjectStatusChanges :many
 SELECT id, project_id, from_status, to_status, actor_name, actor_profile, reason, changed_at FROM project_status_changes
 WHERE project_id = $1

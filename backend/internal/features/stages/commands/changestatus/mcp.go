@@ -36,7 +36,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_stage_status",
-		Description: "Cambia el status de una etapa de PMT. Deja un registro inmutable, consultable con list_stage_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Una etapa solo pasa a done si todas sus tareas están en done. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Usa list_stages para obtener el ID de la etapa y su status actual.",
+		Description: "Cambia el status de una etapa de PMT. Deja un registro inmutable, consultable con list_stage_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende del proyecto y de las tareas: con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working, y planning → stand_by, al menos una tarea activa. Una etapa solo pasa a done si todas sus tareas están en done. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Usa list_stages para obtener el ID de la etapa y su status actual.",
 	}, h.callTool)
 }
 

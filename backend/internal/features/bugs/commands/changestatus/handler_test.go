@@ -51,7 +51,7 @@ func (r *fakeRepo) ChangeStatus(_ context.Context, bug domain.Bug, change domain
 func TestHandleChangesStatus(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusReported)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusConfirmed, Actor: actorFor(domain.StatusConfirmed), Reason: "motivo"})
+	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusConfirmed, Actor: actorFor(domain.StatusConfirmed), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t, domain.StatusReported)
 
-			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
+			_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -94,7 +94,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 func TestHandleNotFound(t *testing.T) {
 	repo, _ := newRepoWith(t, domain.StatusReported)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusConfirmed, Actor: actorFor(domain.StatusConfirmed), Reason: "motivo"})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusConfirmed, Actor: actorFor(domain.StatusConfirmed), Reason: "motivo"})
 
 	if !errors.Is(err, domain.ErrBugNotFound) {
 		t.Fatalf("err = %v", err)
@@ -124,7 +124,7 @@ func TestRest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t, tt.from)
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, fakeProjects{}).Register(mux)
 
 			req := httptest.NewRequest(http.MethodPut, tt.path(id), strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()

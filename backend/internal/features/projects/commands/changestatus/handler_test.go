@@ -18,6 +18,7 @@ type fakeRepo struct {
 	projects map[uuid.UUID]domain.Project
 	updates  int
 	recorded []domain.StatusChange
+	reached  bool
 }
 
 func newRepoWith(t *testing.T) (*fakeRepo, uuid.UUID) {
@@ -44,10 +45,35 @@ func (r *fakeRepo) ChangeStatus(_ context.Context, p domain.Project, change doma
 	return p, nil
 }
 
+func (r *fakeRepo) HasReachedWorking(context.Context, uuid.UUID) (bool, error) {
+	return r.reached, nil
+}
+
+// fakeStages responde como un proyecto con esas etapas y cuenta las consultas.
+type fakeStages struct {
+	releasable, startable, closed error
+	calls                         int
+}
+
+func (s *fakeStages) EnsureReleasable(context.Context, uuid.UUID) error {
+	s.calls++
+	return s.releasable
+}
+
+func (s *fakeStages) EnsureStartable(context.Context, uuid.UUID) error {
+	s.calls++
+	return s.startable
+}
+
+func (s *fakeStages) EnsureClosed(context.Context, uuid.UUID) error {
+	s.calls++
+	return s.closed
+}
+
 func TestHandleChangesStatus(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
+	result, err := New(repo, &fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +98,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t)
 
-			_, err := New(repo).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
+			_, err := New(repo, &fakeStages{}).Handle(context.Background(), Command{ID: id, Status: tt.status, Actor: actorFor(tt.status), Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)
@@ -87,7 +113,7 @@ func TestHandleRejectedStatusIsNotSaved(t *testing.T) {
 func TestHandleMissingProject(t *testing.T) {
 	repo, _ := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
+	_, err := New(repo, &fakeStages{}).Handle(context.Background(), Command{ID: uuid.New(), Status: domain.StatusStandBy, Actor: actorFor(domain.StatusStandBy), Reason: "motivo"})
 
 	if !errors.Is(err, domain.ErrProjectNotFound) {
 		t.Fatalf("err = %v", err)
@@ -115,7 +141,7 @@ func TestREST(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, id := newRepoWith(t)
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, &fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+tt.id(id)+"/status", strings.NewReader(tt.body)))
@@ -133,7 +159,7 @@ func TestRESTReturnsWholeProject(t *testing.T) {
 	p.ProductVersion = "1.0.0"
 	repo.projects[id] = p
 	mux := http.NewServeMux()
-	New(repo).Register(mux)
+	New(repo, &fakeStages{}).Register(mux)
 	rec := httptest.NewRecorder()
 
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`)))
