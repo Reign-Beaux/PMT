@@ -634,7 +634,7 @@ QAP diseña y versiona un plan de pruebas por etapa, el TL lo aprueba y QA lo ej
 
 ## Eventos
 
-PMT no tiene bus de eventos ni envía avisos. Sus comandos solo afectan la base de datos. Los agentes se avisan entre sí con hooks de herdr, fuera de PMT.
+PMT no tiene bus de eventos ni envía avisos. Sus comandos solo afectan la base de datos. Los agentes se avisan entre sí con avisos de herdr, fuera de PMT.
 
 ## Ejemplo: QA aprueba una tarea
 

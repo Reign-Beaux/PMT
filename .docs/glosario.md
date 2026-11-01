@@ -46,6 +46,8 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Casos de error** | `ErrorCases` | Casos de un plan QAP en los que algo debe rechazarse o fallar. Obligatorios para enviarlo. |
 | **Correcciones** | `ReviewNotes` | Lo que el TL pide cambiar al devolver un plan QAP. Son obligatorias al devolver, siguen visibles al revisar y aprobar las limpia. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y se comunica con PMT por MCP. |
+| **Aviso** | | Mensaje que se envía a un agente con `herdr agent prompt`. Es la única forma en que los agentes se comunican. No se guarda en PMT: lo que deba quedar registrado va en PMT. |
+| **Vigía** | | Observa a los agentes con herramientas de herdr y da aviso a PC si todos llevan un rato quietos. Queda fuera de PMT. |
 | **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DevFrontend, DevBackend, CR, QAP o QA. |
 | **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. Lo resuelve el servidor a partir del token. |
 | **Token** | | Credencial de un agente o del usuario. Determina su `Actor`. PMT solo guarda su hash. |

@@ -13,7 +13,7 @@ La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFro
 | **QAP** | Quality Assurance Planning | Diseña y versiona planes de pruebas para casos que combinan cambios de frontend y backend. Vincula tareas, define casos de prueba y envía el plan al TL para su aprobación. |
 | **QA** | Quality Assurance | Verifica el funcionamiento mediante pruebas y evidencias. Ejecuta planes aprobados, comprueba persistencia y realiza exploración y regresión cuando corresponde. Registra hallazgos, solicita correcciones y aprueba QA; después queda pendiente el cierre del TL. |
 
-El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP y PC, y no aprueba por CR, QA ni TL. PC solo detiene y reanuda etapas y proyectos.
+El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP y PC, y no aprueba por CR, QA ni TL. En los status, PC solo detiene y reanuda etapas y proyectos.
 
 ## Flujo por perfil
 
@@ -26,7 +26,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | 5 | Dev | a `in_review` | Entrega |
 | 6 | CR | a `in_qa`, `changes_requested` o, con motivo, `pending_close` | Aprueba, pide corrección o cierra su parte en un cambio interno |
 | 7 | Dev | de `changes_requested` a `in_dev` | Corrige y vuelve a entregar |
-| 8 | QA | a `pending_close` o `changes_requested` | Aprueba o pide corrección |
+| 8 | QA | a `pending_close`, con evidencia en el motivo, o `changes_requested` | Aprueba o pide corrección |
 | 9 | TL | a `done`, o con motivo a `in_review` o `in_qa` | Cierra o devuelve |
 | 10 | TL | `change_stage_status` a `done` | Cierra la etapa; con la última de la versión 1, el proyecto pasa solo a `working`. Cancelar la última abierta, potestad de PP o `User`, o retirarla, tiene el mismo efecto si otra quedó en `done` |
 
@@ -38,9 +38,32 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 **Criterio de QA:** aplica cuando el cambio altera algo observable desde fuera: pantalla, respuesta MCP o API, resultado de un worker o datos guardados. No aplica si es interno y el comportamiento sigue igual: refactor, limpieza o renombre.
 
-**Cómo prueba QA:** con plan, Playwright headless; en MCP, ejecuta el comando; en un worker, registro falso funcional. Siempre verifica la integridad en la base de datos. Una falla bloqueante se devuelve de inmediato; las no bloqueantes, juntas al terminar. El script de Playwright se guarda en el repositorio del proyecto probado.
+**Cómo prueba QA:** con plan, Playwright headless; en MCP, ejecuta el comando; en un worker, registro falso funcional. Siempre verifica la integridad en la base de datos con `psql`, que viene en el contenedor de PostgreSQL, sin instalar nada ni escribir scripts temporales: `docker exec postgresql psql -U <usuario> -d <base> -c "<consulta>"`. Una falla bloqueante se devuelve de inmediato; las no bloqueantes, juntas al terminar. El script de Playwright se guarda en el repositorio del proyecto probado.
 
-**Comunicación entre agentes:** se avisan con hooks de herdr, fuera de PMT. Los comandos de PMT solo afectan la base de datos; PMT no envía avisos ni notificaciones.
+**Comunicación entre agentes:** se comunican con avisos de herdr, fuera de PMT. Los comandos de PMT solo afectan la base de datos; PMT no envía avisos ni notificaciones. Un aviso no se guarda: lo que deba quedar registrado va en PMT.
+
+**Herramientas de PMT:** un agente carga el esquema de una herramienta antes de llamarla por primera vez, y copia los ID de la salida de PMT, sin escribirlos de memoria.
+
+## Coordinación paso a paso
+
+Completa la tabla del flujo con quién actúa y cuándo.
+
+1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen, e incluye la preparación de lo que usarán las pruebas, como Vitest o Playwright. Si falta algo al planear, lo incluye el TL. Nadie lo instala a mitad de una prueba.
+2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas, en orden de posición.
+3. **Iniciar la etapa:** el TL inicia la primera sin esperar otra orden. Si la etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
+4. **Tomar tareas:** al entregar una tarea, el dev toma la siguiente en `ready` de su etapa que no dependa de otra abierta.
+5. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL da aviso a QAP si toca frontend; si no, a QA.
+6. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. Desde la fase 2, PMT exige ese motivo.
+7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready` y da aviso al dev, porque ese cierre puede destrabar una tarea cuando el turno del dev ya terminó.
+8. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar. Después inicia la siguiente etapa, desde el paso 3.
+
+**En todo momento:**
+
+- **Registro:** desde la fase 3, el TL registra con `add_comment` la decisión del paso 5 y las demás que no sean una transición, y PC los bloqueos. No se copian los avisos.
+- **Avance:** PC revisa `list_stages` y `list_tasks` de cada etapa, nunca solo proyecto y etapas. Desde la fase 1 usa `get_project_progress`.
+- **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y da aviso a quien le toque seguir, o informa al usuario si nadie puede seguir.
+- **Detener:** el usuario o PC pueden detener una etapa o el proyecto en cualquier paso.
+- **Limpieza:** quien levanta un proceso lo baja.
 
 Los perfiles definen responsabilidades; el modelo de IA se configura por separado para cada agente.
 
