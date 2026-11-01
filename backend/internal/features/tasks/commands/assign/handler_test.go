@@ -84,7 +84,7 @@ func TestHandle(t *testing.T) {
 }
 
 func TestREST(t *testing.T) {
-	repo := &fakeRepo{task: domain.Task{ID: uuid.New(), Status: domain.StatusInProgress}}
+	repo := &fakeRepo{task: domain.Task{ID: uuid.New(), Status: domain.StatusInDev}}
 	mux := http.NewServeMux()
 	New(repo, fakeStages{}, fakeAgents{}).Register(mux)
 	req := httptest.NewRequest(http.MethodPut, "/api/tasks/"+repo.task.ID.String()+"/assignee", strings.NewReader(`{"agent":"dev"}`))

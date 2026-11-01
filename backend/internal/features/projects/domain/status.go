@@ -31,14 +31,35 @@ const (
 	StatusCancelled Status = "cancelled"
 )
 
-// statusTransitions indica a qué estados puede pasar cada estado.
+// statusTransitions indica a qué estados puede pasar cada estado. in_dev → working
+// no está: solo ocurre al cerrar la versión 1, con CloseVersionOne.
 var statusTransitions = map[Status][]Status{
 	StatusPlanning:  {StatusStandBy, StatusStopped, StatusCancelled},
 	StatusStandBy:   {StatusPlanning, StatusInDev, StatusStopped, StatusCancelled},
-	StatusInDev:     {StatusWorking, StatusStopped, StatusCancelled},
+	StatusInDev:     {StatusStopped, StatusCancelled},
 	StatusWorking:   {StatusStopped, StatusCancelled},
 	StatusStopped:   {StatusPlanning, StatusStandBy, StatusInDev, StatusWorking, StatusCancelled},
 	StatusCancelled: {StatusPlanning},
+}
+
+// StartWork aplica la decisión 2: tomar la primera etapa saca al proyecto de
+// stand_by. Es automático, sin tabla de perfiles, e indica si el status cambió.
+func (p *Project) StartWork() bool {
+	if p.Status != StatusStandBy {
+		return false
+	}
+	p.Status = StatusInDev
+	return true
+}
+
+// CloseVersionOne aplica la decisión 3: terminar la versión 1 lleva al proyecto de
+// in_dev a working. Es automático, sin tabla de perfiles, e indica si el status cambió.
+func (p *Project) CloseVersionOne() bool {
+	if p.Status != StatusInDev {
+		return false
+	}
+	p.Status = StatusWorking
+	return true
 }
 
 // ChangeStatus pasa el proyecto a otro estado si la transición está permitida.

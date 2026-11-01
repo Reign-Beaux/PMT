@@ -271,6 +271,49 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListSt
 	return items, nil
 }
 
+const listVersionOneStages = `-- name: ListVersionOneStages :many
+SELECT s.id, s.project_id, s.name, s.description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead FROM stages s
+WHERE s.project_id = $1 AND s.retired_at IS NULL AND s.add_reason IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM stage_changes c
+      WHERE c.stage_id = s.id AND c.kind = 'add'
+  )
+ORDER BY s.position
+`
+
+func (q *Queries) ListVersionOneStages(ctx context.Context, projectID uuid.UUID) ([]Stage, error) {
+	rows, err := q.db.Query(ctx, listVersionOneStages, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Stage{}
+	for rows.Next() {
+		var i Stage
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Description,
+			&i.Position,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Status,
+			&i.RetiredAt,
+			&i.AddReason,
+			&i.AddRequestedBy,
+			&i.Lead,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockStage = `-- name: LockStage :one
 SELECT id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead FROM stages
 WHERE id = $1 AND retired_at IS NULL

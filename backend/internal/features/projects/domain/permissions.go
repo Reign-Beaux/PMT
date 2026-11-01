@@ -15,7 +15,7 @@ var (
 var statusProfiles = map[Status]map[Status][]kernel.Profile{
 	StatusPlanning:  {StatusStandBy: planners, StatusStopped: stoppers, StatusCancelled: planners},
 	StatusStandBy:   {StatusPlanning: planners, StatusInDev: planners, StatusStopped: stoppers, StatusCancelled: planners},
-	StatusInDev:     {StatusWorking: planners, StatusStopped: stoppers, StatusCancelled: planners},
+	StatusInDev:     {StatusStopped: stoppers, StatusCancelled: planners},
 	StatusWorking:   {StatusStopped: stoppers, StatusCancelled: planners},
 	StatusStopped:   {StatusPlanning: stoppers, StatusStandBy: stoppers, StatusInDev: stoppers, StatusWorking: stoppers, StatusCancelled: planners},
 	StatusCancelled: {StatusPlanning: planners},

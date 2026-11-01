@@ -1,4 +1,4 @@
-// Package checkdone consulta si todas las tareas de una etapa están terminadas.
+// Package checkdone hace el recuento de las tareas de una etapa para cerrarla.
 package checkdone
 
 import (
@@ -9,7 +9,7 @@ import (
 	"pmt/internal/features/tasks/domain"
 )
 
-// Reader es la lectura que necesita la operación.
+// Reader es la lectura que necesita la operación. No devuelve lo retirado.
 type Reader interface {
 	List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, error)
 }
@@ -24,18 +24,23 @@ func New(reader Reader) *Handler {
 	return &Handler{reader: reader}
 }
 
-// Handle indica si todas las tareas de la etapa están en done. Una etapa sin
-// tareas cumple la condición.
-func (h *Handler) Handle(ctx context.Context, stageID uuid.UUID) (bool, error) {
+// Handle cuenta las tareas terminadas y las pendientes de la etapa. Una cancelada
+// no cuenta, igual que una retirada.
+func (h *Handler) Handle(ctx context.Context, stageID uuid.UUID) (domain.Closure, error) {
 	tasks, err := h.reader.List(ctx, stageID)
 	if err != nil {
-		return false, err
+		return domain.Closure{}, err
 	}
 
+	var closure domain.Closure
 	for _, t := range tasks {
-		if t.Status != domain.StatusDone {
-			return false, nil
+		switch t.Status {
+		case domain.StatusDone:
+			closure.Done++
+		case domain.StatusCancelled:
+		default:
+			closure.Pending++
 		}
 	}
-	return true, nil
+	return closure, nil
 }

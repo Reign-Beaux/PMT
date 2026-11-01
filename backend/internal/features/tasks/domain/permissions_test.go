@@ -50,16 +50,26 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		reason string
 		want   error
 	}{
+		{"CR pasa a cierre con motivo", Task{Status: StatusInReview}, StatusPendingClose, cr, "interno", nil},
+		{"CR a cierre sin motivo", Task{Status: StatusInReview}, StatusPendingClose, cr, "  ", kernel.ErrReasonRequired},
+		{"TL devuelve a CR", Task{Status: StatusPendingClose}, StatusInReview, tl, "falta", nil},
+		{"TL devuelve a QA", Task{Status: StatusPendingClose}, StatusInQA, tl, "falta", nil},
+		{"devolver sin motivo", Task{Status: StatusPendingClose}, StatusInQA, tl, "", kernel.ErrReasonRequired},
+		{"otro TL no devuelve", Task{Status: StatusPendingClose}, StatusInQA, otherTL, "falta", kernel.ErrNotStageLead},
+		{"QA no devuelve por TL", Task{Status: StatusPendingClose}, StatusInReview, qa, "falta", kernel.ErrTransitionForbidden},
+		{"sin devolución a correcciones", Task{Status: StatusPendingClose}, StatusChangesRequested, tl, "falta", ErrTaskStatusTransition},
+		{"corrección vuelve a in_dev", Task{Status: StatusChangesRequested, Assignee: "dev"}, StatusInDev, dev, "", nil},
+		{"sin atajo a in_review", Task{Status: StatusChangesRequested, Assignee: "dev"}, StatusInReview, dev, "", ErrTaskStatusTransition},
 		{"TL libera", Task{Status: StatusBacklog}, StatusReady, tl, "", nil},
 		{"TL ajeno no libera", Task{Status: StatusBacklog}, StatusReady, otherTL, "", kernel.ErrNotStageLead},
 		{"PP no libera", Task{Status: StatusBacklog}, StatusReady, pp, "", kernel.ErrTransitionForbidden},
-		{"dev toma", Task{Status: StatusReady}, StatusInProgress, dev, "", nil},
-		{"frontend toma", Task{Status: StatusReady}, StatusInProgress, front, "", nil},
-		{"dev ajeno no toma", Task{Status: StatusReady}, StatusInProgress, otherDev, "", ErrNotStageMember},
-		{"CR no toma", Task{Status: StatusReady}, StatusInProgress, cr, "", kernel.ErrTransitionForbidden},
-		{"dueño entrega", Task{Status: StatusInProgress, Assignee: "dev"}, StatusInReview, dev, "", nil},
-		{"otro dev no entrega", Task{Status: StatusInProgress, Assignee: "dev"}, StatusInReview, otherDev, "", ErrNotAssignee},
-		{"sin dueño no se entrega", Task{Status: StatusInProgress}, StatusInReview, dev, "", ErrNotAssignee},
+		{"dev toma", Task{Status: StatusReady}, StatusInDev, dev, "", nil},
+		{"frontend toma", Task{Status: StatusReady}, StatusInDev, front, "", nil},
+		{"dev ajeno no toma", Task{Status: StatusReady}, StatusInDev, otherDev, "", ErrNotStageMember},
+		{"CR no toma", Task{Status: StatusReady}, StatusInDev, cr, "", kernel.ErrTransitionForbidden},
+		{"dueño entrega", Task{Status: StatusInDev, Assignee: "dev"}, StatusInReview, dev, "", nil},
+		{"otro dev no entrega", Task{Status: StatusInDev, Assignee: "dev"}, StatusInReview, otherDev, "", ErrNotAssignee},
+		{"sin dueño no se entrega", Task{Status: StatusInDev}, StatusInReview, dev, "", ErrNotAssignee},
 		{"CR aprueba", Task{Status: StatusInReview}, StatusInQA, cr, "", nil},
 		{"QA no hace de CR", Task{Status: StatusInReview}, StatusInQA, qa, "", kernel.ErrTransitionForbidden},
 		{"QA aprueba", Task{Status: StatusInQA}, StatusPendingClose, qa, "", nil},
@@ -94,7 +104,7 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 func TestChangeStatusTracksAssignee(t *testing.T) {
 	dev := kernel.Actor{Name: "dev", Profile: kernel.ProfileDevBackend}
 	task := Task{Status: StatusReady}
-	if err := task.ChangeStatus(StatusInProgress, dev, "", kernel.Team{Members: []string{"dev"}}); err != nil {
+	if err := task.ChangeStatus(StatusInDev, dev, "", kernel.Team{Members: []string{"dev"}}); err != nil {
 		t.Fatal(err)
 	}
 	if task.Assignee != "dev" {
@@ -111,7 +121,7 @@ func TestChangeStatusTracksAssignee(t *testing.T) {
 }
 
 func TestAssign(t *testing.T) {
-	for _, status := range []Status{StatusInProgress, StatusInReview, StatusChangesRequested, StatusInQA, StatusPendingClose} {
+	for _, status := range []Status{StatusInDev, StatusInReview, StatusChangesRequested, StatusInQA, StatusPendingClose} {
 		task := Task{Status: status}
 		if err := task.Assign("dev"); err != nil || task.Assignee != "dev" {
 			t.Fatalf("%s: err = %v, assignee = %q", status, err, task.Assignee)

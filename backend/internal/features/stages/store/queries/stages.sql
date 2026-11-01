@@ -33,6 +33,15 @@ LEFT JOIN LATERAL (
 WHERE s.project_id = $1 AND s.retired_at IS NULL
 ORDER BY s.position;
 
+-- name: ListVersionOneStages :many
+SELECT s.* FROM stages s
+WHERE s.project_id = $1 AND s.retired_at IS NULL AND s.add_reason IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM stage_changes c
+      WHERE c.stage_id = s.id AND c.kind = 'add'
+  )
+ORDER BY s.position;
+
 -- name: UpdateStage :one
 UPDATE stages
 SET name = $2, description = $3, updated_at = now()

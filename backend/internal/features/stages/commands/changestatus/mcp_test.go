@@ -101,7 +101,7 @@ func TestToolRejectsInvalidInput(t *testing.T) {
 		}, "no encontrada"},
 		{"tareas pendientes", domain.StatusInDev, func(id uuid.UUID) map[string]any {
 			return map[string]any{"stage_id": id.String(), "status": "done"}
-		}, "no se puede cerrar"},
+		}, "tareas pendientes"},
 	}
 
 	for _, tt := range tests {

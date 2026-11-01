@@ -11,17 +11,17 @@ import (
 func TestChangeStatusTransitions(t *testing.T) {
 	allowed := map[Status]map[Status]bool{
 		StatusBacklog:          {StatusReady: true, StatusCancelled: true},
-		StatusReady:            {StatusInProgress: true, StatusCancelled: true},
-		StatusInProgress:       {StatusInReview: true, StatusCancelled: true},
-		StatusInReview:         {StatusInQA: true, StatusChangesRequested: true, StatusCancelled: true},
-		StatusChangesRequested: {StatusInReview: true, StatusCancelled: true},
+		StatusReady:            {StatusInDev: true, StatusCancelled: true},
+		StatusInDev:            {StatusInReview: true, StatusCancelled: true},
+		StatusInReview:         {StatusInQA: true, StatusChangesRequested: true, StatusPendingClose: true, StatusCancelled: true},
+		StatusChangesRequested: {StatusInDev: true, StatusCancelled: true},
 		StatusInQA:             {StatusPendingClose: true, StatusChangesRequested: true, StatusCancelled: true},
-		StatusPendingClose:     {StatusDone: true, StatusCancelled: true},
+		StatusPendingClose:     {StatusDone: true, StatusInReview: true, StatusInQA: true, StatusCancelled: true},
 		StatusDone:             {},
 		StatusCancelled:        {StatusBacklog: true},
 	}
 	statuses := []Status{
-		StatusBacklog, StatusReady, StatusInProgress, StatusInReview, StatusChangesRequested,
+		StatusBacklog, StatusReady, StatusInDev, StatusInReview, StatusChangesRequested,
 		StatusInQA, StatusPendingClose, StatusDone, StatusCancelled,
 	}
 
@@ -56,5 +56,50 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 		if task.Status != StatusBacklog {
 			t.Errorf("status %q: tarea = %+v", status, task)
 		}
+	}
+}
+
+func TestReviseStatus(t *testing.T) {
+	tests := []struct {
+		from Status
+		want Status
+		err  error
+	}{
+		{StatusInReview, StatusChangesRequested, nil},
+		{StatusInQA, StatusChangesRequested, nil},
+		{StatusPendingClose, StatusChangesRequested, nil},
+		{StatusDone, "", ErrTaskDoneRevised},
+		{StatusBacklog, StatusBacklog, nil},
+		{StatusInDev, StatusInDev, nil},
+		{StatusChangesRequested, StatusChangesRequested, nil},
+		{StatusCancelled, StatusCancelled, nil},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.from), func(t *testing.T) {
+			got, err := Task{Status: tt.from}.ReviseStatus()
+			if !errors.Is(err, tt.err) || got != tt.want {
+				t.Fatalf("got = %q, err = %v", got, err)
+			}
+		})
+	}
+}
+
+func TestClosureEnsureClosable(t *testing.T) {
+	tests := []struct {
+		name    string
+		closure Closure
+		want    error
+	}{
+		{"terminada", Closure{Done: 2}, nil},
+		{"pendientes", Closure{Done: 1, Pending: 1}, ErrStageTasksPending},
+		{"vacía o toda cancelada", Closure{}, ErrStageNoTasksDone},
+		{"sin done y con pendientes", Closure{Pending: 1}, ErrStageTasksPending},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.closure.EnsureClosable(); !errors.Is(err, tt.want) {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	}
 }

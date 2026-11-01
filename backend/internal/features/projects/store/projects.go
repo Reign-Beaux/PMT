@@ -51,6 +51,18 @@ func (s *Projects) Get(ctx context.Context, id uuid.UUID) (domain.Project, error
 	return toDomain(row), nil
 }
 
+// Lock busca un proyecto y bloquea su fila hasta el fin de la transacción.
+func (s *Projects) Lock(ctx context.Context, id uuid.UUID) (domain.Project, error) {
+	row, err := s.queries.LockProject(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Project{}, domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return domain.Project{}, fmt.Errorf("bloquear proyecto: %w", err)
+	}
+	return toDomain(row), nil
+}
+
 // List devuelve los proyectos, del más reciente al más antiguo.
 func (s *Projects) List(ctx context.Context) ([]domain.Project, error) {
 	rows, err := s.queries.ListProjects(ctx)

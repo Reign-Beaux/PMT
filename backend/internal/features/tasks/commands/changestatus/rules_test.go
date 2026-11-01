@@ -48,7 +48,7 @@ func TestHandleFailedRuleKeepsAssignee(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusReady)
 	dev := kernel.Actor{Name: "dev", Profile: kernel.ProfileDevBackend}
 
-	_, err := New(repo, fakeStages{work: blocked}).Handle(context.Background(), Command{ID: id, Status: domain.StatusInProgress, Actor: dev})
+	_, err := New(repo, fakeStages{work: blocked}).Handle(context.Background(), Command{ID: id, Status: domain.StatusInDev, Actor: dev})
 
 	if !errors.Is(err, blocked) {
 		t.Fatalf("err = %v", err)

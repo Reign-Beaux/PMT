@@ -12,12 +12,15 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 	"pmt/internal/platform/rest"
 )
 
 type fakeRepo struct {
 	stages   map[uuid.UUID]domain.Stage
 	updates  int
+	closes   int
+	closedBy kernel.Actor
 	recorded []domain.StatusChange
 	changes  []domain.Change
 }
@@ -48,6 +51,15 @@ func (r *fakeRepo) ChangeStatus(_ context.Context, s domain.Stage, change domain
 	return s, nil
 }
 
+func (r *fakeRepo) CloseStage(_ context.Context, s domain.Stage, change domain.StatusChange, actor kernel.Actor) (domain.Stage, error) {
+	r.updates++
+	r.closes++
+	r.closedBy = actor
+	r.recorded = append(r.recorded, change)
+	r.stages[s.ID] = s
+	return s, nil
+}
+
 func (r *fakeRepo) LeavePlanning(_ context.Context, s domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error) {
 	r.recorded = append(r.recorded, statusChange)
 	r.changes = append(r.changes, change)
@@ -56,8 +68,9 @@ func (r *fakeRepo) LeavePlanning(_ context.Context, s domain.Stage, change domai
 	return s, nil
 }
 
-// fakeTasks responde como si la etapa tuviera tareas en ese estado. Una etapa
-// sin tareas responde true, igual que una con todas terminadas.
+var errTasksPending = kernel.Conflict("tareas pendientes")
+
+// fakeTasks responde como si la etapa tuviera tareas en ese estado.
 type fakeTasks struct {
 	allDone    bool
 	err        error
@@ -66,9 +79,15 @@ type fakeTasks struct {
 	checks     int
 }
 
-func (f *fakeTasks) AllDone(context.Context, uuid.UUID) (bool, error) {
+func (f *fakeTasks) EnsureClosable(context.Context, uuid.UUID) error {
 	f.calls++
-	return f.allDone, f.err
+	if f.err != nil {
+		return f.err
+	}
+	if !f.allDone {
+		return errTasksPending
+	}
+	return nil
 }
 
 func (f *fakeTasks) EnsureReleasable(context.Context, uuid.UUID) error {
@@ -146,6 +165,9 @@ func TestHandleClosesStageWhenAllTasksDone(t *testing.T) {
 	if result.Status != domain.StatusDone || repo.stages[id].Status != domain.StatusDone || tasks.calls != 1 {
 		t.Errorf("result = %+v, consultas = %d", result, tasks.calls)
 	}
+	if repo.closes != 1 || repo.closedBy != actorFor(domain.StatusDone) {
+		t.Errorf("toda salida a done pasa por CloseStage: cierres = %d, actor = %+v", repo.closes, repo.closedBy)
+	}
 }
 
 func TestHandleKeepsStageOpenWithPendingTasks(t *testing.T) {
@@ -153,7 +175,7 @@ func TestHandleKeepsStageOpenWithPendingTasks(t *testing.T) {
 
 	_, err := New(repo, &fakeTasks{allDone: false}, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: actorFor(domain.StatusDone), Reason: "motivo"})
 
-	if !errors.Is(err, domain.ErrStageTasksPending) {
+	if !errors.Is(err, errTasksPending) {
 		t.Fatalf("err = %v", err)
 	}
 	if repo.updates != 0 || repo.stages[id].Status != domain.StatusInDev {

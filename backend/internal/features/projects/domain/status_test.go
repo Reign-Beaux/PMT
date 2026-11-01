@@ -12,7 +12,7 @@ func TestChangeStatusTransitions(t *testing.T) {
 	allowed := map[Status]map[Status]bool{
 		StatusPlanning:  {StatusStandBy: true, StatusStopped: true, StatusCancelled: true},
 		StatusStandBy:   {StatusPlanning: true, StatusInDev: true, StatusStopped: true, StatusCancelled: true},
-		StatusInDev:     {StatusWorking: true, StatusStopped: true, StatusCancelled: true},
+		StatusInDev:     {StatusStopped: true, StatusCancelled: true},
 		StatusWorking:   {StatusStopped: true, StatusCancelled: true},
 		StatusStopped:   {StatusPlanning: true, StatusStandBy: true, StatusInDev: true, StatusWorking: true, StatusCancelled: true},
 		StatusCancelled: {StatusPlanning: true},
@@ -50,5 +50,27 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 		if p.Status != StatusPlanning {
 			t.Errorf("status %q: proyecto = %+v", status, p)
 		}
+	}
+}
+
+func TestAutomaticMoves(t *testing.T) {
+	for _, status := range []Status{StatusPlanning, StatusInDev, StatusWorking, StatusStopped, StatusCancelled} {
+		p := Project{Status: status}
+		if p.StartWork() || p.Status != status {
+			t.Errorf("StartWork desde %s no debe mover", status)
+		}
+	}
+	for _, status := range []Status{StatusPlanning, StatusStandBy, StatusWorking, StatusStopped, StatusCancelled} {
+		p := Project{Status: status}
+		if p.CloseVersionOne() || p.Status != status {
+			t.Errorf("CloseVersionOne desde %s no debe mover", status)
+		}
+	}
+	p := Project{Status: StatusStandBy}
+	if !p.StartWork() || p.Status != StatusInDev {
+		t.Errorf("StartWork: %s", p.Status)
+	}
+	if !p.CloseVersionOne() || p.Status != StatusWorking {
+		t.Errorf("CloseVersionOne: %s", p.Status)
 	}
 }

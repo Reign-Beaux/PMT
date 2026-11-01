@@ -10,14 +10,15 @@ func TestStatusValues(t *testing.T) {
 	want := map[Status]string{
 		StatusReported:         "reported",
 		StatusConfirmed:        "confirmed",
-		StatusInProgress:       "in_progress",
+		StatusInDev:            "in_dev",
 		StatusInReview:         "in_review",
 		StatusChangesRequested: "changes_requested",
 		StatusInQA:             "in_qa",
+		StatusPendingClose:     "pending_close",
 		StatusDone:             "done",
 		StatusRejected:         "rejected",
 	}
-	if len(want) != 8 {
+	if len(want) != 9 {
 		t.Fatalf("status repetidos: %d", len(want))
 	}
 	for status, value := range want {
@@ -30,17 +31,18 @@ func TestStatusValues(t *testing.T) {
 func TestChangeStatusTransitions(t *testing.T) {
 	allowed := map[Status]map[Status]bool{
 		StatusReported:         {StatusConfirmed: true, StatusRejected: true},
-		StatusConfirmed:        {StatusInProgress: true, StatusRejected: true},
-		StatusInProgress:       {StatusInReview: true, StatusRejected: true},
-		StatusInReview:         {StatusInQA: true, StatusChangesRequested: true, StatusRejected: true},
-		StatusChangesRequested: {StatusInReview: true, StatusRejected: true},
-		StatusInQA:             {StatusDone: true, StatusChangesRequested: true, StatusRejected: true},
+		StatusConfirmed:        {StatusInDev: true, StatusRejected: true},
+		StatusInDev:            {StatusInReview: true, StatusRejected: true},
+		StatusInReview:         {StatusInQA: true, StatusChangesRequested: true, StatusPendingClose: true, StatusRejected: true},
+		StatusChangesRequested: {StatusInDev: true, StatusRejected: true},
+		StatusInQA:             {StatusPendingClose: true, StatusChangesRequested: true, StatusRejected: true},
+		StatusPendingClose:     {StatusDone: true, StatusInReview: true, StatusInQA: true, StatusRejected: true},
 		StatusDone:             {},
 		StatusRejected:         {StatusReported: true},
 	}
 	statuses := []Status{
-		StatusReported, StatusConfirmed, StatusInProgress, StatusInReview,
-		StatusChangesRequested, StatusInQA, StatusDone, StatusRejected,
+		StatusReported, StatusConfirmed, StatusInDev, StatusInReview,
+		StatusChangesRequested, StatusInQA, StatusPendingClose, StatusDone, StatusRejected,
 	}
 
 	for _, from := range statuses {

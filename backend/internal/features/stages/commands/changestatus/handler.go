@@ -16,12 +16,15 @@ type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Stage, error)
 	ChangeStatus(ctx context.Context, s domain.Stage, change domain.StatusChange) (domain.Stage, error)
 	LeavePlanning(ctx context.Context, s domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error)
+	// CloseStage guarda el paso a done y, si termina la versión 1, pasa el proyecto
+	// a working en la misma transacción. Lo implementa la feature workflow.
+	CloseStage(ctx context.Context, s domain.Stage, change domain.StatusChange, actor kernel.Actor) (domain.Stage, error)
 }
 
-// TaskChecker indica si todas las tareas de una etapa están terminadas y si
-// tiene alguna activa. Lo implementa la feature tasks.
+// TaskChecker comprueba que las tareas de una etapa permitan cerrarla o liberarla
+// y responde con el error de negocio. Lo implementa la feature tasks.
 type TaskChecker interface {
-	AllDone(ctx context.Context, stageID uuid.UUID) (bool, error)
+	EnsureClosable(ctx context.Context, stageID uuid.UUID) error
 	EnsureReleasable(ctx context.Context, stageID uuid.UUID) error
 }
 
@@ -71,8 +74,8 @@ func New(repo Repository, tasks TaskChecker, projects ProjectChecker) *Handler {
 }
 
 // Handle cambia el status de la etapa si su proyecto y sus tareas lo permiten.
-// Solo la cierra si todas sus tareas están terminadas. Al salir de su planning
-// propio escribe el registro add pendiente; ese camino cumple las mismas reglas.
+// Al salir de su planning propio escribe el registro add pendiente; ese camino
+// cumple las mismas reglas. Toda salida a done pasa por CloseStage.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -98,13 +101,11 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result(updated), nil
 	}
 	if s.Status == domain.StatusDone {
-		allDone, err := h.tasks.AllDone(ctx, s.ID)
+		updated, err := h.repo.CloseStage(ctx, s, statusChange, cmd.Actor)
 		if err != nil {
 			return Result{}, err
 		}
-		if !allDone {
-			return Result{}, domain.ErrStageTasksPending
-		}
+		return Result(updated), nil
 	}
 
 	updated, err := h.repo.ChangeStatus(ctx, s, statusChange)
@@ -114,8 +115,8 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	return Result(updated), nil
 }
 
-// ensureRules aplica las reglas 4, 5 y 10. La 4 solo vale desde planning; la 5,
-// desde cualquier origen.
+// ensureRules aplica las reglas 4, 5 y 10 y la decisión 8. La 4 solo vale desde
+// planning; la 5, desde cualquier origen. Reabrir no consulta las tareas.
 func (h *Handler) ensureRules(ctx context.Context, from domain.Status, s domain.Stage) error {
 	if s.Status != domain.StatusStopped && s.Status != domain.StatusCancelled {
 		frozen, err := h.projects.IsFrozen(ctx, s.ProjectID)
@@ -134,6 +135,9 @@ func (h *Handler) ensureRules(ctx context.Context, from domain.Status, s domain.
 		if !accepts {
 			return domain.ErrStageProjectNotStarted
 		}
+	}
+	if s.Status == domain.StatusDone {
+		return h.tasks.EnsureClosable(ctx, s.ID)
 	}
 	if from == domain.StatusPlanning && s.Status == domain.StatusStandBy {
 		return h.tasks.EnsureReleasable(ctx, s.ID)

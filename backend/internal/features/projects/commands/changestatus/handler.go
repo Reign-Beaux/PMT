@@ -79,8 +79,8 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 }
 
 // ensureStages aplica las reglas 11 a 14. Las de liberar e iniciar solo valen
-// desde el origen que nombran. stopped → working solo se comprueba si el proyecto
-// nunca estuvo en working: si no, es reanudar.
+// desde el origen que nombran. stopped → working, la única llegada manual a working,
+// solo se comprueba si el proyecto nunca estuvo ahí: si no, es reanudar.
 func (h *Handler) ensureStages(ctx context.Context, from domain.Status, p domain.Project) error {
 	switch {
 	case from == domain.StatusPlanning && p.Status == domain.StatusStandBy:
@@ -92,8 +92,6 @@ func (h *Handler) ensureStages(ctx context.Context, from domain.Status, p domain
 		if err != nil || reached {
 			return err
 		}
-		return h.stages.EnsureClosed(ctx, p.ID)
-	case p.Status == domain.StatusWorking:
 		return h.stages.EnsureClosed(ctx, p.ID)
 	}
 	return nil

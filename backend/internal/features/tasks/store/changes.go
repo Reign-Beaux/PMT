@@ -10,6 +10,7 @@ import (
 
 	"pmt/internal/features/tasks/domain"
 	"pmt/internal/features/tasks/store/sqlcgen"
+	"pmt/internal/kernel"
 )
 
 // DB es la base de datos de la feature: consultas y transacciones. pgxpool.Pool la implementa.
@@ -47,12 +48,23 @@ func (s *Changes) Add(ctx context.Context, task domain.Task, change domain.Chang
 	return created, saved, nil
 }
 
-// Revise guarda una nueva versión de la tarea, sin tocar su fila, y devuelve la última versión.
-func (s *Changes) Revise(ctx context.Context, change domain.Change) (domain.Task, domain.Change, error) {
+// Revise guarda una nueva versión de la tarea, sin tocar su contenido en la fila, y
+// devuelve la última versión. El status que resulta se decide con el leído tras
+// bloquear; si cambia, deja su registro con actor como autor y conserva el dueño.
+func (s *Changes) Revise(ctx context.Context, change domain.Change, actor kernel.Actor) (domain.Task, domain.Change, error) {
 	var updated domain.Task
 	var saved domain.Change
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		queries := sqlcgen.New(tx)
+		row, err := lockTask(ctx, queries, change.TaskID)
+		if err != nil {
+			return err
+		}
+		task := toDomain(row)
+		status, err := task.ReviseStatus()
+		if err != nil {
+			return err
+		}
 		version, err := nextVersion(ctx, queries, change.TaskID)
 		if err != nil {
 			return err
@@ -60,7 +72,18 @@ func (s *Changes) Revise(ctx context.Context, change domain.Change) (domain.Task
 		if saved, err = insertChange(ctx, queries, change, version); err != nil {
 			return err
 		}
-		updated, err = NewTasks(tx).Get(ctx, change.TaskID)
+		repo := NewTasks(tx)
+		if status != task.Status {
+			statusChange := domain.NewStatusChange(task.ID, task.Status, status, actor, change.Reason)
+			if err := insertStatusChange(ctx, queries, statusChange); err != nil {
+				return err
+			}
+			task.Status = status
+			if _, err := repo.UpdateStatus(ctx, task); err != nil {
+				return err
+			}
+		}
+		updated, err = repo.Get(ctx, change.TaskID)
 		return err
 	})
 	if err != nil {
@@ -120,10 +143,8 @@ func (s *Changes) List(ctx context.Context, stageID uuid.UUID, taskID *uuid.UUID
 
 // nextVersion bloquea la tarea y devuelve el número de su próximo cambio.
 func nextVersion(ctx context.Context, queries *sqlcgen.Queries, id uuid.UUID) (int, error) {
-	if _, err := queries.LockTask(ctx, id); errors.Is(err, pgx.ErrNoRows) {
-		return 0, domain.ErrTaskNotFound
-	} else if err != nil {
-		return 0, fmt.Errorf("bloquear tarea: %w", err)
+	if _, err := lockTask(ctx, queries, id); err != nil {
+		return 0, err
 	}
 
 	version, err := queries.MaxTaskChangeVersion(ctx, id)
@@ -131,6 +152,18 @@ func nextVersion(ctx context.Context, queries *sqlcgen.Queries, id uuid.UUID) (i
 		return 0, fmt.Errorf("obtener versión: %w", err)
 	}
 	return int(version) + 1, nil
+}
+
+// lockTask bloquea una tarea sin retirar hasta el fin de la transacción.
+func lockTask(ctx context.Context, queries *sqlcgen.Queries, id uuid.UUID) (sqlcgen.Task, error) {
+	row, err := queries.LockTask(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcgen.Task{}, domain.ErrTaskNotFound
+	}
+	if err != nil {
+		return sqlcgen.Task{}, fmt.Errorf("bloquear tarea: %w", err)
+	}
+	return row, nil
 }
 
 func insertChange(ctx context.Context, queries *sqlcgen.Queries, change domain.Change, version int) (domain.Change, error) {

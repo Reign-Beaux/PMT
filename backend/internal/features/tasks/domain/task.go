@@ -33,8 +33,8 @@ const (
 	StatusBacklog Status = "backlog"
 	// StatusReady indica que la tarea está liberada para desarrollo.
 	StatusReady Status = "ready"
-	// StatusInProgress indica que la tarea está en desarrollo.
-	StatusInProgress Status = "in_progress"
+	// StatusInDev indica que la tarea está en desarrollo.
+	StatusInDev Status = "in_dev"
 	// StatusInReview indica que la tarea está en revisión de código.
 	StatusInReview Status = "in_review"
 	// StatusChangesRequested indica que la tarea tiene correcciones pendientes.

@@ -207,6 +207,33 @@ func (q *Queries) LockTask(ctx context.Context, id uuid.UUID) (Task, error) {
 	return i, err
 }
 
+const lockTasks = `-- name: LockTasks :many
+SELECT id FROM tasks
+WHERE id = ANY($1::uuid[]) AND retired_at IS NULL
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockTasks(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockTasks, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const retireTask = `-- name: RetireTask :exec
 UPDATE tasks
 SET retired_at = now(), updated_at = now()

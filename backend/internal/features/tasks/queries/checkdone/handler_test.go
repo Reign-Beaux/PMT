@@ -23,12 +23,14 @@ func TestHandle(t *testing.T) {
 	tests := []struct {
 		name  string
 		tasks []domain.Task
-		want  bool
+		want  domain.Closure
 	}{
-		{"sin tareas", nil, true},
-		{"todas en done", []domain.Task{{Status: domain.StatusDone}, {Status: domain.StatusDone}}, true},
-		{"alguna sin terminar", []domain.Task{{Status: domain.StatusDone}, {Status: domain.StatusBacklog}}, false},
-		{"casi cerrada", []domain.Task{{Status: "pending_close"}}, false},
+		{"sin tareas", nil, domain.Closure{}},
+		{"todas en done", []domain.Task{{Status: domain.StatusDone}, {Status: domain.StatusDone}}, domain.Closure{Done: 2}},
+		{"alguna sin terminar", []domain.Task{{Status: domain.StatusDone}, {Status: domain.StatusBacklog}}, domain.Closure{Done: 1, Pending: 1}},
+		{"casi cerrada", []domain.Task{{Status: domain.StatusPendingClose}}, domain.Closure{Pending: 1}},
+		{"cancelada no cuenta", []domain.Task{{Status: domain.StatusDone}, {Status: domain.StatusCancelled}}, domain.Closure{Done: 1}},
+		{"toda cancelada", []domain.Task{{Status: domain.StatusCancelled}}, domain.Closure{}},
 	}
 
 	for _, tt := range tests {
@@ -50,7 +52,7 @@ func TestHandleReturnsReadError(t *testing.T) {
 
 	got, err := New(&fakeReader{err: failure}).Handle(context.Background(), uuid.New())
 
-	if !errors.Is(err, failure) || got {
+	if !errors.Is(err, failure) || got != (domain.Closure{}) {
 		t.Fatalf("got = %v, err = %v", got, err)
 	}
 }

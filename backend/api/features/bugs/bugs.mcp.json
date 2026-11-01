@@ -162,7 +162,7 @@
     }
   },
   {
-    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Usa list_bugs para obtener el ID del bug y su status actual.",
+    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Una corrección vuelve de changes_requested a in_dev. QA aprueba a pending_close y el TL cierra en done. in_review → pending_close y pending_close → in_review o in_qa exigen reason. Usa list_bugs para obtener el ID del bug y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -175,7 +175,7 @@
           "type": "string"
         },
         "status": {
-          "description": "Nuevo status: reported, confirmed, in_progress, in_review, changes_requested, in_qa, done o rejected",
+          "description": "Nuevo status: reported, confirmed, in_dev, in_review, changes_requested, in_qa, pending_close, done o rejected",
           "type": "string"
         }
       },

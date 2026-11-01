@@ -8,12 +8,13 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Task, error)
-	Revise(ctx context.Context, change domain.Change) (domain.Task, domain.Change, error)
+	Revise(ctx context.Context, change domain.Change, actor kernel.Actor) (domain.Task, domain.Change, error)
 }
 
 // StageChecker confirma que la etapa de una tarea admite cambios con historial.
@@ -29,6 +30,8 @@ type Command struct {
 	Description string    `json:"description"`
 	Reason      string    `json:"reason"`
 	RequestedBy string    `json:"requested_by"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result es la última versión de la tarea.
@@ -54,7 +57,9 @@ func New(repo Repository, stages StageChecker) *Handler {
 	return &Handler{repo: repo, stages: stages}
 }
 
-// Handle registra el cambio con la nueva versión. La fila conserva el original.
+// Handle registra el cambio con la nueva versión. La fila conserva el original. Una
+// tarea ya entregada vuelve a changes_requested, aunque esté congelada, y una en
+// done se rechaza: lo decide el repositorio con el status que lee al bloquearla.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	task, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -71,7 +76,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 
-	updated, change, err := h.repo.Revise(ctx, change)
+	updated, change, err := h.repo.Revise(ctx, change, cmd.Actor)
 	if err != nil {
 		return Result{}, err
 	}

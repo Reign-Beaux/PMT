@@ -11,12 +11,15 @@ var (
 	ErrStageStatusInvalid = kernel.Invalid("status desconocido: usa planning, stand_by, in_dev, done, stopped o cancelled")
 	// ErrStageStatusTransition indica que el status actual no permite pasar al pedido.
 	ErrStageStatusTransition = kernel.Conflict("transición de status no permitida")
-	// ErrStageTasksPending indica que la etapa no se puede cerrar porque tiene tareas sin terminar.
-	ErrStageTasksPending = kernel.Conflict("la etapa no se puede cerrar: tiene tareas que no están en done")
 	// ErrStageProjectFrozen aplica la regla 10: el proyecto congela sus etapas.
 	ErrStageProjectFrozen = kernel.Conflict("el proyecto está detenido o cancelado: la etapa solo puede detenerse o cancelarse")
 	// ErrStageProjectNotStarted aplica la regla 5: el proyecto aún no admite trabajo.
 	ErrStageProjectNotStarted = kernel.Conflict("la etapa solo pasa a in_dev con el proyecto en in_dev o working")
+
+	// ErrStageNotStandBy indica que start_stage solo inicia etapas en stand_by.
+	ErrStageNotStandBy = kernel.Conflict("la etapa no está en stand_by")
+	// ErrStageProjectNotReady indica que el proyecto aún no se libera, o que está detenido.
+	ErrStageProjectNotReady = kernel.Conflict("la etapa solo se inicia con el proyecto en stand_by, in_dev o working")
 
 	// ErrWorkProjectClosed aplica la regla 1: el proyecto no admite que la tarea avance.
 	ErrWorkProjectClosed = kernel.Conflict("la tarea no avanza: el proyecto debe estar en in_dev o working")
@@ -93,6 +96,16 @@ func EnsureStartable(stages []Stage) error {
 		}
 	}
 	return ErrNoStagesStandBy
+}
+
+// EnsureHasActive comprueba que quede al menos una etapa sin cancelar.
+func EnsureHasActive(stages []Stage) error {
+	for _, s := range stages {
+		if s.Status != StatusCancelled {
+			return nil
+		}
+	}
+	return ErrNoActiveStages
 }
 
 // EnsureClosed aplica las reglas 13 y 14: todas en done o cancelled, con al menos

@@ -18,17 +18,20 @@ var (
 // etapa: todos son por perfil, sin asignación. Dev es DevFrontend o DevBackend.
 var statusProfiles = map[Status]map[Status][]kernel.Profile{
 	StatusReported:         {StatusConfirmed: testers, StatusRejected: triagers},
-	StatusConfirmed:        {StatusInProgress: devs, StatusRejected: leads},
-	StatusInProgress:       {StatusInReview: devs, StatusRejected: leads},
-	StatusInReview:         {StatusInQA: reviewers, StatusChangesRequested: reviewers, StatusRejected: leads},
-	StatusChangesRequested: {StatusInReview: devs, StatusRejected: leads},
-	StatusInQA:             {StatusDone: testers, StatusChangesRequested: testers, StatusRejected: leads},
+	StatusConfirmed:        {StatusInDev: devs, StatusRejected: leads},
+	StatusInDev:            {StatusInReview: devs, StatusRejected: leads},
+	StatusInReview:         {StatusInQA: reviewers, StatusChangesRequested: reviewers, StatusPendingClose: reviewers, StatusRejected: leads},
+	StatusChangesRequested: {StatusInDev: devs, StatusRejected: leads},
+	StatusInQA:             {StatusPendingClose: testers, StatusChangesRequested: testers, StatusRejected: leads},
+	StatusPendingClose:     {StatusDone: leads, StatusInReview: leads, StatusInQA: leads, StatusRejected: leads},
 	StatusDone:             {},
 	StatusRejected:         {StatusReported: triagers},
 }
 
 func ensureReason(from, to Status, reason string) error {
-	required := to == StatusRejected || (from == StatusRejected && to == StatusReported)
+	required := to == StatusRejected || (from == StatusRejected && to == StatusReported) ||
+		(from == StatusInReview && to == StatusPendingClose) ||
+		(from == StatusPendingClose && (to == StatusInReview || to == StatusInQA))
 	if required && strings.TrimSpace(reason) == "" {
 		return kernel.ErrReasonRequired
 	}

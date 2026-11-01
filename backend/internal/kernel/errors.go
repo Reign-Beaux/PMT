@@ -1,6 +1,11 @@
 // Package kernel contiene los conceptos compartidos entre features.
 package kernel
 
+import (
+	"errors"
+	"fmt"
+)
+
 // ErrorKind clasifica un error de negocio sin depender de ningún transporte.
 type ErrorKind int
 
@@ -19,10 +24,26 @@ const (
 type Error struct {
 	Kind    ErrorKind
 	Message string
+	cause   error
 }
 
 func (e *Error) Error() string {
 	return e.Message
+}
+
+// Unwrap devuelve el error original de uno creado con Prefix.
+func (e *Error) Unwrap() error {
+	return e.cause
+}
+
+// Prefix antepone un contexto al mensaje de un error de negocio y conserva su
+// tipo, para saber qué elemento de un lote falló. Otro error se envuelve igual.
+func Prefix(prefix string, err error) error {
+	var business *Error
+	if errors.As(err, &business) {
+		return &Error{Kind: business.Kind, Message: prefix + business.Message, cause: err}
+	}
+	return fmt.Errorf("%s%w", prefix, err)
 }
 
 // Invalid crea un error de entrada inválida.

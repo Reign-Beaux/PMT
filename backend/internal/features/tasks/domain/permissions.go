@@ -27,18 +27,20 @@ var (
 // equipo para tomarla y su dueño para moverla.
 var statusProfiles = map[Status]map[Status][]kernel.Profile{
 	StatusBacklog:          {StatusReady: leads, StatusCancelled: scope},
-	StatusReady:            {StatusInProgress: devs, StatusCancelled: scope},
-	StatusInProgress:       {StatusInReview: devs, StatusCancelled: scope},
-	StatusInReview:         {StatusInQA: reviewers, StatusChangesRequested: reviewers, StatusCancelled: scope},
-	StatusChangesRequested: {StatusInReview: devs, StatusCancelled: scope},
+	StatusReady:            {StatusInDev: devs, StatusCancelled: scope},
+	StatusInDev:            {StatusInReview: devs, StatusCancelled: scope},
+	StatusInReview:         {StatusInQA: reviewers, StatusChangesRequested: reviewers, StatusPendingClose: reviewers, StatusCancelled: scope},
+	StatusChangesRequested: {StatusInDev: devs, StatusCancelled: scope},
 	StatusInQA:             {StatusPendingClose: testers, StatusChangesRequested: testers, StatusCancelled: scope},
-	StatusPendingClose:     {StatusDone: leads, StatusCancelled: scope},
+	StatusPendingClose:     {StatusDone: leads, StatusInReview: leads, StatusInQA: leads, StatusCancelled: scope},
 	StatusDone:             {},
 	StatusCancelled:        {StatusBacklog: scope},
 }
 
 func reasonRequired(from, to Status) bool {
-	return to == StatusCancelled || (from == StatusCancelled && to == StatusBacklog)
+	return to == StatusCancelled || (from == StatusCancelled && to == StatusBacklog) ||
+		(from == StatusInReview && to == StatusPendingClose) ||
+		(from == StatusPendingClose && (to == StatusInReview || to == StatusInQA))
 }
 
 // EnsureProfile comprueba, sin consultar el equipo, que el status exista, que la

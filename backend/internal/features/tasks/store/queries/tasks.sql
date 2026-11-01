@@ -19,6 +19,12 @@ SELECT * FROM tasks
 WHERE id = $1 AND retired_at IS NULL
 FOR UPDATE;
 
+-- name: LockTasks :many
+SELECT id FROM tasks
+WHERE id = ANY(@ids::uuid[]) AND retired_at IS NULL
+ORDER BY id
+FOR UPDATE;
+
 -- name: ListTasks :many
 SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee
 FROM tasks s

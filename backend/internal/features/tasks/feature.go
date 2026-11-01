@@ -11,6 +11,7 @@ import (
 	"pmt/internal/features/tasks/commands/add"
 	"pmt/internal/features/tasks/commands/assign"
 	"pmt/internal/features/tasks/commands/changestatus"
+	"pmt/internal/features/tasks/commands/changestatusbatch"
 	"pmt/internal/features/tasks/commands/create"
 	"pmt/internal/features/tasks/commands/delete"
 	"pmt/internal/features/tasks/commands/retire"
@@ -35,6 +36,7 @@ type StageChecker interface {
 	list.StageChecker
 	changestatus.StageChecker
 	assign.StageChecker
+	changestatusbatch.StageChecker
 }
 
 // AgentChecker reúne lo que las slices piden a la feature agents.
@@ -67,6 +69,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	}{repo, statusChanges}, stages)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
+
+	changeBatch := changestatusbatch.New(statusChanges, stages)
+	changeBatch.Register(mux)
+	changeBatch.RegisterTool(tools)
 
 	assignTask := assign.New(repo, stages, agents)
 	assignTask.Register(mux)
@@ -120,9 +126,13 @@ func NewChecker(db sqlcgen.DBTX) *Checker {
 	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo), release: checkrelease.New(repo)}
 }
 
-// AllDone indica si todas las tareas de la etapa están en done.
-func (c *Checker) AllDone(ctx context.Context, stageID uuid.UUID) (bool, error) {
-	return c.checkDone.Handle(ctx, stageID)
+// EnsureClosable devuelve un error de negocio si las tareas de la etapa no permiten cerrarla.
+func (c *Checker) EnsureClosable(ctx context.Context, stageID uuid.UUID) error {
+	closure, err := c.checkDone.Handle(ctx, stageID)
+	if err != nil {
+		return err
+	}
+	return closure.EnsureClosable()
 }
 
 // EnsureReleasable devuelve un error de negocio si la etapa no tiene tareas activas.

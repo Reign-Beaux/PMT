@@ -14,14 +14,16 @@ const (
 	StatusReported Status = "reported"
 	// StatusConfirmed indica que se reprodujo y falta corregirlo.
 	StatusConfirmed Status = "confirmed"
-	// StatusInProgress indica que está en corrección.
-	StatusInProgress Status = "in_progress"
+	// StatusInDev indica que está en corrección.
+	StatusInDev Status = "in_dev"
 	// StatusInReview indica que está en revisión de código.
 	StatusInReview Status = "in_review"
 	// StatusChangesRequested indica que tiene correcciones pendientes.
 	StatusChangesRequested Status = "changes_requested"
 	// StatusInQA indica que está en verificación de QA.
 	StatusInQA Status = "in_qa"
+	// StatusPendingClose indica que fue aprobado y falta el cierre del TL.
+	StatusPendingClose Status = "pending_close"
 	// StatusDone indica que está corregido y verificado.
 	StatusDone Status = "done"
 	// StatusRejected indica que no se corregirá: no se reproduce, está duplicado o no es un bug.
@@ -30,7 +32,7 @@ const (
 
 var (
 	// ErrBugStatusInvalid indica que el status no es uno de los valores conocidos.
-	ErrBugStatusInvalid = kernel.Invalid("status desconocido: usa reported, confirmed, in_progress, in_review, changes_requested, in_qa, done o rejected")
+	ErrBugStatusInvalid = kernel.Invalid("status desconocido: usa reported, confirmed, in_dev, in_review, changes_requested, in_qa, pending_close, done o rejected")
 	// ErrBugStatusTransition indica que el status actual no permite pasar al pedido.
 	ErrBugStatusTransition = kernel.Conflict("transición de status no permitida")
 )
@@ -38,11 +40,12 @@ var (
 // statusTransitions indica a qué estados puede pasar cada estado.
 var statusTransitions = map[Status][]Status{
 	StatusReported:         {StatusConfirmed, StatusRejected},
-	StatusConfirmed:        {StatusInProgress, StatusRejected},
-	StatusInProgress:       {StatusInReview, StatusRejected},
-	StatusInReview:         {StatusInQA, StatusChangesRequested, StatusRejected},
-	StatusChangesRequested: {StatusInReview, StatusRejected},
-	StatusInQA:             {StatusDone, StatusChangesRequested, StatusRejected},
+	StatusConfirmed:        {StatusInDev, StatusRejected},
+	StatusInDev:            {StatusInReview, StatusRejected},
+	StatusInReview:         {StatusInQA, StatusChangesRequested, StatusPendingClose, StatusRejected},
+	StatusChangesRequested: {StatusInDev, StatusRejected},
+	StatusInQA:             {StatusPendingClose, StatusChangesRequested, StatusRejected},
+	StatusPendingClose:     {StatusDone, StatusInReview, StatusInQA, StatusRejected},
 	StatusDone:             {},
 	StatusRejected:         {StatusReported},
 }

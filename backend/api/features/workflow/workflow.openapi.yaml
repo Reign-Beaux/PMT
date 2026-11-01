@@ -1,0 +1,141 @@
+openapi: 3.1.0
+info:
+  title: PMT - Flujo
+  version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
+paths:
+  /api/projects/{id}/release:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Libera un proyecto en planning junto con sus etapas
+      description: Solo PP y `User`. Pasa a stand_by el proyecto y sus etapas en planning, todo o nada. Exige al menos una etapa activa, y cada etapa en planning necesita una tarea activa; el error nombra la que falla. Las demás etapas no se tocan y las tareas siguen en backlog. Una etapa en planning propio sale con su registro add.
+      requestBody:
+        $ref: "#/components/requestBodies/ReasonInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Proyecto liberado y etapas que pasaron a stand_by.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, stages]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                  stages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Moved"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/start:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Inicia una etapa en stand_by
+      description: Solo el TL de la etapa. Pasa la etapa a in_dev, sus tareas en backlog a ready y el proyecto a in_dev si sigue en stand_by, todo o nada. Exige proyecto en stand_by, in_dev o working. Las demás tareas no se tocan.
+      requestBody:
+        $ref: "#/components/requestBodies/ReasonInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Etapa iniciada, status del proyecto y tareas liberadas.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, project_id, project_status, tasks]
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                  project_id:
+                    type: string
+                    format: uuid
+                  project_status:
+                    type: string
+                  tasks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Moved"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  requestBodies:
+    ReasonInput:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              reason:
+                type: string
+                description: Motivo; queda en el historial de status de cada elemento.
+  responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Moved:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

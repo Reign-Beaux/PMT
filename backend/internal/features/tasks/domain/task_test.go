@@ -11,7 +11,7 @@ func TestStatusValues(t *testing.T) {
 	tests := map[Status]string{
 		StatusBacklog:          "backlog",
 		StatusReady:            "ready",
-		StatusInProgress:       "in_progress",
+		StatusInDev:            "in_dev",
 		StatusInReview:         "in_review",
 		StatusChangesRequested: "changes_requested",
 		StatusInQA:             "in_qa",

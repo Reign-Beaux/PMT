@@ -25,6 +25,8 @@ func (s fakeStages) EnsureHistoryRule(context.Context, uuid.UUID) error {
 type fakeRepo struct {
 	current domain.Task
 	changes []domain.Change
+	actor   kernel.Actor
+	err     error
 }
 
 func newRepo() *fakeRepo {
@@ -38,7 +40,11 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Task, error) {
 	return r.current, nil
 }
 
-func (r *fakeRepo) Revise(_ context.Context, change domain.Change) (domain.Task, domain.Change, error) {
+func (r *fakeRepo) Revise(_ context.Context, change domain.Change, actor kernel.Actor) (domain.Task, domain.Change, error) {
+	r.actor = actor
+	if r.err != nil {
+		return domain.Task{}, domain.Change{}, r.err
+	}
 	change.Version = 2
 	r.current.Title = change.Title
 	r.current.Description = change.Description
@@ -143,5 +149,20 @@ func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
 
 	if !errors.Is(err, errOwnPlanning) || len(repo.changes) != 0 {
 		t.Errorf("err = %v, cambios = %+v", err, repo.changes)
+	}
+}
+
+func TestHandlePassesActorAndKeepsDoneRejection(t *testing.T) {
+	repo := newRepo()
+	repo.err = domain.ErrTaskDoneRevised
+	actor := kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}
+
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: repo.current.ID, Title: "A", Reason: "M", RequestedBy: "PM", Actor: actor})
+
+	if !errors.Is(err, domain.ErrTaskDoneRevised) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.actor != actor {
+		t.Errorf("actor = %+v", repo.actor)
 	}
 }

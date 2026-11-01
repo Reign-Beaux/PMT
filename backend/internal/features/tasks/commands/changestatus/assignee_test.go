@@ -23,7 +23,7 @@ func TestHandleTakeLeavesTaskToDev(t *testing.T) {
 	var saved domain.Task
 	repo.onChange = func(task domain.Task) { saved = task }
 
-	if _, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusInProgress, Actor: dev}); err != nil {
+	if _, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusInDev, Actor: dev}); err != nil {
 		t.Fatal(err)
 	}
 	if saved.Assignee != "dev" {
@@ -51,7 +51,7 @@ func TestHandleRejectsOutsiders(t *testing.T) {
 		want  error
 	}{
 		{"TL ajeno", domain.StatusBacklog, domain.StatusReady, kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ErrNotStageLead},
-		{"dev ajeno", domain.StatusReady, domain.StatusInProgress, kernel.Actor{Name: "dev2", Profile: kernel.ProfileDevBackend}, domain.ErrNotStageMember},
+		{"dev ajeno", domain.StatusReady, domain.StatusInDev, kernel.Actor{Name: "dev2", Profile: kernel.ProfileDevBackend}, domain.ErrNotStageMember},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

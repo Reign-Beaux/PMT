@@ -18,6 +18,7 @@ import (
 	"pmt/internal/features/stages/commands/retire"
 	"pmt/internal/features/stages/commands/revise"
 	"pmt/internal/features/stages/commands/update"
+	"pmt/internal/features/stages/domain"
 	"pmt/internal/features/stages/queries/checkprogress"
 	"pmt/internal/features/stages/queries/checktasks"
 	"pmt/internal/features/stages/queries/checkteam"
@@ -50,9 +51,15 @@ type AgentChecker interface {
 	addmember.AgentChecker
 }
 
+// StageCloser cierra una etapa y mueve el proyecto si termina la versión 1. Lo
+// implementa la feature workflow.
+type StageCloser interface {
+	CloseStage(ctx context.Context, s domain.Stage, change domain.StatusChange, actor kernel.Actor) (domain.Stage, error)
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// tasks, projects y agents los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker) {
+// tasks, projects, agents y closer los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker, closer StageCloser) {
 	repo := store.NewStages(db)
 	changes := store.NewChanges(db)
 	statusChanges := store.NewStatusChanges(db)
@@ -69,7 +76,8 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 		*store.Stages
 		*store.Changes
 		*store.StatusChanges
-	}{repo, changes, statusChanges}, tasks, projects)
+		StageCloser
+	}{repo, changes, statusChanges, closer}, tasks, projects)
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 

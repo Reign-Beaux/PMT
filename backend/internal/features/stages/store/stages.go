@@ -86,6 +86,20 @@ func (s *Stages) List(ctx context.Context, projectID uuid.UUID) ([]domain.Stage,
 	return stages, nil
 }
 
+// ListVersionOne devuelve las etapas sin retirar de la planeación original: ni
+// tienen registro add ni están en planning propio, que lo escribirá al salir.
+func (s *Stages) ListVersionOne(ctx context.Context, projectID uuid.UUID) ([]domain.Stage, error) {
+	rows, err := s.queries.ListVersionOneStages(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("listar etapas de la versión 1: %w", err)
+	}
+	stages := make([]domain.Stage, 0, len(rows))
+	for _, row := range rows {
+		stages = append(stages, toDomain(row))
+	}
+	return stages, nil
+}
+
 // Update guarda los cambios de una etapa.
 func (s *Stages) Update(ctx context.Context, stage domain.Stage) (domain.Stage, error) {
 	row, err := s.queries.UpdateStage(ctx, sqlcgen.UpdateStageParams{

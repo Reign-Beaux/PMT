@@ -230,7 +230,7 @@
     }
   },
   {
-    "description": "Cambia el status de una tarea de PMT y devuelve la tarea con su última versión. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Cada transición exige un perfil: el TL debe ser el de la etapa, y solo un dev del equipo toma una tarea en ready, que queda a su nombre y solo él mueve. Cancelar y reabrir exigen reason. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No registra un cambio de contenido; deja un registro inmutable, consultable con list_task_status_changes. Usa list_tasks para obtener el ID de la tarea y su status actual.",
+    "description": "Cambia el status de una tarea de PMT y devuelve la tarea con su última versión. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Cada transición exige un perfil: el TL debe ser el de la etapa, y solo un dev del equipo toma una tarea en ready, que queda a su nombre y solo él mueve. Cancelar, reabrir, in_review → pending_close y pending_close → in_review o in_qa exigen reason. Una corrección vuelve de changes_requested a in_dev. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No registra un cambio de contenido; deja un registro inmutable, consultable con list_task_status_changes. Usa list_tasks para obtener el ID de la tarea y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -239,7 +239,7 @@
           "type": "string"
         },
         "status": {
-          "description": "Nuevo status: backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done o cancelled",
+          "description": "Nuevo status: backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done o cancelled",
           "type": "string"
         },
         "task_id": {
@@ -290,6 +290,97 @@
         "status",
         "created_at",
         "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Cambia el status de varias tareas de una etapa de PMT a un mismo status, todas o ninguna, y devuelve las tareas actualizadas. Cada tarea valida por separado lo mismo que change_task_status y puede venir de otro status; si una falla, ninguna cambia y el error nombra la tarea. Deja un registro inmutable por tarea. Usa list_tasks para obtener los ID. Los bugs no tienen lote.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Motivo del cambio de status; es el mismo para todas y queda en el historial",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        },
+        "status": {
+          "description": "Nuevo status de todas: backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done o cancelled",
+          "type": "string"
+        },
+        "task_ids": {
+          "description": "UUID de las tareas, todas de esa etapa y sin repetir",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "stage_id",
+        "task_ids",
+        "status"
+      ],
+      "type": "object"
+    },
+    "name": "change_tasks_status",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "tasks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "assignee": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "stage_id",
+              "title",
+              "description",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "tasks"
       ],
       "type": "object"
     }
@@ -372,7 +463,7 @@
     }
   },
   {
-    "description": "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Se rechaza si su etapa está en su planning propio: ahí usa update_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Una tarea en in_review, in_qa o pending_close vuelve a changes_requested, conserva su dueño y deja un registro de status; las demás no cambian de status, y una en done se rechaza: usa add_task. Se rechaza si su etapa está en su planning propio: ahí usa update_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

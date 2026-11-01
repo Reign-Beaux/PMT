@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -44,6 +43,50 @@ func (s *StatusChanges) ChangeStatus(ctx context.Context, task domain.Task, chan
 	return updated, nil
 }
 
+// ChangeBatch cambia varias tareas en una transacción: todas o ninguna. Bloquea por
+// orden de ID, para que dos lotes no se bloqueen entre sí, y decide con lo leído tras
+// bloquear. decide recibe las tareas que existen sin retirar y devuelve cómo quedan,
+// con un registro por tarea en el mismo orden.
+func (s *StatusChanges) ChangeBatch(ctx context.Context, ids []uuid.UUID, decide func([]domain.Task) ([]domain.Task, []domain.StatusChange, error)) ([]domain.Task, error) {
+	var updated []domain.Task
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		queries := sqlcgen.New(tx)
+		repo := NewTasks(tx)
+		locked, err := queries.LockTasks(ctx, ids)
+		if err != nil {
+			return fmt.Errorf("bloquear tareas: %w", err)
+		}
+		current := make([]domain.Task, 0, len(locked))
+		for _, id := range locked {
+			task, err := repo.Get(ctx, id)
+			if err != nil {
+				return err
+			}
+			current = append(current, task)
+		}
+		tasks, changes, err := decide(current)
+		if err != nil {
+			return err
+		}
+		updated = make([]domain.Task, 0, len(tasks))
+		for i, task := range tasks {
+			if err := insertStatusChange(ctx, queries, changes[i]); err != nil {
+				return err
+			}
+			saved, err := repo.UpdateStatus(ctx, task)
+			if err != nil {
+				return err
+			}
+			updated = append(updated, saved)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
 // ListStatusChanges devuelve el historial de status por orden de fecha. Incluye
 // el de elementos retirados o eliminados.
 func (s *StatusChanges) ListStatusChanges(ctx context.Context, id uuid.UUID) ([]domain.StatusChange, error) {
@@ -69,12 +112,9 @@ func (s *StatusChanges) ListStatusChanges(ctx context.Context, id uuid.UUID) ([]
 
 // ensureStatus bloquea la fila y comprueba que su status siga siendo el de origen.
 func ensureStatus(ctx context.Context, queries *sqlcgen.Queries, change domain.StatusChange) error {
-	row, err := queries.LockTask(ctx, change.TaskID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.ErrTaskNotFound
-	}
+	row, err := lockTask(ctx, queries, change.TaskID)
 	if err != nil {
-		return fmt.Errorf("bloquear tarea: %w", err)
+		return err
 	}
 	if domain.Status(row.Status) != change.From {
 		return domain.ErrTaskStatusChanged

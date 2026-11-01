@@ -14,7 +14,7 @@ import (
 
 type toolInput struct {
 	TaskID string `json:"task_id" jsonschema:"UUID de la tarea"`
-	Status string `json:"status" jsonschema:"Nuevo status: backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done o cancelled"`
+	Status string `json:"status" jsonschema:"Nuevo status: backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done o cancelled"`
 	Reason string `json:"reason,omitempty" jsonschema:"Motivo del cambio de status; queda en el historial"`
 }
 
@@ -33,7 +33,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_task_status",
-		Description: "Cambia el status de una tarea de PMT y devuelve la tarea con su última versión. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Cada transición exige un perfil: el TL debe ser el de la etapa, y solo un dev del equipo toma una tarea en ready, que queda a su nombre y solo él mueve. Cancelar y reabrir exigen reason. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No registra un cambio de contenido; deja un registro inmutable, consultable con list_task_status_changes. Usa list_tasks para obtener el ID de la tarea y su status actual.",
+		Description: "Cambia el status de una tarea de PMT y devuelve la tarea con su última versión. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Cada transición exige un perfil: el TL debe ser el de la etapa, y solo un dev del equipo toma una tarea en ready, que queda a su nombre y solo él mueve. Cancelar, reabrir, in_review → pending_close y pending_close → in_review o in_qa exigen reason. Una corrección vuelve de changes_requested a in_dev. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No registra un cambio de contenido; deja un registro inmutable, consultable con list_task_status_changes. Usa list_tasks para obtener el ID de la tarea y su status actual.",
 	}, h.callTool)
 }
 

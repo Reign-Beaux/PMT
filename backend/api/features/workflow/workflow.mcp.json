@@ -1,0 +1,130 @@
+[
+  {
+    "description": "Libera un proyecto de PMT en planning: lo pasa a stand_by junto con sus etapas en planning, todo o nada, y devuelve las etapas que movió. Solo PP y el usuario. Exige al menos una etapa activa, y cada etapa en planning necesita una tarea activa; si una falla, nada cambia y el error la nombra. Las etapas en otro status no se tocan y las tareas siguen en backlog. Deja un registro inmutable por elemento. Una etapa en planning propio sale con su registro add. Usa list_projects para obtener el ID del proyecto.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo; queda en el historial de status del proyecto y de cada etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "release_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "stages": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "stages"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Inicia una etapa de PMT en stand_by: la pasa a in_dev, sus tareas en backlog a ready y el proyecto a in_dev si sigue en stand_by, todo o nada. Solo el TL de la etapa. Exige proyecto en stand_by, in_dev o working. Las tareas en otro status no se tocan. Deja un registro inmutable por elemento; el del proyecto lleva al TL como actor y el motivo inicio de la etapa. Usa list_stages para obtener el ID de la etapa.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Motivo; queda en el historial de status de la etapa y de cada tarea",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id"
+      ],
+      "type": "object"
+    },
+    "name": "start_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "project_status": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tasks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "project_id",
+        "project_status",
+        "tasks"
+      ],
+      "type": "object"
+    }
+  }
+]
