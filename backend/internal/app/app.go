@@ -16,6 +16,7 @@ import (
 	"pmt/internal/features/bugs"
 	"pmt/internal/features/imports"
 	"pmt/internal/features/projects"
+	"pmt/internal/features/reviews"
 	"pmt/internal/features/stages"
 	"pmt/internal/features/tasks"
 	"pmt/internal/features/workflow"
@@ -69,8 +70,10 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	projects.Register(mux, tools, pool, stages.NewProgress(pool))
 	taskChecker := tasks.NewChecker(pool)
 	stages.Register(mux, tools, pool, taskChecker, projectChecker, agentChecker, workflow.NewCloser(pool))
-	tasks.Register(mux, tools, pool, stages.NewChecker(pool, projectChecker), agentChecker)
+	stageChecker := stages.NewChecker(pool, projectChecker)
+	tasks.Register(mux, tools, pool, stageChecker, agentChecker)
 	imports.Register(tools, pool)
 	workflow.Register(mux, tools, pool, taskChecker)
 	bugs.Register(mux, tools, pool, projectChecker)
+	reviews.Register(mux, tools, pool, taskChecker, bugs.NewChecker(pool), stageChecker)
 }

@@ -3,6 +3,8 @@ package domain
 import (
 	"slices"
 
+	"github.com/google/uuid"
+
 	"pmt/internal/kernel"
 )
 
@@ -135,6 +137,13 @@ func EndsVersionOne(stage Stage, versionOne []Stage) bool {
 		return false
 	}
 	return EnsureClosed(versionOne) == nil
+}
+
+// RetirementEndsVersionOne indica si retirar la etapa termina la versión 1. versionOne
+// son las etapas de esa versión antes del retiro: retirar una agregada no termina nada.
+func RetirementEndsVersionOne(stageID uuid.UUID, versionOne []Stage) bool {
+	rest := slices.DeleteFunc(slices.Clone(versionOne), func(s Stage) bool { return s.ID == stageID })
+	return len(rest) < len(versionOne) && EnsureClosed(rest) == nil
 }
 
 // ChangeStatus pasa la etapa a otro estado si la transición está permitida. Las

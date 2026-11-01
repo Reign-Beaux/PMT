@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 type fakeTasks struct {
@@ -25,6 +26,7 @@ type fakeRepo struct {
 	existing uuid.UUID
 	ownPlan  bool
 	changes  []domain.Change
+	actor    kernel.Actor
 }
 
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
@@ -37,8 +39,9 @@ func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
 	return domain.Stage{ID: id, Name: "Crear login"}, nil
 }
 
-func (r *fakeRepo) Retire(_ context.Context, change domain.Change) (domain.Change, error) {
+func (r *fakeRepo) RetireStage(_ context.Context, _ domain.Stage, change domain.Change, actor kernel.Actor) (domain.Change, error) {
 	change.Version = 3
+	r.actor = actor
 	r.changes = append(r.changes, change)
 	return change, nil
 }
@@ -51,7 +54,9 @@ func TestHandleRetires(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	result, err := newHandler(repo).Handle(context.Background(), Command{ID: id, Reason: "No se pensó bien", RequestedBy: "PM"})
+	actor := kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}
+
+	result, err := newHandler(repo).Handle(context.Background(), Command{ID: id, Reason: "No se pensó bien", RequestedBy: "PM", Actor: actor})
 
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +66,9 @@ func TestHandleRetires(t *testing.T) {
 	}
 	if len(repo.changes) != 1 || repo.changes[0].Kind != domain.ChangeRetire || repo.changes[0].Name != "Crear login" {
 		t.Errorf("cambios = %+v", repo.changes)
+	}
+	if repo.actor != actor {
+		t.Errorf("actor = %+v", repo.actor)
 	}
 }
 

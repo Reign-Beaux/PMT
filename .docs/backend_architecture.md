@@ -195,18 +195,18 @@ Cada feature corresponde a un agregado principal:
 | `stages` | Etapas de un proyecto. |
 | `tasks` | Tareas, estados, asignaciones y propuestas de cambio. |
 | `agents` | Agentes, perfiles y tokens. Sin REST ni MCP: se administra con `pmt-server agent`. |
-| `reviews` | Revisiones de CR y hallazgos. |
+| `reviews` | Hallazgos de CR y QA sobre tareas y bugs. |
 | `qa` | Planes QAP, casos y ejecuciones de QA. |
 | `activity` | Auditoría, comentarios y bloqueos. |
 | `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
 | `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
-| `workflow` | Operaciones que mueven varios agregados en una transacción: `release_project`, `start_stage` y el cierre de una etapa. No tiene agregado propio. |
+| `workflow` | Operaciones que mueven varios agregados en una transacción: `release_project`, `start_stage` y el cierre y el retiro de una etapa. No tiene agregado propio. |
 
 Las dependencias entre features van, en general, en este sentido:
 
 ```text
 reviews, qa → tasks → stages → projects
-bugs → projects
+reviews → bugs → projects
 tasks → agents
 todas → activity
 ```
@@ -256,7 +256,7 @@ Ninguna otra feature importa `imports`, así que no hay ciclos. El formato del f
 
 - `workflow/domain` declara qué mueve cada operación. Las reglas siguen en el `domain` de cada feature, incluidos su tabla de perfiles y su ámbito.
 - `workflow/store` usa el `store` de `projects`, `stages` y `tasks` sobre una sola `pgx.Tx`. `pgx.Tx` tiene `Begin`, así que `NewStatusChanges(tx)` funciona: sus `BeginFunc` internos son savepoints y conservan el `FOR UPDATE` y la comparación de origen.
-- `stages/commands/changestatus` cierra una etapa con la interfaz `CloseStage`, que `app` conecta con `workflow.NewCloser`: `stages` no importa `workflow`.
+- `stages/commands/changestatus` cierra una etapa con `CloseStage`, y `stages/commands/retire` la retira con `RetireStage`, que `app` conecta con `workflow.NewCloser`: `stages` no importa `workflow`.
 - El bloqueo sigue siempre el orden proyecto, etapa y tareas por ID.
 
 ## Identidad y permisos
@@ -309,14 +309,14 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 Cambiar el status depende de las etapas; ver [Reglas entre status](#reglas-entre-status).
 
-**Movimientos automáticos.** Ocurren en la transacción que los provoca, sin consultar la tabla de perfiles. El actor es quien hizo la operación: el TL en `start_stage` y al cerrar, y quien canceló la etapa al cancelar:
+**Movimientos automáticos.** Ocurren en la transacción que los provoca, sin consultar la tabla de perfiles. El actor es quien hizo la operación: el TL en `start_stage` y al cerrar, y quien canceló o retiró la etapa en esos casos:
 
 | Movimiento | Cuándo | Motivo |
 | --- | --- | --- |
 | `stand_by → in_dev` | `start_stage`, si el proyecto sigue en `stand_by`. `change_project_status` también lo hace, para PP y `User`, con la regla 12 | `inicio de la etapa <nombre>` |
-| `in_dev → working` | Al pasar a `done` una etapa, o a `cancelled` una etapa de la versión 1, si las etapas de la **versión 1** cumplen la regla 13: todas en `done` o `cancelled`, con al menos una en `done`. Si todas quedan canceladas, el proyecto no cambia. Nunca es manual | `cierre de la versión 1` |
+| `in_dev → working` | Al pasar a `done` una etapa, o al cancelar o retirar una etapa de la versión 1, si las etapas de la **versión 1** cumplen la regla 13: todas en `done`, `cancelled` o retiradas, con al menos una en `done`. Si ninguna queda en `done`, el proyecto no cambia. Nunca es manual | `cierre de la versión 1` |
 
-La versión 1 son las etapas de la planeación original con PP, las que no tienen registro `add`. Las agregadas no cuentan, aunque se agreguen antes de `working`, y una etapa en planning propio tampoco. Cancelar una etapa agregada no mueve el proyecto. `CloseStage` bloquea primero el proyecto, para que dos cierres simultáneos se vean entre sí. `stopped → working` sigue siendo manual y evalúa las mismas etapas; ver [Reglas entre status](#reglas-entre-status).
+La versión 1 son las etapas de la planeación original con PP, las que no tienen registro `add`. Las agregadas no cuentan, aunque se agreguen antes de `working`, y una etapa en planning propio tampoco. Cancelar o retirar una etapa agregada no mueve el proyecto. `CloseStage` y `RetireStage` bloquean primero el proyecto, para que dos cierres simultáneos se vean entre sí. `stopped → working` sigue siendo manual y evalúa las mismas etapas; ver [Reglas entre status](#reglas-entre-status).
 
 ## Estados de una etapa
 
@@ -483,7 +483,7 @@ Fuera de `planning`, las etapas y tareas cambian mediante registros inmutables, 
 - **Historial:** `list_stage_changes` (`GET /api/projects/{project_id}/stage-changes?stage_id=`) y `list_task_changes` (`GET /api/stages/{stage_id}/task-changes?task_id=`). Para cada elemento con al menos un cambio devuelven `original` (contenido de la fila, con `created_at`) y `changes` en orden de `version`. Se consulta por padre porque lo retirado no aparece en `list_*`. Sin registros responde lista vacía.
 - **Retirado:** `GetStage`, `GetTask`, `ListStages` y `ListTasks` lo excluyen, así que responde `NotFound` en todas las operaciones y el retiro no se deshace. Su `status` y su `position` no cambian. `position` nunca se renumera ni se reutiliza.
 - **Cierre:** las tareas retiradas no cuentan para pasar a `done`; las agregadas nacen en `backlog` y sí cuentan. Agregar a una etapa en `done` no la reabre.
-- **Retirar una etapa:** con tareas activas responde `kernel.Conflict`. `stages` define `retire.TaskChecker`, que implementa `tasks.Checker` sobre `tasks/queries/hasactive`.
+- **Retirar una etapa:** con tareas activas responde `kernel.Conflict`. `stages` define `retire.TaskChecker`, que implementa `tasks.Checker` sobre `tasks/queries/hasactive`. El retiro pasa por `RetireStage`, de `workflow`, y puede disparar el paso a `working`; ver [movimientos automáticos](#estados-de-un-proyecto).
 - **Status del proyecto:** `add_*`, `revise_*` y `retire_*` funcionan con cualquiera, salvo sobre una etapa en su planning propio. Así, un elemento con historial se sigue pudiendo cambiar si el proyecto vuelve a `planning`.
 - **Inmutabilidad:** triggers de PostgreSQL rechazan `UPDATE`, `DELETE` y `TRUNCATE` en ambas tablas, y `ON DELETE RESTRICT` impide borrar un elemento con historial. No hay consultas, comandos ni rutas que los modifiquen.
 - **Transacción:** `store/changes.go` escribe el registro, y en `retire_*` también `retired_at`, con `pgx.BeginFunc`, porque `kernel.Transactor` sigue pendiente. Bloquea el elemento con `FOR UPDATE` para numerar las versiones.
@@ -572,6 +572,22 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 **Perfiles:** un bug no tiene etapa, así que todo es por perfil, sin asignación. QA confirma; Dev inicia, entrega y retoma; CR aprueba, pide corrección o lleva un cambio interno a `pending_close`; QA aprueba o pide corrección en `in_qa`; el TL cierra o devuelve a `in_review` o `in_qa`. QA o TL rechazan un bug `reported` y reabren uno `rejected`; solo TL rechaza desde los demás. Rechazar, reabrir, `in_review → pending_close` y devolver exigen motivo.
 
+## Hallazgos
+
+Un hallazgo es algo que CR o QA encontró en una tarea o un bug. Lo guarda `findings`, de la feature `reviews`, con `blocking`, quién lo registró y su perfil. Nace en `open` y termina en `fixed` o `dismissed`; no se reabre.
+
+| Comando MCP | REST | Quién | Efecto |
+| --- | --- | --- | --- |
+| `create_finding` | `POST /api/findings` | CR, QA | Registra el hallazgo. El elemento debe existir, sin retirar |
+| `close_finding` | `PUT /api/findings/{id}/close` | `fixed`: CR, QA. `dismissed`: TL de la etapa, o TL en bugs | Cierra con `resolution` y motivo obligatorio |
+| `list_findings` | `GET /api/findings?item_kind=&item_id=&pending=` | Todos | Por fecha. Con `pending=true`, solo los abiertos, bloqueantes primero |
+
+- **No frenan el flujo:** no tocan el status del elemento, y QA puede aprobar con hallazgos abiertos. CR y QA lo devuelven con `change_tasks_status` o `change_bug_status`.
+- **Sin llave foránea:** igual que el [historial de status](#historial-de-status), para no impedir `delete_task`. La existencia se valida al crear, y `list_findings` no la comprueba: responde lista vacía.
+- **Validación de `close_finding`:** resolución conocida, abierto, perfil, ámbito y motivo. Solo espacios cuenta como motivo vacío. Cerrar uno cerrado responde `kernel.Conflict`; el `UPDATE` exige `status = 'open'`, así que de dos cierres simultáneos el segundo también. `User` no registra ni cierra hallazgos: no tiene lo de CR, QA ni TL.
+- **Tarea que ya no existe:** descartar exige saber su etapa, así que responde `NotFound` si la tarea se retiró o se eliminó. `fixed` no consulta la tarea.
+- **Colaboración:** `tasks.Checker` da `StageOf`, `stages.Checker` da `Team` y `bugs.Checker` da `Check`, sobre `bugs/queries/get`. Todo se conecta en `registerFeatures`.
+
 ## Transacciones
 
 - Los commands usan la interfaz `kernel.Transactor`, con `WithinTx(ctx, fn)`, implementada en `platform/postgres`.
@@ -601,10 +617,9 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, y la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
 - **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
-- **Carencia conocida:** `store` no tiene pruebas automáticas contra PostgreSQL.
 
 ## Orden de construcción
 
@@ -613,7 +628,8 @@ Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 3. Reglas por perfil en las transiciones, con asignación, reglas entre status y lotes. Hecho.
 4. `activity`, integrada a las transiciones.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
-6. `reviews` y `qa`.
+6. `reviews`. Hecho.
+7. `qa`.
 
 Una operación debe funcionar de entrada a salida antes de extender el patrón a otras.
 

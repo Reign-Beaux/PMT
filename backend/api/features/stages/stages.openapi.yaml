@@ -230,6 +230,7 @@ paths:
           format: uuid
     post:
       summary: Retira la etapa sin borrar nada
+      description: Al retirar la última etapa abierta de la versión 1, el proyecto pasa solo de in_dev a working, en la misma transacción, si al menos una quedó en done y las demás en done, cancelled o retiradas. El actor es quien retira y el motivo, `cierre de la versión 1`. Retirar una etapa agregada no mueve el proyecto.
       requestBody:
         required: true
         content:

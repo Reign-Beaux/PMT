@@ -118,12 +118,13 @@ type Checker struct {
 	hasActive *hasactive.Handler
 	assigned  *checkassigned.Handler
 	release   *checkrelease.Handler
+	get       *get.Handler
 }
 
 // NewChecker crea el verificador sobre las queries checkdone y hasactive.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewTasks(db)
-	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo), release: checkrelease.New(repo)}
+	return &Checker{checkDone: checkdone.New(repo), hasActive: hasactive.New(repo), assigned: checkassigned.New(repo), release: checkrelease.New(repo), get: get.New(repo)}
 }
 
 // EnsureClosable devuelve un error de negocio si las tareas de la etapa no permiten cerrarla.
@@ -143,6 +144,15 @@ func (c *Checker) EnsureReleasable(ctx context.Context, stageID uuid.UUID) error
 // HasOpenAssigned indica si el agente tiene tareas sin terminar en la etapa.
 func (c *Checker) HasOpenAssigned(ctx context.Context, stageID uuid.UUID, agent string) (bool, error) {
 	return c.assigned.Handle(ctx, stageID, agent)
+}
+
+// StageOf devuelve la etapa de una tarea, o un error de negocio si no existe o está retirada.
+func (c *Checker) StageOf(ctx context.Context, taskID uuid.UUID) (uuid.UUID, error) {
+	task, err := c.get.Handle(ctx, taskID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return task.StageID, nil
 }
 
 // HasActive indica si la etapa tiene tareas sin retirar.

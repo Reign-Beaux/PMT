@@ -1,5 +1,5 @@
 // Package workflow compone las operaciones que mueven varios agregados en una
-// transacción: release_project, start_stage y el cierre de una etapa.
+// transacción: release_project, start_stage y el cierre y el retiro de una etapa.
 package workflow
 
 import (

@@ -119,18 +119,51 @@ func (s *Workflow) CloseStage(ctx context.Context, stage stagedomain.Stage, chan
 		if !stagedomain.EndsVersionOne(updated, versionOne) {
 			return nil
 		}
-		from := project.Status
-		if !project.CloseVersionOne() {
-			return nil
-		}
-		statusChange := projectdomain.NewStatusChange(project.ID, from, project.Status, actor, VersionOneClosedReason)
-		_, err = projects.NewStatusChanges(tx).ChangeStatus(ctx, project, statusChange)
-		return err
+		return closeVersionOne(ctx, tx, project, actor)
 	})
 	if err != nil {
 		return stagedomain.Stage{}, err
 	}
 	return updated, nil
+}
+
+// RetireStage registra el retiro de la etapa y, si con él termina la versión 1 y el
+// proyecto sigue en in_dev, lo pasa a working con actor como responsable. Bloquea
+// primero el proyecto, igual que CloseStage.
+func (s *Workflow) RetireStage(ctx context.Context, stage stagedomain.Stage, change stagedomain.Change, actor kernel.Actor) (stagedomain.Change, error) {
+	var saved stagedomain.Change
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		project, err := projects.NewProjects(tx).Lock(ctx, stage.ProjectID)
+		if err != nil {
+			return err
+		}
+		versionOne, err := stages.NewStages(tx).ListVersionOne(ctx, stage.ProjectID)
+		if err != nil {
+			return err
+		}
+		if saved, err = stages.NewChanges(tx).Retire(ctx, change); err != nil {
+			return err
+		}
+		if !stagedomain.RetirementEndsVersionOne(stage.ID, versionOne) {
+			return nil
+		}
+		return closeVersionOne(ctx, tx, project, actor)
+	})
+	if err != nil {
+		return stagedomain.Change{}, err
+	}
+	return saved, nil
+}
+
+// closeVersionOne pasa el proyecto ya bloqueado a working si sigue en in_dev.
+func closeVersionOne(ctx context.Context, tx pgx.Tx, project projectdomain.Project, actor kernel.Actor) error {
+	from := project.Status
+	if !project.CloseVersionOne() {
+		return nil
+	}
+	change := projectdomain.NewStatusChange(project.ID, from, project.Status, actor, VersionOneClosedReason)
+	_, err := projects.NewStatusChanges(tx).ChangeStatus(ctx, project, change)
+	return err
 }
 
 func moveStage(ctx context.Context, tx pgx.Tx, move domain.StageMove) error {

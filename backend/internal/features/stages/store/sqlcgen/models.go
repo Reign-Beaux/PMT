@@ -43,6 +43,21 @@ type BugStatusChange struct {
 	ChangedAt    time.Time
 }
 
+type Finding struct {
+	ID           uuid.UUID
+	ItemKind     string
+	ItemID       uuid.UUID
+	Description  string
+	Blocking     bool
+	Status       string
+	ActorName    string
+	ActorProfile string
+	ClosedBy     pgtype.Text
+	CloseReason  string
+	CreatedAt    time.Time
+	ClosedAt     pgtype.Timestamptz
+}
+
 type Project struct {
 	ID             uuid.UUID
 	Name           string

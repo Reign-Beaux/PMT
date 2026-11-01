@@ -7,12 +7,15 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Stage, error)
-	Retire(ctx context.Context, change domain.Change) (domain.Change, error)
+	// RetireStage guarda el retiro y, si termina la versión 1, pasa el proyecto a
+	// working en la misma transacción. Lo implementa la feature workflow.
+	RetireStage(ctx context.Context, s domain.Stage, change domain.Change, actor kernel.Actor) (domain.Change, error)
 }
 
 // TaskChecker indica si una etapa tiene tareas sin retirar. Lo implementa la
@@ -26,6 +29,8 @@ type Command struct {
 	ID          uuid.UUID `json:"-"`
 	Reason      string    `json:"reason"`
 	RequestedBy string    `json:"requested_by"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result identifica el retiro.
@@ -66,7 +71,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 
-	saved, err := h.repo.Retire(ctx, change)
+	saved, err := h.repo.RetireStage(ctx, stage, change, cmd.Actor)
 	if err != nil {
 		return Result{}, err
 	}

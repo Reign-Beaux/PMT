@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: PMT - Revisiones
+  version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
+paths:
+  /api/findings:
+    post:
+      summary: Registra un hallazgo sobre una tarea o un bug
+      description: Solo CR y QA. No cambia el status del elemento.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [item_kind, item_id, description, blocking]
+              properties:
+                item_kind:
+                  $ref: "#/components/schemas/ItemKind"
+                item_id:
+                  type: string
+                  format: uuid
+                description:
+                  type: string
+                blocking:
+                  type: boolean
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          $ref: "#/components/responses/Finding"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    get:
+      summary: Lista los hallazgos de una tarea o un bug
+      description: Por fecha. Con `pending=true`, solo los abiertos, bloqueantes primero. No comprueba que el elemento exista.
+      parameters:
+        - name: item_kind
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/ItemKind"
+        - name: item_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pending
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Hallazgos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Finding"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/findings/{id}/close:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cierra un hallazgo abierto
+      description: "`fixed`: CR o QA. `dismissed`: el TL de la etapa de la tarea, o un TL si es de un bug; si la tarea ya no existe o está retirada, responde 404. El motivo es obligatorio. Un hallazgo cerrado responde 409."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [resolution, reason]
+              properties:
+                resolution:
+                  type: string
+                  enum: [fixed, dismissed]
+                reason:
+                  type: string
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Finding"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Finding:
+      description: Hallazgo
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Finding"
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    ItemKind:
+      type: string
+      enum: [task, bug]
+    Finding:
+      type: object
+      required: [id, item_kind, item_id, description, blocking, status, actor_name, actor_profile, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        item_kind:
+          $ref: "#/components/schemas/ItemKind"
+        item_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        blocking:
+          type: boolean
+        status:
+          type: string
+          enum: [open, fixed, dismissed]
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+        closed_by:
+          type: string
+        close_reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

@@ -1,0 +1,227 @@
+[
+  {
+    "description": "Cierra un hallazgo abierto, con motivo obligatorio. fixed: CR o QA, cuando verificaron la corrección. dismissed: el TL de la etapa de la tarea, o un TL si es de un bug; exige que la tarea siga existiendo. Un hallazgo cerrado no se vuelve a cerrar ni se reabre. No cambia el status del elemento. Usa list_findings para obtener su ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "description": "UUID del hallazgo",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cierre",
+          "type": "string"
+        },
+        "resolution": {
+          "description": "Cierre: fixed o dismissed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "resolution",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "close_finding",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "close_reason": {
+          "type": "string"
+        },
+        "closed_at": {
+          "type": "string"
+        },
+        "closed_by": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "item_kind": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "item_kind",
+        "item_id",
+        "status",
+        "closed_by",
+        "close_reason",
+        "closed_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Registra un hallazgo de CR o QA sobre una tarea o un bug. Solo CR y QA. No cambia el status del elemento: para devolverlo usa change_tasks_status o change_bug_status. Usa list_tasks o list_bugs para obtener su ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "description": "Si impide aprobar: una falla bloqueante se devuelve de inmediato",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Qué se encontró",
+          "type": "string"
+        },
+        "item_id": {
+          "description": "UUID de la tarea o el bug",
+          "type": "string"
+        },
+        "item_kind": {
+          "description": "Tipo de elemento: task o bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_kind",
+        "item_id",
+        "description",
+        "blocking"
+      ],
+      "type": "object"
+    },
+    "name": "create_finding",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_name": {
+          "type": "string"
+        },
+        "actor_profile": {
+          "type": "string"
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "item_kind": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "item_kind",
+        "item_id",
+        "description",
+        "blocking",
+        "status",
+        "actor_name",
+        "actor_profile",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista los hallazgos de una tarea o un bug por fecha. Con pending, solo los abiertos, bloqueantes primero. Disponible para todos los perfiles. No comprueba que el elemento exista: sin hallazgos responde lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "description": "UUID de la tarea o el bug",
+          "type": "string"
+        },
+        "item_kind": {
+          "description": "Tipo de elemento: task o bug",
+          "type": "string"
+        },
+        "pending": {
+          "description": "Solo los abiertos, bloqueantes primero",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "item_kind",
+        "item_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_findings",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "findings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "blocking": {
+                "type": "boolean"
+              },
+              "close_reason": {
+                "type": "string"
+              },
+              "closed_at": {
+                "type": "string"
+              },
+              "closed_by": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "description",
+              "blocking",
+              "status",
+              "actor_name",
+              "actor_profile",
+              "created_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "findings"
+      ],
+      "type": "object"
+    }
+  }
+]

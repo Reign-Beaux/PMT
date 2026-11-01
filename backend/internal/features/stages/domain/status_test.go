@@ -95,3 +95,34 @@ func TestEndsVersionOne(t *testing.T) {
 		})
 	}
 }
+
+func TestRetirementEndsVersionOne(t *testing.T) {
+	retired := Stage{ID: uuid.New(), Status: StatusInDev}
+	done := Stage{ID: uuid.New(), Status: StatusDone}
+	cancelled := Stage{ID: uuid.New(), Status: StatusCancelled}
+	open := Stage{ID: uuid.New(), Status: StatusInDev}
+	stopped := Stage{ID: uuid.New(), Status: StatusStopped}
+
+	tests := []struct {
+		name       string
+		stageID    uuid.UUID
+		versionOne []Stage
+		want       bool
+	}{
+		{"retirar la última con otra en done", retired.ID, []Stage{done, retired}, true},
+		{"retirar la última con done y cancelled", retired.ID, []Stage{done, cancelled, retired}, true},
+		{"retirar con otra abierta", retired.ID, []Stage{done, open, retired}, false},
+		{"retirar con otra detenida", retired.ID, []Stage{done, stopped, retired}, false},
+		{"sin ninguna en done", retired.ID, []Stage{cancelled, retired}, false},
+		{"retirar la única", retired.ID, []Stage{retired}, false},
+		{"retirar la única en done", done.ID, []Stage{done, cancelled}, false},
+		{"retirar una agregada no termina la versión 1", uuid.New(), []Stage{done}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RetirementEndsVersionOne(tt.stageID, tt.versionOne); got != tt.want {
+				t.Errorf("RetirementEndsVersionOne = %v, se esperaba %v", got, tt.want)
+			}
+		})
+	}
+}

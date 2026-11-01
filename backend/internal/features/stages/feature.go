@@ -51,10 +51,11 @@ type AgentChecker interface {
 	addmember.AgentChecker
 }
 
-// StageCloser cierra o cancela una etapa y mueve el proyecto si termina la versión 1. Lo
-// implementa la feature workflow.
+// StageCloser cierra, cancela o retira una etapa y mueve el proyecto si termina la
+// versión 1. Lo implementa la feature workflow.
 type StageCloser interface {
 	CloseStage(ctx context.Context, s domain.Stage, change domain.StatusChange, actor kernel.Actor) (domain.Stage, error)
+	RetireStage(ctx context.Context, s domain.Stage, change domain.Change, actor kernel.Actor) (domain.Change, error)
 }
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
@@ -119,8 +120,8 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 
 	retireStage := retire.New(struct {
 		*store.Stages
-		*store.Changes
-	}{repo, changes}, tasks)
+		StageCloser
+	}{repo, closer}, tasks)
 	retireStage.Register(mux)
 	retireStage.RegisterTool(tools)
 

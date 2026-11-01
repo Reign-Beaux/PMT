@@ -28,7 +28,9 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | 7 | Dev | de `changes_requested` a `in_dev` | Corrige y vuelve a entregar |
 | 8 | QA | a `pending_close` o `changes_requested` | Aprueba o pide corrección |
 | 9 | TL | a `done`, o con motivo a `in_review` o `in_qa` | Cierra o devuelve |
-| 10 | TL | `change_stage_status` a `done` | Cierra la etapa; con la última de la versión 1, el proyecto pasa solo a `working`. Cancelar la última abierta, potestad de PP o `User`, tiene el mismo efecto si otra quedó en `done` |
+| 10 | TL | `change_stage_status` a `done` | Cierra la etapa; con la última de la versión 1, el proyecto pasa solo a `working`. Cancelar la última abierta, potestad de PP o `User`, o retirarla, tiene el mismo efecto si otra quedó en `done` |
+
+**Hallazgos:** CR y QA los registran con `create_finding`, indicando si son bloqueantes, y los cierran como `fixed` con `close_finding`. El TL de la etapa, o un TL en bugs, los descarta como `dismissed`. Ambos cierres exigen motivo. Todos los perfiles los consultan con `list_findings`. No frenan transiciones: la decisión de devolver es de CR o QA.
 
 **Camino que termina en CR:** un cambio interno va de `in_review` a `pending_close` sin pasar por QA, y lo cierra el TL.
 
