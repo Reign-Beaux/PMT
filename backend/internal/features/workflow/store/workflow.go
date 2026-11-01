@@ -99,9 +99,9 @@ func (s *Workflow) Start(ctx context.Context, plan domain.StartPlan) error {
 	})
 }
 
-// CloseStage pasa la etapa a done y, si con ella termina la versión 1 y el proyecto
-// sigue en in_dev, lo pasa a working con el TL como actor. Bloquea primero el
-// proyecto: dos cierres simultáneos se ven entre sí y uno de ellos lo mueve.
+// CloseStage pasa la etapa a done o a cancelled y, si con ella termina la versión 1 y
+// el proyecto sigue en in_dev, lo pasa a working con actor como responsable. Bloquea
+// primero el proyecto: dos cierres simultáneos se ven entre sí y uno de ellos lo mueve.
 func (s *Workflow) CloseStage(ctx context.Context, stage stagedomain.Stage, change stagedomain.StatusChange, actor kernel.Actor) (stagedomain.Stage, error) {
 	var updated stagedomain.Stage
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
@@ -116,7 +116,7 @@ func (s *Workflow) CloseStage(ctx context.Context, stage stagedomain.Stage, chan
 		if err != nil {
 			return err
 		}
-		if stagedomain.EnsureClosed(versionOne) != nil {
+		if !stagedomain.EndsVersionOne(updated, versionOne) {
 			return nil
 		}
 		from := project.Status

@@ -62,3 +62,36 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestEndsVersionOne(t *testing.T) {
+	closing := Stage{ID: uuid.New(), Status: StatusCancelled}
+	done := Stage{ID: uuid.New(), Status: StatusDone}
+	cancelled := Stage{ID: uuid.New(), Status: StatusCancelled}
+	open := Stage{ID: uuid.New(), Status: StatusInDev}
+	stopped := Stage{ID: uuid.New(), Status: StatusStopped}
+	added := Stage{ID: uuid.New(), Status: StatusCancelled}
+	closed := Stage{ID: uuid.New(), Status: StatusDone}
+
+	tests := []struct {
+		name       string
+		stage      Stage
+		versionOne []Stage
+		want       bool
+	}{
+		{"cancelar la última con otra en done", closing, []Stage{done, closing}, true},
+		{"cancelar con otra abierta", closing, []Stage{done, open, closing}, false},
+		{"cancelar con otra detenida", closing, []Stage{done, stopped, closing}, false},
+		{"todas canceladas", closing, []Stage{cancelled, closing}, false},
+		{"cancelar una agregada no termina la versión 1", added, []Stage{done, closing}, false},
+		{"cerrar la última", closed, []Stage{cancelled, closed}, true},
+		{"cerrar una agregada con la versión 1 terminada", closed, []Stage{done}, true},
+		{"cerrar con otra abierta", closed, []Stage{closed, open}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := EndsVersionOne(tt.stage, tt.versionOne); got != tt.want {
+				t.Errorf("EndsVersionOne = %v, se esperaba %v", got, tt.want)
+			}
+		})
+	}
+}

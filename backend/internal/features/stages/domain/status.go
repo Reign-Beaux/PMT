@@ -37,9 +37,9 @@ var (
 	// ErrNoStagesStandBy aplica la regla 12.
 	ErrNoStagesStandBy = kernel.Conflict("el proyecto no tiene etapas en stand_by")
 	// ErrNoStagesDone aplica la regla 13.
-	ErrNoStagesDone = kernel.Conflict("el proyecto no tiene etapas en done")
+	ErrNoStagesDone = kernel.Conflict("la versión 1 no tiene etapas en done")
 	// ErrStagesOpen aplica las reglas 13 y 14.
-	ErrStagesOpen = kernel.Conflict("el proyecto tiene etapas sin terminar: todas deben estar en done o cancelled")
+	ErrStagesOpen = kernel.Conflict("la versión 1 tiene etapas sin terminar: todas deben estar en done o cancelled")
 )
 
 // Status es el estado de una etapa.
@@ -125,6 +125,16 @@ func EnsureClosed(stages []Stage) error {
 		return ErrNoStagesDone
 	}
 	return nil
+}
+
+// EndsVersionOne indica si, con la etapa ya en su nuevo status, termina la versión 1.
+// versionOne son las etapas de esa versión tras el cambio. Cancelar solo cuenta si la
+// etapa es de la versión 1: cancelar una agregada no termina nada.
+func EndsVersionOne(stage Stage, versionOne []Stage) bool {
+	if stage.Status == StatusCancelled && !slices.ContainsFunc(versionOne, func(s Stage) bool { return s.ID == stage.ID }) {
+		return false
+	}
+	return EnsureClosed(versionOne) == nil
 }
 
 // ChangeStatus pasa la etapa a otro estado si la transición está permitida. Las

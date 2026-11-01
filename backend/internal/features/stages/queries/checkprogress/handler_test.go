@@ -11,12 +11,17 @@ import (
 )
 
 type fakeReader struct {
-	stages []domain.Stage
-	err    error
+	stages     []domain.Stage
+	versionOne []domain.Stage
+	err        error
 }
 
 func (r fakeReader) List(context.Context, uuid.UUID) ([]domain.Stage, error) {
 	return r.stages, r.err
+}
+
+func (r fakeReader) ListVersionOne(context.Context, uuid.UUID) ([]domain.Stage, error) {
+	return r.versionOne, r.err
 }
 
 func withStatus(statuses ...domain.Status) fakeReader {
@@ -24,6 +29,7 @@ func withStatus(statuses ...domain.Status) fakeReader {
 	for _, status := range statuses {
 		reader.stages = append(reader.stages, domain.Stage{Status: status})
 	}
+	reader.versionOne = reader.stages
 	return reader
 }
 
@@ -82,6 +88,31 @@ func TestEnsureClosed(t *testing.T) {
 		{"solo canceladas", withStatus(domain.StatusCancelled), domain.ErrNoStagesDone},
 		{"una en in_dev", withStatus(domain.StatusDone, domain.StatusInDev), domain.ErrStagesOpen},
 		{"una detenida", withStatus(domain.StatusDone, domain.StatusStopped), domain.ErrStagesOpen},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := New(tt.reader).EnsureClosed(context.Background(), uuid.New())
+			if !errors.Is(err, tt.want) {
+				t.Errorf("err = %v, se esperaba %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnsureClosedOnlyCountsVersionOne(t *testing.T) {
+	added := func(status domain.Status, versionOne ...domain.Status) fakeReader {
+		reader := withStatus(versionOne...)
+		reader.stages = append(reader.stages, domain.Stage{Status: status})
+		return reader
+	}
+	tests := []struct {
+		name   string
+		reader fakeReader
+		want   error
+	}{
+		{"versión 1 terminada y agregada abierta", added(domain.StatusInDev, domain.StatusDone, domain.StatusCancelled), nil},
+		{"versión 1 abierta y agregada en done", added(domain.StatusDone, domain.StatusDone, domain.StatusInDev), domain.ErrStagesOpen},
+		{"versión 1 cancelada y agregada en done", added(domain.StatusDone, domain.StatusCancelled), domain.ErrNoStagesDone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

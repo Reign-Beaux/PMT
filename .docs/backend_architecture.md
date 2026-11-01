@@ -309,14 +309,14 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 Cambiar el status depende de las etapas; ver [Reglas entre status](#reglas-entre-status).
 
-**Movimientos automáticos.** Ocurren en la transacción que los provoca, sin consultar la tabla de perfiles, con el TL como actor:
+**Movimientos automáticos.** Ocurren en la transacción que los provoca, sin consultar la tabla de perfiles. El actor es quien hizo la operación: el TL en `start_stage` y al cerrar, y quien canceló la etapa al cancelar:
 
 | Movimiento | Cuándo | Motivo |
 | --- | --- | --- |
 | `stand_by → in_dev` | `start_stage`, si el proyecto sigue en `stand_by`. `change_project_status` también lo hace, para PP y `User`, con la regla 12 | `inicio de la etapa <nombre>` |
-| `in_dev → working` | Al pasar a `done` una etapa, si las etapas de la **versión 1** cumplen la regla 13. Nunca es manual | `cierre de la versión 1` |
+| `in_dev → working` | Al pasar a `done` una etapa, o a `cancelled` una etapa de la versión 1, si las etapas de la **versión 1** cumplen la regla 13: todas en `done` o `cancelled`, con al menos una en `done`. Si todas quedan canceladas, el proyecto no cambia. Nunca es manual | `cierre de la versión 1` |
 
-La versión 1 son las etapas de la planeación original con PP, las que no tienen registro `add`. Las agregadas no cuentan, aunque se agreguen antes de `working`, y una etapa en planning propio tampoco. `CloseStage` bloquea primero el proyecto, para que dos cierres simultáneos se vean entre sí. `stopped → working` sigue siendo manual.
+La versión 1 son las etapas de la planeación original con PP, las que no tienen registro `add`. Las agregadas no cuentan, aunque se agreguen antes de `working`, y una etapa en planning propio tampoco. Cancelar una etapa agregada no mueve el proyecto. `CloseStage` bloquea primero el proyecto, para que dos cierres simultáneos se vean entre sí. `stopped → working` sigue siendo manual y evalúa las mismas etapas; ver [Reglas entre status](#reglas-entre-status).
 
 ## Estados de una etapa
 
@@ -335,7 +335,7 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 **Perfiles:** `stand_by → in_dev` e `in_dev → done` son del TL de la etapa; `done → in_dev`, de PP, `User` o ese TL, con motivo. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User`, PC y el TL detienen y reanudan. Detener, cancelar y reabrir exigen motivo.
 
-**Regla de cierre:** una etapa solo pasa a `done` si todas sus tareas activas están en `done` o `cancelled`, con al menos una en `done`; si no, la operación responde `kernel.Conflict`. Una etapa vacía o toda cancelada no cierra: se cancela. Reabrirla (`done` → `in_dev`) no consulta las tareas, pero cumple la regla 5. Como `stages` no importa `tasks`, la slice define la interfaz `changestatus.TaskChecker`, que implementa `tasks.Checker.EnsureClosable` sobre el recuento de `tasks/queries/checkdone`, conectada en `registerFeatures`. Toda salida a `done` pasa por `CloseStage`; ver [movimientos automáticos](#estados-de-un-proyecto).
+**Regla de cierre:** una etapa solo pasa a `done` si todas sus tareas activas están en `done` o `cancelled`, con al menos una en `done`; si no, la operación responde `kernel.Conflict`. Una etapa vacía o toda cancelada no cierra: se cancela. Reabrirla (`done` → `in_dev`) no consulta las tareas, pero cumple la regla 5. Como `stages` no importa `tasks`, la slice define la interfaz `changestatus.TaskChecker`, que implementa `tasks.Checker.EnsureClosable` sobre el recuento de `tasks/queries/checkdone`, conectada en `registerFeatures`. Todo paso a `done` o `cancelled` pasa por `CloseStage`, salvo la salida del planning propio; ver [movimientos automáticos](#estados-de-un-proyecto).
 
 ## Estados de una tarea
 
@@ -427,11 +427,11 @@ Las comprueba el handler después del dominio y antes de escribir. Ninguna escri
 | 10 | Igual | Con proyecto `stopped` o `cancelled`: solo `→ stopped` o `→ cancelled` |
 | 11 | `projects/commands/changestatus` | `planning → stand_by`: al menos una etapa activa y ninguna en `planning` |
 | 12 | Igual | `stand_by → in_dev`: al menos una etapa en `stand_by` |
-| 13, 14 | Igual | `→ working`: al menos una etapa en `done` y las demás sin retirar en `done` o `cancelled`, así que una detenida lo impide |
+| 13, 14 | Igual | `→ working`: entre las etapas de la versión 1, al menos una en `done` y las demás sin retirar en `done` o `cancelled`, así que una detenida lo impide. Las agregadas no cuentan |
 | 15 | `bugs/commands/changestatus` | Toda transición: proyecto en `working` |
 
 - Las reglas 4, 11 y 12 solo valen desde el origen que nombran, y no desde `stopped`.
-- `stopped → working` solo aplica la regla 13 si el proyecto nunca estuvo en `working`, según `project_status_changes`. Un proyecto que llegó antes de la fase 1 no tiene ese registro y cumple la regla.
+- `stopped → working` solo aplica la regla 13 si el proyecto nunca estuvo en `working`, según `project_status_changes`, y evalúa solo las etapas de la versión 1, igual que el paso automático. Un proyecto que llegó antes de la fase 1 no tiene ese registro y cumple la regla.
 - Las etapas en planning propio cumplen las reglas 4 y 10 al salir: las comprobaciones van antes de `LeavePlanning`.
 - Las reglas 16 y 17 ya estaban vigentes: los bugs no afectan al cierre, y `add_task` en una etapa `done` no la reabre.
 - **Colaboración:** `projects.Checker` da `AcceptsWork` e `IsFrozen` (`queries/checkstatus`); `stages.Checker`, `EnsureWorkOpen` y `EnsureTaskCancellable` (`queries/checktasks`); `tasks.Checker`, `EnsureReleasable` (`queries/checkrelease`). `stages.NewProgress` da `EnsureReleasable`, `EnsureStartable` y `EnsureClosed` (`queries/checkprogress`); no depende de `projects`, así que `registerFeatures` lo construye antes y lo pasa a `projects.Register`.

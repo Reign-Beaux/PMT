@@ -51,7 +51,7 @@ type AgentChecker interface {
 	addmember.AgentChecker
 }
 
-// StageCloser cierra una etapa y mueve el proyecto si termina la versión 1. Lo
+// StageCloser cierra o cancela una etapa y mueve el proyecto si termina la versión 1. Lo
 // implementa la feature workflow.
 type StageCloser interface {
 	CloseStage(ctx context.Context, s domain.Stage, change domain.StatusChange, actor kernel.Actor) (domain.Stage, error)

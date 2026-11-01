@@ -101,7 +101,7 @@ paths:
           format: uuid
     put:
       summary: Cambia el status de una etapa
-      description: Solo admite las transiciones permitidas, cada una con su perfil. Con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working; planning → stand_by, al menos una tarea activa; done, tareas en done o cancelled con al menos una en done. Al cerrar la última etapa de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working.
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working; planning → stand_by, al menos una tarea activa; done, tareas en done o cancelled con al menos una en done. Al cerrar o cancelar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done; si todas quedan canceladas, no cambia.
       requestBody:
         required: true
         content:

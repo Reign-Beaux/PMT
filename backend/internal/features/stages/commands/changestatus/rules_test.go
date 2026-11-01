@@ -181,3 +181,45 @@ func TestHandleUserCannotCloseStageWithAllTasksDone(t *testing.T) {
 		t.Errorf("updates = %d, etapa = %+v, consultas = %d", repo.updates, repo.stages[id], tasks.calls)
 	}
 }
+
+func TestHandleCancelGoesThroughCloseStage(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusInDev)
+	actor := kernel.Actor{Name: "pp", Profile: "PP"}
+
+	result, err := New(repo, &fakeTasks{}, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusCancelled, Actor: actor, Reason: "ya no se hará"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusCancelled || repo.closes != 1 || repo.closedBy != actor {
+		t.Errorf("status = %s, cierres = %d, actor = %+v", result.Status, repo.closes, repo.closedBy)
+	}
+}
+
+func TestHandleRejectedCancelDoesNotClose(t *testing.T) {
+	repo, id := newRepoWith(t, domain.StatusInDev)
+
+	_, err := New(repo, &fakeTasks{}, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusCancelled, Actor: kernel.Actor{Name: "pp", Profile: "PP"}})
+
+	if err == nil {
+		t.Fatal("se esperaba error por falta de motivo")
+	}
+	if repo.closes != 0 {
+		t.Errorf("cierres = %d", repo.closes)
+	}
+}
+
+func TestHandleCancelInOwnPlanningDoesNotClose(t *testing.T) {
+	s, err := domain.NewOwnPlanningStage(uuid.New(), "Pagos", "Inicial", "Petición", "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
+
+	if _, err := New(repo, &fakeTasks{}, workingProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusCancelled, Actor: kernel.Actor{Name: "pp", Profile: "PP"}, Reason: "motivo"}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.closes != 0 || len(repo.changes) != 1 {
+		t.Errorf("cierres = %d, registros add = %d", repo.closes, len(repo.changes))
+	}
+}

@@ -16,8 +16,8 @@ type Repository interface {
 	Get(ctx context.Context, id uuid.UUID) (domain.Stage, error)
 	ChangeStatus(ctx context.Context, s domain.Stage, change domain.StatusChange) (domain.Stage, error)
 	LeavePlanning(ctx context.Context, s domain.Stage, change domain.Change, statusChange domain.StatusChange) (domain.Stage, error)
-	// CloseStage guarda el paso a done y, si termina la versión 1, pasa el proyecto
-	// a working en la misma transacción. Lo implementa la feature workflow.
+	// CloseStage guarda el paso a done o a cancelled y, si termina la versión 1, pasa
+	// el proyecto a working en la misma transacción. Lo implementa la feature workflow.
 	CloseStage(ctx context.Context, s domain.Stage, change domain.StatusChange, actor kernel.Actor) (domain.Stage, error)
 }
 
@@ -75,7 +75,7 @@ func New(repo Repository, tasks TaskChecker, projects ProjectChecker) *Handler {
 
 // Handle cambia el status de la etapa si su proyecto y sus tareas lo permiten.
 // Al salir de su planning propio escribe el registro add pendiente; ese camino
-// cumple las mismas reglas. Toda salida a done pasa por CloseStage.
+// cumple las mismas reglas. Todo paso a done o cancelled pasa por CloseStage.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
@@ -100,7 +100,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		}
 		return Result(updated), nil
 	}
-	if s.Status == domain.StatusDone {
+	if s.Status == domain.StatusDone || s.Status == domain.StatusCancelled {
 		updated, err := h.repo.CloseStage(ctx, s, statusChange, cmd.Actor)
 		if err != nil {
 			return Result{}, err

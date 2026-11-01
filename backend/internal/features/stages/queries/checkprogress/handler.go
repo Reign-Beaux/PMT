@@ -13,6 +13,7 @@ import (
 // Reader es la lectura que necesita la operación. No devuelve lo retirado.
 type Reader interface {
 	List(ctx context.Context, projectID uuid.UUID) ([]domain.Stage, error)
+	ListVersionOne(ctx context.Context, projectID uuid.UUID) ([]domain.Stage, error)
 }
 
 // Handler ejecuta la operación.
@@ -35,9 +36,14 @@ func (h *Handler) EnsureStartable(ctx context.Context, projectID uuid.UUID) erro
 	return h.check(ctx, projectID, domain.EnsureStartable)
 }
 
-// EnsureClosed aplica las reglas 13 y 14 a la llegada a working.
+// EnsureClosed aplica las reglas 13 y 14 a la llegada a working, solo sobre las
+// etapas de la versión 1, igual que el paso automático.
 func (h *Handler) EnsureClosed(ctx context.Context, projectID uuid.UUID) error {
-	return h.check(ctx, projectID, domain.EnsureClosed)
+	stages, err := h.reader.ListVersionOne(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	return domain.EnsureClosed(stages)
 }
 
 func (h *Handler) check(ctx context.Context, projectID uuid.UUID, rule func([]domain.Stage) error) error {
