@@ -5,7 +5,7 @@ La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFro
 | Perfil | Nombre | Qué hace |
 |---|---|---|
 | **PP** | Project Planning | Interactúa con el usuario para definir proyectos su alcance y requerimientos. Crea la documentación de los requerimientos y planeación de etapas y tareas. |
-| **PC** | Project Coordinator | Interactúa con el usuario para consultar avances, da seguimiento y registra comunicaciones, comentarios y bloqueos/desbloqueos. |
+| **PC** | Project Coordinator | Interactúa con el usuario para consultar avances, da seguimiento y registra comentarios y bloqueos/desbloqueos. |
 | **TL** | Tech Lead | Dirige técnicamente la etapa: organiza tareas, asigna agentes técnicos y libera tareas para desarrollo. Decide sobre propuestas de cambio, aprueba o rechaza planes QAP y puede descartar hallazgos con justificación. Realiza la verificación final y registra la integración para cerrar tareas como `done`. |
 | **DevFrontend** | Developer Frontend | Lee las especificaciones de frontend e implementa la interfaz con React, Vite y TypeScript. Escribe y ejecuta sus pruebas unitarias con Vitest, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al frontend. |
 | **DevBackend** | Developer Backend | Lee las especificaciones de backend e implementa la lógica con Go. Escribe y ejecuta sus pruebas unitarias con el paquete estándar `testing` mediante `go test`, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al backend. |
