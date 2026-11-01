@@ -64,12 +64,19 @@ type Checker struct {
 	checkPlanning *checkplanning.Handler
 	checkWorking  *checkworking.Handler
 	checkStatus   *checkstatus.Handler
+	get           *get.Handler
 }
 
-// NewChecker crea el verificador sobre las queries checkplanning, checkworking y checkstatus.
+// NewChecker crea el verificador sobre las queries checkplanning, checkworking, checkstatus y get.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewProjects(db)
-	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo), checkStatus: checkstatus.New(repo)}
+	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo), checkStatus: checkstatus.New(repo), get: get.New(repo)}
+}
+
+// Check devuelve un error de negocio si el proyecto no existe.
+func (c *Checker) Check(ctx context.Context, id uuid.UUID) error {
+	_, err := c.get.Handle(ctx, id)
+	return err
 }
 
 // EnsurePlanning devuelve un error de negocio si el proyecto no existe o no está en planning.

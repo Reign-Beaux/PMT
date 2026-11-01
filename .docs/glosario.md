@@ -39,6 +39,7 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Status de un hallazgo** | `Status` | Estado de un hallazgo: `open` (pendiente), `fixed` (corregido y verificado por CR o QA) o `dismissed` (descartado por el TL). No se reabre. |
 | **Hallazgo bloqueante** | `Blocking` | Hallazgo que impide aprobar: se devuelve de inmediato. Los no bloqueantes se devuelven juntos al terminar. |
 | **Resolución** | `Resolution` | Forma de cerrar un hallazgo, `fixed` o `dismissed`, con motivo obligatorio. |
+| **Comentario** | `Comment` | Constancia de una decisión que no es una transición, o de un bloqueo, sobre un proyecto, una etapa, una tarea o un bug. No cambia el status del elemento, no se edita ni se borra, y referencia a su elemento por ID. |
 | **Plan QAP** | `Plan` | Plan de pruebas que QAP diseña para una etapa y vincula a tareas de ella. El TL de la etapa lo aprueba y QA lo ejecuta. No frena transiciones, y los bugs no tienen plan. Es la raíz de su propio agregado y referencia a su etapa y sus tareas por ID. |
 | **Status de un plan** | `Status` | Estado de un plan QAP: `draft` (QAP lo edita), `submitted` (espera la decisión del TL), `approved` (el TL aprobó su última versión) o `returned` (devuelto con correcciones). Un plan devuelto exige una versión nueva antes de reenviarse. |
 | **Versión de un plan** | `Version` | Registro inmutable del contenido de un plan QAP: camino feliz, casos de error, motivo, autor y fecha. Es una entidad del agregado `Plan`. Toda versión nueva deja el plan en `draft`. |

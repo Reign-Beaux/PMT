@@ -1,0 +1,138 @@
+[
+  {
+    "description": "Registra un comentario sobre un proyecto, una etapa, una tarea o un bug: decisiones que no son una transición y bloqueos, sin copiar los avisos. Disponible para todos los perfiles. El elemento debe existir, sin retirar. No cambia su status, y el comentario no se edita ni se borra.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "description": "Texto del comentario: la decisión o el bloqueo, sin copiar avisos",
+          "type": "string"
+        },
+        "item_id": {
+          "description": "UUID del proyecto, la etapa, la tarea o el bug",
+          "type": "string"
+        },
+        "item_kind": {
+          "description": "Tipo de elemento: project, stage, task o bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_kind",
+        "item_id",
+        "body"
+      ],
+      "type": "object"
+    },
+    "name": "add_comment",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_name": {
+          "type": "string"
+        },
+        "actor_profile": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "item_kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "item_kind",
+        "item_id",
+        "body",
+        "actor_name",
+        "actor_profile",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista por fecha los comentarios de un proyecto, una etapa, una tarea o un bug. Disponible para todos los perfiles. No comprueba que el elemento exista: sin comentarios responde lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "description": "UUID del proyecto, la etapa, la tarea o el bug",
+          "type": "string"
+        },
+        "item_kind": {
+          "description": "Tipo de elemento: project, stage, task o bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_kind",
+        "item_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_comments",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "comments": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "item_id": {
+                "type": "string"
+              },
+              "item_kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "item_kind",
+              "item_id",
+              "body",
+              "actor_name",
+              "actor_profile",
+              "created_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "comments"
+      ],
+      "type": "object"
+    }
+  }
+]

@@ -43,6 +43,16 @@ type BugStatusChange struct {
 	ChangedAt    time.Time
 }
 
+type Comment struct {
+	ID           uuid.UUID
+	ItemKind     string
+	ItemID       uuid.UUID
+	Body         string
+	ActorName    string
+	ActorProfile string
+	CreatedAt    time.Time
+}
+
 type Finding struct {
 	ID           uuid.UUID
 	ItemKind     string

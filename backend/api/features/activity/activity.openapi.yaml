@@ -1,0 +1,118 @@
+openapi: 3.1.0
+info:
+  title: PMT - Actividad
+  version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
+paths:
+  /api/comments:
+    post:
+      summary: Registra un comentario sobre un elemento
+      description: Todos los perfiles. El actor sale del token. El elemento debe existir, sin retirar. No cambia su status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [item_kind, item_id, body]
+              properties:
+                item_kind:
+                  $ref: "#/components/schemas/ItemKind"
+                item_id:
+                  type: string
+                  format: uuid
+                body:
+                  type: string
+      responses:
+        "201":
+          description: Comentario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    get:
+      summary: Lista por fecha los comentarios de un elemento
+      description: Todos los perfiles. No comprueba que el elemento exista. Sin comentarios responde lista vacía.
+      parameters:
+        - name: item_kind
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/ItemKind"
+        - name: item_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Comentarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    ItemKind:
+      type: string
+      enum: [project, stage, task, bug]
+    Comment:
+      type: object
+      required: [id, item_kind, item_id, body, actor_name, actor_profile, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        item_kind:
+          $ref: "#/components/schemas/ItemKind"
+        item_id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

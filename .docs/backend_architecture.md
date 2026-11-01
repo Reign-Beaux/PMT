@@ -197,7 +197,7 @@ Cada feature corresponde a un agregado principal:
 | `agents` | Agentes, perfiles y tokens. Sin REST ni MCP: se administra con `pmt-server agent`. |
 | `reviews` | Hallazgos de CR y QA sobre tareas y bugs. |
 | `qa` | Planes QAP, con sus versiones y tareas vinculadas. |
-| `activity` | Auditoría, comentarios y bloqueos. |
+| `activity` | Comentarios sobre proyectos, etapas, tareas y bugs. La auditoría sigue pendiente. |
 | `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
 | `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
 | `workflow` | Operaciones que mueven varios agregados en una transacción: `release_project`, `start_stage` y el cierre y el retiro de una etapa. También compone la lectura `get_project_progress`. No tiene agregado propio. |
@@ -606,6 +606,22 @@ Un hallazgo es algo que CR o QA encontró en una tarea o un bug. Lo guarda `find
 - **Tarea que ya no existe:** si la tarea se retiró o se eliminó ya no se sabe quién era su TL, así que `dismissed` lo puede hacer cualquier TL, con motivo. Solo `NotFound` activa esta excepción: otro error de la consulta se propaga. `fixed` no consulta la tarea.
 - **Colaboración:** `tasks.Checker` da `StageOf` y `TaskIDs`, sobre `tasks/queries/listids`; `stages.Checker` da `Team` y `bugs.Checker` da `Check`, sobre `bugs/queries/get`. Todo se conecta en `registerFeatures`.
 
+## Comentarios
+
+Un comentario deja constancia de una decisión que no es una transición, o de un bloqueo: no cabe en `reason` porque no hay cambio de status. Lo guarda `comments`, de la feature `activity`. No se copian los avisos de herdr.
+
+| Comando MCP | REST | Quién | Efecto |
+| --- | --- | --- | --- |
+| `add_comment` | `POST /api/comments` | Todos, incluido `User` | Registra el comentario sobre un `project`, `stage`, `task` o `bug`. El elemento debe existir, sin retirar |
+| `list_comments` | `GET /api/comments?item_kind=&item_id=` | Todos | Por fecha, de un elemento |
+
+- **Actor:** sale del token, con una copia de nombre y perfil, como en el [historial de status](#historial-de-status).
+- **Validación:** tipo conocido, texto y existencia, en ese orden. Vacío o solo espacios y tipo desconocido responden `kernel.Invalid`; elemento inexistente o retirado, `NotFound`.
+- **No frenan el flujo:** no tocan el status del elemento.
+- **Sin llave foránea:** igual que los [hallazgos](#hallazgos), para no impedir `delete_task`. `list_comments` no comprueba que el elemento exista: los comentarios sobreviven a un elemento retirado o eliminado, y sin comentarios responde lista vacía.
+- **Inmutabilidad:** no se editan ni se borran. Triggers con `reject_change_mutation` rechazan `UPDATE`, `DELETE` y `TRUNCATE`.
+- **Colaboración:** `projects.Checker`, `stages.Checker` y `bugs.Checker` dan `Check`, y `tasks.Checker` da `StageOf`. Todo se conecta en `registerFeatures`.
+
 ## Planes QAP
 
 QAP diseña y versiona un plan de pruebas por etapa, el TL lo aprueba y QA lo ejecuta. El script de Playwright y los resultados no se guardan en PMT.
@@ -668,16 +684,16 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, y `get_project_progress`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, `get_project_progress`, y la feature `activity` con sus comentarios, su REST y las herramientas MCP `add_comment` y `list_comments`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
 - **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
-- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación tienen autorización. Deben incorporarlas cuando exista la auditoría de `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 
 ## Orden de construcción
 
 1. `projects` y `stages`. Hechos, salvo la excepción temporal.
 2. `agents` con autenticación por token, y `Actor` y `Profile` en `kernel`. Hecho.
 3. Reglas por perfil en las transiciones, con asignación, reglas entre status y lotes. Hecho.
-4. `activity`, integrada a las transiciones.
+4. Auditoría en `activity`, integrada a las transiciones. Los comentarios ya están hechos.
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews`. Hecho.
 7. `qa`. Hecho.
