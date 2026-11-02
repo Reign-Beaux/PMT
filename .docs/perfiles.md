@@ -67,7 +67,8 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 - **Correcciones:** si un trabajo regresa, Dev lo corrige en su misma sesión, con el contexto cargado. DP, CR, QAP y QA siempre usan sesión nueva.
 - **Coordinación:** el TL coordina su etapa. DP, Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP, a PC y al TL.
 - **Encargo:** indica proyecto, etapa e ID de las tareas.
-- **Sesión limpia:** se reinicia con `/new`, sin cerrar el programa, y se vuelve a nombrar al agente en herdr, que lo pierde.
+- **Sesión limpia:** en Claude y mcode se reinicia con `/new`, sin cerrar el programa; en Codex se relanza el proceso, porque tras `/new` descarta el primer mensaje. Después se vuelve a nombrar al agente en herdr, que lo pierde.
+- **Levantar Claude:** se usa `claude-400`, comando propio del usuario definido en su `~/.bashrc`, que ejecuta `claude --dangerously-skip-permissions --autocompact 400k` y acepta los argumentos de `claude`. Por ser una función de shell, solo existe en un shell interactivo.
 
 **Herramientas de PMT:** un agente carga el esquema de una herramienta antes de llamarla por primera vez, y copia los ID de la salida de PMT, sin escribirlos de memoria.
 
@@ -114,6 +115,19 @@ Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: P
 - **Avance:** `get_project_progress` trae los bugs abiertos por status en `open_bugs`.
 
 Los perfiles definen responsabilidades; el modelo de IA se configura por separado para cada agente.
+
+## Configuración recomendada
+
+| Perfil | Herramienta | Modelo | Effort |
+| --- | --- | --- | --- |
+| PP, DP, TL y CR | `claude` | Opus | `medium` |
+| PC, DevFrontend, DevBackend, QAP y QA | `mcode` | MiniMax M3.1 Flash | `high` |
+
+MiniMax va en `high`: en una comparación con el mismo plan redujo los bloqueantes y el tiempo con unos 17 % más de tokens. El effort de DP puede subir a `high` por grupo, como indica Planes de desarrollo.
+
+## Kit de agentes
+
+Los perfiles y scripts que coordinan a los agentes están en `agentes/`, con la configuración de cada proyecto en su `.agentes.env`. Ver `agentes/README.md`.
 
 ## Reglas actuales de desarrollo
 
