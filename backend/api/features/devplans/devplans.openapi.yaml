@@ -1,0 +1,246 @@
+openapi: 3.1.0
+info:
+  title: PMT - Planes de desarrollo
+  version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
+paths:
+  /api/dev-plans:
+    post:
+      summary: Crea un plan de desarrollo, versión 1
+      description: Solo DP. Exactamente uno de `stage_id`, con al menos una tarea de esa etapa sin repetir y sin retirar, o `bug_id`, sin tareas. Todo el contenido es obligatorio; si un campo no aplica, se escribe el motivo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/Content"
+                - type: object
+                  properties:
+                    stage_id:
+                      type: string
+                      format: uuid
+                    bug_id:
+                      type: string
+                      format: uuid
+                    task_ids:
+                      $ref: "#/components/schemas/TaskIDs"
+      responses:
+        "201":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    get:
+      summary: Lista los planes de una etapa, una tarea o un bug
+      description: Exactamente uno de los tres filtros. Cada plan trae su versión más reciente, que es la que vale, y sus tareas. No comprueba que el elemento exista.
+      parameters:
+        - name: stage_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: task_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: bug_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Planes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/dev-plans/{id}/revise:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      summary: Añade una versión nueva a un plan
+      description: Solo DP, con motivo obligatorio y todo el contenido. Reemplaza las tareas; las versiones anteriores se conservan. La etapa o el bug y las tareas deben seguir existiendo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/Content"
+                - type: object
+                  required: [reason]
+                  properties:
+                    task_ids:
+                      $ref: "#/components/schemas/TaskIDs"
+                    reason:
+                      type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/PlanSummary"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/dev-plans/{id}/versions:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      summary: Lista todas las versiones de un plan
+      description: En orden. Son inmutables. Un ID sin versiones responde lista vacía.
+      responses:
+        "200":
+          description: Versiones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Version"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    PlanSummary:
+      description: Plan tras la operación
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PlanSummary"
+    Error:
+      description: Error de negocio
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    TaskIDs:
+      type: array
+      items:
+        type: string
+        format: uuid
+    Content:
+      type: object
+      required: [scope, technical_decisions, screen_states, edge_cases, error_handling, acceptance_criteria]
+      properties:
+        scope:
+          type: string
+          description: Archivos a crear o tocar y lo que queda fuera
+        technical_decisions:
+          type: string
+          description: Estructura, contrato y bibliotecas
+        screen_states:
+          type: string
+          description: Carga, vacío, error y móvil
+        edge_cases:
+          type: string
+          description: Valores extremos, caracteres especiales y datos corruptos
+        error_handling:
+          type: string
+          description: Qué falla con mensaje, nunca en silencio
+        acceptance_criteria:
+          type: string
+          description: Cada criterio con el comando o la pantalla que lo comprueba contra la API real
+    PlanSummary:
+      type: object
+      required: [id, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+    Plan:
+      allOf:
+        - $ref: "#/components/schemas/Content"
+        - type: object
+          required: [id, created_by, version, version_created_by, task_ids, created_at, updated_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            stage_id:
+              type: string
+              format: uuid
+            bug_id:
+              type: string
+              format: uuid
+            created_by:
+              type: string
+            version:
+              type: integer
+            reason:
+              type: string
+            version_created_by:
+              type: string
+            task_ids:
+              $ref: "#/components/schemas/TaskIDs"
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+    Version:
+      allOf:
+        - $ref: "#/components/schemas/Content"
+        - type: object
+          required: [version, created_by, created_at]
+          properties:
+            version:
+              type: integer
+            reason:
+              type: string
+            created_by:
+              type: string
+            created_at:
+              type: string
+              format: date-time

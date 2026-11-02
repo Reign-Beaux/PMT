@@ -197,6 +197,7 @@ Cada feature corresponde a un agregado principal:
 | `agents` | Agentes, perfiles y tokens. Sin REST ni MCP: se administra con `pmt-server agent`. |
 | `reviews` | Hallazgos de CR y QA sobre tareas y bugs. |
 | `qa` | Planes QAP, con sus versiones y tareas vinculadas. |
+| `devplans` | Planes de desarrollo de DP, con sus versiones y tareas vinculadas. |
 | `activity` | Comentarios sobre proyectos, etapas, tareas y bugs. La auditoría sigue pendiente. |
 | `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
 | `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
@@ -205,8 +206,8 @@ Cada feature corresponde a un agregado principal:
 Las dependencias entre features van, en general, en este sentido:
 
 ```text
-reviews, qa → tasks → stages → projects
-reviews → bugs → projects
+reviews, qa, devplans → tasks → stages → projects
+reviews, devplans → bugs → projects
 tasks → agents
 todas → activity
 ```
@@ -408,7 +409,7 @@ Cada etapa tiene un TL responsable y un equipo de devs. `stages.lead`, `stage_me
 | `assign_task` | `PUT /api/tasks/{id}/assignee` | TL de la etapa | Pone o cambia el dueño de una tarea ya tomada. `Conflict` en `backlog`, `ready`, `done` y `cancelled` |
 
 - **Tomar no es un comando:** `ready → in_dev` deja `assignee` con el nombre del dev, que debe ser del equipo. Después solo ese dev la mueve. `cancelled → backlog` lo limpia.
-- Un dev puede tener varias tareas sin límite fijo. CR, QA y QAP actúan por perfil.
+- Un dev puede tener varias tareas sin límite fijo. CR, QA, QAP y DP actúan por perfil.
 - Un TL solo actúa sobre su etapa y sus tareas. PP, PC y `User` no tienen ámbito.
 - Solo se asignan agentes activos. Lo ya asignado a un agente revocado no cambia: PP o el TL lo reasignan.
 - Las cuatro operaciones aplican en cualquier status y en el planning propio, porque no son cambios de contenido. Lo retirado responde `NotFound`. `stage_members` se borra en cascada con la etapa, para no impedir `delete_stage`.
@@ -656,6 +657,30 @@ QAP diseña y versiona un plan de pruebas por etapa, el TL lo aprueba y QA lo ej
 - **Transacción:** `store/plans.go` bloquea el plan con `FOR UPDATE` y decide con lo leído tras bloquear, así que de dos decisiones simultáneas la segunda responde `kernel.Conflict`, y dos revisiones no compiten por el número de versión.
 - **Colaboración:** `tasks.Checker` da `StageOf` y `stages.Checker` da `Check` y `Team`. Todo se conecta en `registerFeatures`.
 
+## Planes de desarrollo
+
+DP define el cómo de un grupo de tareas o de un bug antes de que Dev empiece: PP define el qué y DP lo convierte en un plan que Dev sigue. La feature `devplans` tiene como raíz `DevPlan` (`domain.Plan`), y `Version` es una entidad inmutable del agregado.
+
+`dev_plans` guarda la cabecera; `dev_plan_versions`, el contenido de cada versión, y `dev_plan_tasks`, las tareas vinculadas ahora.
+
+| Comando MCP | REST | Quién | Efecto |
+| --- | --- | --- | --- |
+| `create_dev_plan` | `POST /api/dev-plans` | DP | Versión 1, de una etapa con al menos una tarea de ella, o de un bug |
+| `revise_dev_plan` | `POST /api/dev-plans/{id}/revise` | DP | Versión nueva con motivo obligatorio; reemplaza las tareas |
+| `list_dev_plans` | `GET /api/dev-plans?stage_id=&task_id=&bug_id=` | Todos | Con la versión más reciente y sus tareas. Exactamente un filtro, si no `kernel.Invalid` |
+| `list_dev_plan_versions` | `GET /api/dev-plans/{id}/versions` | Todos | Todas las versiones |
+
+- **Dos modos:** un plan pertenece a una etapa, con al menos una tarea de ella, o a un bug, sin tareas. Exactamente uno de los dos: la invariante está en `domain` y en un `CHECK` de `dev_plans`.
+- **Contenido:** cada versión lleva `scope`, `technical_decisions`, `screen_states`, `edge_cases`, `error_handling` y `acceptance_criteria`, todos obligatorios, con `CHECK` en la tabla. Si uno no aplica, se escribe el motivo. Solo espacios cuenta como vacío. `reason` es obligatorio en las versiones nuevas; la versión 1 no lo lleva, como en los planes QAP. Cada versión guarda autor y fecha.
+- **Sin status ni aprobación:** el TL solo comprueba que quedó registrado, y vale la versión más reciente. Revisar lleva todo el contenido, no solo lo que cambia.
+- **No frena el flujo:** como los hallazgos y los planes QAP, no bloquea transiciones.
+- **Validación:** perfil, modo o motivo, tareas y contenido, y después la existencia en otras features. `revise_dev_plan` comprueba el perfil antes de leer el plan. Otro perfil recibe `kernel.Forbidden`, incluido `User`.
+- **Sin llave foránea:** `stage_id`, `bug_id` y `task_id` no referencian a su entidad, igual que los [planes QAP](#planes-qap). La existencia se valida al crear y al revisar: revisar un plan cuya etapa o bug ya no existe responde `NotFound`. Las listas no la comprueban y responden vacío si no hay planes.
+- **Inmutabilidad:** triggers con `reject_change_mutation` protegen `dev_plan_versions`.
+- **Transacción:** `store/plans.go` bloquea el plan con `FOR UPDATE`, así que dos revisiones no compiten por el número de versión.
+- **Perfil en la base:** la migración 00020 añade `DP` al `CHECK` de `agents.profile`, además de crear las tablas.
+- **Colaboración:** `tasks.Checker` da `StageOf`, y `stages.Checker` y `bugs.Checker` dan `Check`. Todo se conecta en `registerFeatures`.
+
 ## Transacciones
 
 - Los commands usan la interfaz `kernel.Transactor`, con `WithinTx(ctx, fn)`, implementada en `platform/postgres`.
@@ -685,7 +710,7 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
-- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, `get_project_progress`, y la feature `activity` con sus comentarios, su REST y las herramientas MCP `add_comment` y `list_comments`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
+- **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, la feature `devplans` con sus planes de desarrollo, su REST y las herramientas MCP `create_dev_plan`, `revise_dev_plan`, `list_dev_plans` y `list_dev_plan_versions`, `get_project_progress`, y la feature `activity` con sus comentarios, su REST y las herramientas MCP `add_comment` y `list_comments`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
 - **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
 - **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación, `create_bug` y `update_bug` tienen autorización. Deben incorporarlas cuando exista la auditoría de `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 
@@ -698,6 +723,7 @@ Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 5. Primera operación completa por MCP, con una prueba de dos agentes en conflicto.
 6. `reviews`. Hecho.
 7. `qa`. Hecho.
+8. `devplans`. Hecho.
 
 Una operación debe funcionar de entrada a salida antes de extender el patrón a otras.
 

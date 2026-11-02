@@ -19,6 +19,7 @@ const (
 	ProfileCR          Profile = "CR"
 	ProfileQAP         Profile = "QAP"
 	ProfileQA          Profile = "QA"
+	ProfileDP          Profile = "DP"
 	ProfileUser        Profile = "User"
 )
 

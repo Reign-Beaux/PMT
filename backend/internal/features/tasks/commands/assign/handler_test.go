@@ -58,6 +58,7 @@ func TestHandle(t *testing.T) {
 	}{
 		{"TL reasigna", domain.StatusInReview, tl, "dev2", fakeAgents{}, nil},
 		{"perfil incorrecto", domain.StatusInReview, kernel.Owner, "dev2", fakeAgents{}, domain.ErrAssignForbidden},
+		{"DP no asigna", domain.StatusInReview, kernel.Actor{Name: "dp", Profile: kernel.ProfileDP}, "dev2", fakeAgents{}, domain.ErrAssignForbidden},
 		{"TL ajeno", domain.StatusInReview, otherTL, "dev2", fakeAgents{}, kernel.ErrNotStageLead},
 		{"fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, domain.ErrAssigneeNotMember},
 		{"agente revocado", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, revoked},

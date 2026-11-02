@@ -1,6 +1,6 @@
 # Perfiles de agentes
 
-La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFrontend y DevBackend para separar responsabilidades y reducir el contexto que necesita cada perfil. Las transiciones por perfil y la asignación ya están en el backend; ver `backend_architecture.md`.
+La definición acordada contempla 9 perfiles de agentes. DEV se divide en DevFrontend y DevBackend para separar responsabilidades y reducir el contexto que necesita cada perfil. Las transiciones por perfil y la asignación ya están en el backend; ver `backend_architecture.md`.
 
 | Perfil | Nombre | Qué hace |
 |---|---|---|
@@ -11,6 +11,7 @@ La definición acordada contempla 8 perfiles de agentes. DEV se divide en DevFro
 | **DevBackend** | Developer Backend | Lee las especificaciones de backend e implementa la lógica con Go. Escribe y ejecuta sus pruebas unitarias con el paquete estándar `testing` mediante `go test`, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al backend. |
 | **CR** | Code Reviewer | Revisa la lógica, integridad y calidad del código, incluyendo prácticas como SOLID y DRY. Registra hallazgos, solicita correcciones, verifica su resolución y aprueba la revisión de código. |
 | **QAP** | Quality Assurance Planning | Diseña y versiona planes de pruebas para casos que combinan cambios de frontend y backend. Vincula tareas, define casos de prueba y envía el plan al TL para su aprobación. |
+| **DP** | Development Planning | Define el cómo de un grupo de tareas o de un bug antes de que Dev empiece: PP define el qué y DP lo convierte en un plan de desarrollo que Dev sigue. Lee el código existente antes de planear. No escribe código, no cambia status y no aprueba nada. |
 | **QA** | Quality Assurance | Verifica el funcionamiento mediante pruebas y evidencias. Ejecuta planes aprobados, comprueba persistencia y realiza exploración y regresión cuando corresponde. Registra hallazgos, solicita correcciones y aprueba QA; después queda pendiente el cierre del TL. |
 
 El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP y PC, y no aprueba por CR, QA ni TL. En los status, PC solo detiene y reanuda etapas y proyectos.
@@ -22,17 +23,25 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | 1 | PP | `create_*`, `import_project`, `assign_stage_lead` | Planea y pone un TL a cada etapa |
 | 2 | PP | `release_project` | Proyecto y etapas a `stand_by` |
 | 3 | TL | `add_stage_member`, `start_stage` | Etapa a `in_dev`, tareas a `ready`; con la primera etapa, proyecto a `in_dev` |
-| 4 | Dev | `change_tasks_status` a `in_dev` | Toma tareas de su equipo, que quedan a su nombre |
-| 5 | Dev | a `in_review` | Entrega |
-| 6 | CR | a `in_qa`, `changes_requested` o, con motivo, `pending_close` | Aprueba, pide corrección o cierra su parte en un cambio interno |
-| 7 | Dev | de `changes_requested` a `in_dev` | Corrige y vuelve a entregar |
-| 8 | QA | a `pending_close`, con evidencia en el motivo, o `changes_requested` | Aprueba o pide corrección |
-| 9 | TL | a `done`, o con motivo a `in_review` o `in_qa` | Cierra o devuelve |
-| 10 | TL | `change_stage_status` a `done` | Cierra la etapa; con la última de la versión 1, el proyecto pasa solo a `working`. Cancelar la última abierta, potestad de PP o `User`, o retirarla, tiene el mismo efecto si otra quedó en `done` |
+| 4 | DP | `create_dev_plan` | Registra el plan de desarrollo del grupo de tareas |
+| 5 | Dev | `list_dev_plans`, `change_tasks_status` a `in_dev` | Lee el plan y toma tareas de su equipo, que quedan a su nombre |
+| 6 | Dev | a `in_review` | Entrega, con evidencia por criterio de aceptación |
+| 7 | CR | a `in_qa`, `changes_requested` o, con motivo, `pending_close` | Revisa también contra el plan. Aprueba, pide corrección o cierra su parte en un cambio interno |
+| 8 | Dev | de `changes_requested` a `in_dev` | Corrige y vuelve a entregar |
+| 9 | QA | a `pending_close`, con evidencia en el motivo, o `changes_requested` | Aprueba o pide corrección |
+| 10 | TL | a `done`, o con motivo a `in_review` o `in_qa` | Cierra o devuelve |
+| 11 | TL | `change_stage_status` a `done` | Cierra la etapa; con la última de la versión 1, el proyecto pasa solo a `working`. Cancelar la última abierta, potestad de PP o `User`, o retirarla, tiene el mismo efecto si otra quedó en `done` |
 
 **Hallazgos:** CR y QA los registran con `create_finding`, indicando si son bloqueantes, y los cierran como `fixed` con `close_finding`. El TL de la etapa, o cualquier TL si es un bug o si la tarea se retiró o se eliminó, los descarta como `dismissed`. Ambos cierres exigen motivo. Todos los perfiles los consultan con `list_findings`, por tarea, por bug o por etapa. No frenan transiciones: la decisión de devolver es de CR o QA.
 
 **Planes QAP:** QAP crea el plan con `create_test_plan`, lo versiona con `revise_test_plan` y lo envía con `submit_test_plan`. El TL de la etapa lo aprueba con `approve_test_plan` o lo devuelve con correcciones con `return_test_plan`; un plan devuelto exige una versión nueva antes de reenviarse. QA y los demás perfiles los consultan con `list_test_plans` y `list_test_plan_versions`. No frenan transiciones, y el script de Playwright y los resultados no se guardan en PMT.
+
+**Planes de desarrollo:** el flujo es TL → DP → Dev. DP registra el plan con `create_dev_plan`, de una etapa con sus tareas o de un bug, y lo versiona con `revise_dev_plan`, con motivo. Cada versión define `scope` (archivos a crear o tocar y lo que queda fuera), `technical_decisions` (estructura, contrato y bibliotecas), `screen_states` (carga, vacío, error y móvil), `edge_cases` (valores extremos, caracteres especiales y datos corruptos), `error_handling` (qué falla con mensaje, nunca en silencio) y `acceptance_criteria` (cada criterio con el comando o la pantalla que lo comprueba contra la API real). Todos son obligatorios: si uno no aplica, se escribe el motivo. No tiene status ni aprobación: el TL solo comprueba que quedó registrado, y vale la versión más reciente. No frena transiciones. Todos los perfiles los consultan con `list_dev_plans`, por etapa, por tarea o por bug, y `list_dev_plan_versions`.
+
+- **Dev** sigue el plan y entrega evidencia por criterio. Si encuentra que el plan está mal, se lo dice al TL y no lo cambia por su cuenta.
+- **El TL** levanta a DP para una versión nueva si el problema es técnico. PP resuelve lo que cambie alcance o requisitos.
+- **CR** revisa el código también contra el plan.
+- **Effort:** si el grupo toca pagos, permisos, migraciones de datos o contratos entre etapas, el TL relanza a DP en `high`; en lo demás usa `medium`.
 
 **Camino que termina en CR:** un cambio interno va de `in_review` a `pending_close` sin pasar por QA, y lo cierra el TL.
 
@@ -47,6 +56,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | Perfil | Una sesión por |
 | --- | --- |
 | DevFrontend y DevBackend | Cada grupo de tareas, hasta que todas estén en `done` |
+| DP | Cada grupo de tareas o cada bug: termina al registrar el plan y el TL la reinicia |
 | CR | Cada revisión |
 | QAP | Cada plan de pruebas |
 | QA | Cada ronda de pruebas |
@@ -54,8 +64,8 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | PP | Cada planeación o cada bug que registra |
 | PC | Cada consulta o seguimiento |
 
-- **Correcciones:** si un trabajo regresa, Dev lo corrige en su misma sesión, con el contexto cargado. CR, QAP y QA siempre usan sesión nueva.
-- **Coordinación:** el TL coordina su etapa. Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP, a PC y al TL.
+- **Correcciones:** si un trabajo regresa, Dev lo corrige en su misma sesión, con el contexto cargado. DP, CR, QAP y QA siempre usan sesión nueva.
+- **Coordinación:** el TL coordina su etapa. DP, Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP, a PC y al TL.
 - **Encargo:** indica proyecto, etapa e ID de las tareas.
 - **Sesión limpia:** se reinicia con `/new`, sin cerrar el programa, y se vuelve a nombrar al agente en herdr, que lo pierde.
 
@@ -68,15 +78,16 @@ Completa la tabla del flujo con quién actúa y cuándo.
 1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen, e incluye la preparación de lo que usarán las pruebas, como Vitest o Playwright. Si falta algo al planear, lo incluye el TL. Nadie lo instala a mitad de una prueba.
 2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas.
 3. **Iniciar las etapas:** el TL las inicia sin esperar otra orden, y varias pueden estar en `in_dev` a la vez. Si una etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
-4. **Tomar tareas:** el TL levanta a cada dev con un grupo de tareas relacionadas. Un dev no recibe otro grupo hasta cerrar el actual.
-5. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL levanta a QAP si toca frontend; si no, a QA.
-6. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
-7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
-8. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar.
+4. **Planear el desarrollo:** el TL agrupa tareas relacionadas y levanta a DP con proyecto, etapa e ID de las tareas, o con el bug. DP lee el código, registra el plan y avisa al TL, que comprueba en PMT que quedó registrado y reinicia a DP.
+5. **Tomar tareas:** el TL levanta a cada dev con su grupo de tareas. Dev sigue el plan, entrega evidencia por criterio y avisa al TL, que levanta a CR. Un dev no recibe otro grupo hasta cerrar el actual.
+6. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL levanta a QAP si toca frontend; si no, a QA.
+7. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
+8. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
+9. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar.
 
 **En todo momento:**
 
-- **Registro:** el TL registra con `add_comment` la decisión del paso 5 y las demás que no sean una transición, y PC los bloqueos. Todos los perfiles los consultan con `list_comments`. No se copian los avisos.
+- **Registro:** el TL registra con `add_comment` la decisión del paso 6 y las demás que no sean una transición, y PC los bloqueos. Todos los perfiles los consultan con `list_comments`. No se copian los avisos.
 - **Avance:** PC revisa siempre `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
 - **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y avisa al TL, o informa al usuario si nadie puede seguir.
 - **Detener:** el usuario o PC pueden detener una etapa o el proyecto en cualquier paso.
@@ -89,12 +100,13 @@ Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: P
 | Paso | Quién | Qué hace | El TL levanta a |
 | --- | --- | --- | --- |
 | 1 | Usuario con PP | Registra el bug con `create_bug`, en `reported` | QA |
-| 2 | QA | Lo reproduce. Real: `confirmed`. Si no: `rejected` con motivo | Dev si es real; si se rechaza, avisa a PP |
-| 3 | TL | Decide a qué dev le toca y lo deja en un comentario con `add_comment` | Ese dev |
-| 4 | Dev | `in_dev`, corrige, `in_review` | CR |
-| 5 | CR | Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 7 |
-| 6 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | Dev; si está bien, hace el paso 7 |
-| 7 | TL | Cierra en `done`, o regresa a CR o QA | CR o QA si lo regresa |
+| 2 | QA | Lo reproduce. Real: `confirmed`. Si no: `rejected` con motivo | Hace el paso 3 si es real; si se rechaza, avisa a PP |
+| 3 | TL | Decide a qué dev le toca y lo deja en un comentario con `add_comment` | DP |
+| 4 | DP | Registra el plan del bug con `create_dev_plan` y avisa al TL | Ese dev |
+| 5 | Dev | Sigue el plan: `in_dev`, corrige, `in_review`, con evidencia por criterio | CR |
+| 6 | CR | Revisa también contra el plan. Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 8 |
+| 7 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | Dev; si está bien, hace el paso 8 |
+| 8 | TL | Cierra en `done`, o regresa a CR o QA | CR o QA si lo regresa |
 
 - **Crear y corregir:** solo PP y `User` ejecutan `create_bug` y `update_bug`. Otro perfil que detecte un fallo se lo pasa al usuario o a PP. Un bug en `done` o `rejected` ya no se corrige.
 - **Sin dueño:** un bug no tiene dev ni TL asignado. El TL indica al dev en el comentario, y PMT no restringe qué dev o TL mueve el bug.
