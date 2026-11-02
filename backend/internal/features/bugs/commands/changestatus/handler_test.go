@@ -23,7 +23,7 @@ type fakeRepo struct {
 
 func newRepoWith(t *testing.T, status domain.Status) (*fakeRepo, uuid.UUID) {
 	t.Helper()
-	bug, err := domain.NewBug(uuid.New(), "Falla", "Detalle", "Paso 1", "1.0.0")
+	bug, err := domain.NewBug(uuid.New(), "Falla", "Detalle", "Paso 1", "1.0.0", "pp")
 	if err != nil {
 		t.Fatal(err)
 	}

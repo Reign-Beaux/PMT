@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/bugs/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -24,11 +25,12 @@ type ProjectChecker interface {
 
 // Command contiene los datos de entrada.
 type Command struct {
-	ID               uuid.UUID `json:"-"`
-	Title            string    `json:"title"`
-	Description      string    `json:"description"`
-	StepsToReproduce string    `json:"steps_to_reproduce"`
-	ProductVersion   string    `json:"product_version"`
+	ID               uuid.UUID    `json:"-"`
+	Title            string       `json:"title"`
+	Description      string       `json:"description"`
+	StepsToReproduce string       `json:"steps_to_reproduce"`
+	ProductVersion   string       `json:"product_version"`
+	Actor            kernel.Actor `json:"-"`
 }
 
 // Result es el bug actualizado.
@@ -40,6 +42,7 @@ type Result struct {
 	StepsToReproduce string        `json:"steps_to_reproduce"`
 	ProductVersion   string        `json:"product_version"`
 	Status           domain.Status `json:"status"`
+	ReportedBy       string        `json:"reported_by,omitempty"`
 	CreatedAt        time.Time     `json:"created_at"`
 	UpdatedAt        time.Time     `json:"updated_at"`
 }
@@ -55,8 +58,11 @@ func New(repo Repository, projects ProjectChecker) *Handler {
 	return &Handler{repo: repo, projects: projects}
 }
 
-// Handle actualiza el bug.
+// Handle actualiza el bug. El perfil se comprueba antes de consultar nada.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanUpdate(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	b, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

@@ -79,7 +79,7 @@ Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: c
 | 6 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | TL o dev |
 | 7 | TL | Cierra en `done`, o regresa a CR o QA | CR o QA si lo regresa |
 
-- **Crear:** solo PP y `User` ejecutan `create_bug`. Otro perfil que detecte un fallo se lo pasa al usuario o a PP.
+- **Crear y corregir:** solo PP y `User` ejecutan `create_bug` y `update_bug`. Otro perfil que detecte un fallo se lo pasa al usuario o a PP. Un bug en `done` o `rejected` ya no se corrige.
 - **Sin dueño:** un bug no tiene dev ni TL asignado. El TL indica al dev en el comentario, y PMT no restringe qué dev o TL mueve el bug.
 - **Bugs con frontend:** van directo a QA, sin plan de QAP. QA los prueba con Playwright y deja el script de regresión.
 - **Avance:** `get_project_progress` trae los bugs abiertos por status en `open_bugs`.

@@ -27,6 +27,7 @@ type toolOutput struct {
 	StepsToReproduce string `json:"steps_to_reproduce"`
 	ProductVersion   string `json:"product_version"`
 	Status           string `json:"status"`
+	ReportedBy       string `json:"reported_by,omitempty"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
 }
@@ -65,6 +66,7 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 		StepsToReproduce: result.StepsToReproduce,
 		ProductVersion:   result.ProductVersion,
 		Status:           string(result.Status),
+		ReportedBy:       result.ReportedBy,
 		CreatedAt:        result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:        result.UpdatedAt.Format(time.RFC3339),
 	}, nil

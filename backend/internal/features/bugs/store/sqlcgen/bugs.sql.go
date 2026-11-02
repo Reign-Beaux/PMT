@@ -9,12 +9,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createBug = `-- name: CreateBug :one
-INSERT INTO bugs (id, project_id, title, description, steps_to_reproduce, product_version, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at
+INSERT INTO bugs (id, project_id, title, description, steps_to_reproduce, product_version, status, reported_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by
 `
 
 type CreateBugParams struct {
@@ -25,6 +26,7 @@ type CreateBugParams struct {
 	StepsToReproduce string
 	ProductVersion   string
 	Status           string
+	ReportedBy       pgtype.Text
 }
 
 func (q *Queries) CreateBug(ctx context.Context, arg CreateBugParams) (Bug, error) {
@@ -36,6 +38,7 @@ func (q *Queries) CreateBug(ctx context.Context, arg CreateBugParams) (Bug, erro
 		arg.StepsToReproduce,
 		arg.ProductVersion,
 		arg.Status,
+		arg.ReportedBy,
 	)
 	var i Bug
 	err := row.Scan(
@@ -48,12 +51,13 @@ func (q *Queries) CreateBug(ctx context.Context, arg CreateBugParams) (Bug, erro
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportedBy,
 	)
 	return i, err
 }
 
 const getBug = `-- name: GetBug :one
-SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at FROM bugs
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by FROM bugs
 WHERE id = $1
 `
 
@@ -70,12 +74,13 @@ func (q *Queries) GetBug(ctx context.Context, id uuid.UUID) (Bug, error) {
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportedBy,
 	)
 	return i, err
 }
 
 const listBugs = `-- name: ListBugs :many
-SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at FROM bugs
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by FROM bugs
 WHERE project_id = $1
 ORDER BY created_at, id
 `
@@ -99,6 +104,7 @@ func (q *Queries) ListBugs(ctx context.Context, projectID uuid.UUID) ([]Bug, err
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ReportedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -111,7 +117,7 @@ func (q *Queries) ListBugs(ctx context.Context, projectID uuid.UUID) ([]Bug, err
 }
 
 const lockBug = `-- name: LockBug :one
-SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at FROM bugs
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by FROM bugs
 WHERE id = $1
 FOR UPDATE
 `
@@ -129,6 +135,7 @@ func (q *Queries) LockBug(ctx context.Context, id uuid.UUID) (Bug, error) {
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportedBy,
 	)
 	return i, err
 }
@@ -137,7 +144,7 @@ const updateBug = `-- name: UpdateBug :one
 UPDATE bugs
 SET title = $2, description = $3, steps_to_reproduce = $4, product_version = $5, updated_at = clock_timestamp()
 WHERE id = $1
-RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by
 `
 
 type UpdateBugParams struct {
@@ -167,6 +174,7 @@ func (q *Queries) UpdateBug(ctx context.Context, arg UpdateBugParams) (Bug, erro
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportedBy,
 	)
 	return i, err
 }
@@ -175,7 +183,7 @@ const updateBugStatus = `-- name: UpdateBugStatus :one
 UPDATE bugs
 SET status = $2, updated_at = clock_timestamp()
 WHERE id = $1
-RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by
 `
 
 type UpdateBugStatusParams struct {
@@ -196,6 +204,7 @@ func (q *Queries) UpdateBugStatus(ctx context.Context, arg UpdateBugStatusParams
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReportedBy,
 	)
 	return i, err
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"pmt/internal/features/bugs/domain"
 	"pmt/internal/features/bugs/store/sqlcgen"
@@ -34,6 +35,7 @@ func (s *Bugs) Create(ctx context.Context, bug domain.Bug) (domain.Bug, error) {
 		StepsToReproduce: bug.StepsToReproduce,
 		ProductVersion:   bug.ProductVersion,
 		Status:           string(bug.Status),
+		ReportedBy:       pgtype.Text{String: bug.ReportedBy, Valid: bug.ReportedBy != ""},
 	})
 	if postgres.IsForeignKeyViolation(err) {
 		return domain.Bug{}, domain.ErrProjectNotFound
@@ -111,6 +113,7 @@ func toDomain(row sqlcgen.Bug) domain.Bug {
 		StepsToReproduce: row.StepsToReproduce,
 		ProductVersion:   row.ProductVersion,
 		Status:           domain.Status(row.Status),
+		ReportedBy:       row.ReportedBy.String,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
 	}

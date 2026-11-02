@@ -1,6 +1,6 @@
 -- name: CreateBug :one
-INSERT INTO bugs (id, project_id, title, description, steps_to_reproduce, product_version, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO bugs (id, project_id, title, description, steps_to_reproduce, product_version, status, reported_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetBug :one

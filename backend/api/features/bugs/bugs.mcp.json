@@ -64,6 +64,9 @@
         },
         "updated_at": {
           "type": "string"
+        },
+        "reported_by": {
+          "type": "string"
         }
       },
       "required": [
@@ -81,7 +84,7 @@
     }
   },
   {
-    "description": "Reemplaza título, descripción, pasos para reproducirlo y versión de un bug, para corregir el reporte, y devuelve el bug completo. No cambia su status. Solo funciona si el proyecto está en working. Usa list_bugs para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza título, descripción, pasos para reproducirlo y versión de un bug, para corregir el reporte, y devuelve el bug completo. No cambia su status. Solo PP y el usuario. Solo funciona si el proyecto está en working y el bug no está en done ni rejected. Usa list_bugs para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -144,6 +147,9 @@
           "type": "string"
         },
         "updated_at": {
+          "type": "string"
+        },
+        "reported_by": {
           "type": "string"
         }
       },
@@ -215,6 +221,9 @@
         },
         "updated_at": {
           "type": "string"
+        },
+        "reported_by": {
+          "type": "string"
         }
       },
       "required": [
@@ -279,6 +288,9 @@
                 "type": "string"
               },
               "updated_at": {
+                "type": "string"
+              },
+              "reported_by": {
                 "type": "string"
               }
             },

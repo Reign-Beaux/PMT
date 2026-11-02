@@ -453,7 +453,7 @@ Son todo o nada, en una transacción, con un registro de status por elemento.
 
 `get_project_progress` (`GET /api/projects/{id}/progress`) muestra en una llamada lo que antes pedía cruzar `list_stages` y `list_tasks`. Es de solo lectura y para todos los perfiles. Un proyecto inexistente responde `NotFound`, y lo retirado no aparece.
 
-- **Proyecto:** `id`, `name`, `status` y `last_change_at`, la última `updated_at` del proyecto, de sus etapas o de sus tareas sin retirar. `revise_*` no toca la fila, así que no la mueve, y los bugs tampoco.
+- **Proyecto:** `id`, `name`, `status` y `last_change_at`, la última `updated_at` del proyecto, de sus etapas, de sus tareas sin retirar o de sus bugs, abiertos o no. `revise_*` no toca la fila, así que no la mueve.
 - **Etapas,** por posición: `id`, `name`, `status`, `lead`, `members`, `counts` por status, solo los presentes, y `tasks` con `id`, `title`, `status`, `assignee` y `updated_at`.
 - **Bugs abiertos:** `open_bugs` trae `counts` por status, solo los presentes, e `items` con `id`, `title`, `status` y `updated_at`, por fecha de creación. Abierto es todo status salvo `done` y `rejected`. Los bugs no se retiran. No generan señales.
 - **Señales:** `signals` lista hechos, con `code`, `stage_id` y `stage_name`, sin umbrales de tiempo. PMT no avisa ni sabe si un agente trabaja: quien consulta decide.
@@ -547,16 +547,16 @@ Cualquier transición desde `planning` es la salida, y es definitiva: si la etap
 
 ## Bugs
 
-Un bug pertenece a un proyecto, sin etapa: `tasks` no cambia y los bugs no afectan al cierre de etapas. Guarda `steps_to_reproduce` y `product_version`, la versión donde apareció, de texto libre y sin compararla con la del proyecto.
+Un bug pertenece a un proyecto, sin etapa: `tasks` no cambia y los bugs no afectan al cierre de etapas. Guarda `steps_to_reproduce`, `product_version`, la versión donde apareció, de texto libre y sin compararla con la del proyecto, y `reported_by`, el nombre del actor que lo registró. `reported_by` no se edita y falta en las salidas de los bugs anteriores a la migración 00019, que no tienen relleno: inventaría el autor.
 
 | Comando | REST | Status del proyecto | Perfiles |
 | --- | --- | --- | --- |
 | `create_bug` | `POST /api/projects/{project_id}/bugs` | Solo `working` | PP y `User` |
-| `update_bug` | `PUT /api/bugs/{id}` | Solo `working` | Sin autorización |
+| `update_bug` | `PUT /api/bugs/{id}` | Solo `working` | PP y `User` |
 | `change_bug_status` | `PUT /api/bugs/{id}/status` | Solo `working` | Por transición |
 | `list_bugs` | `GET /api/projects/{project_id}/bugs` | Cualquiera | Todos |
 
-Otro perfil en `create_bug` recibe `kernel.Forbidden`, antes de consultar el proyecto. Fuera de `working` responden `el proyecto no está en working`. `update_bug` corrige el reporte y no cambia el status. No hay comando para eliminar un bug. `delete_project` se bloquea si el proyecto tiene bugs.
+Otro perfil en `create_bug` o `update_bug` recibe `kernel.Forbidden`, antes de consultar el proyecto o el bug. Fuera de `working` responden `el proyecto no está en working`. `update_bug` corrige el reporte y no cambia el status; con el bug en `done` o `rejected` responde `kernel.Conflict`. No hay comando para eliminar un bug. `delete_project` se bloquea si el proyecto tiene bugs.
 
 Todo bug nace en `reported`. Estos son sus status:
 
@@ -687,7 +687,7 @@ Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
 - **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, `get_project_progress`, y la feature `activity` con sus comentarios, su REST y las herramientas MCP `add_comment` y `list_comments`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
 - **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
-- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación, y `create_bug`, tienen autorización. Deben incorporarlas cuando exista la auditoría de `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación, `create_bug` y `update_bug` tienen autorización. Deben incorporarlas cuando exista la auditoría de `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 
 ## Orden de construcción
 

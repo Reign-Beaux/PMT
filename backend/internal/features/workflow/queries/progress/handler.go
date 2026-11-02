@@ -30,7 +30,7 @@ type Reader interface {
 }
 
 // Project es el proyecto. LastChangeAt es la última actualización del proyecto, de
-// sus etapas o de sus tareas sin retirar; los bugs no la mueven.
+// sus etapas, de sus tareas sin retirar o de sus bugs, abiertos o no.
 type Project struct {
 	ID           uuid.UUID       `json:"id"`
 	Name         string          `json:"name"`
@@ -118,6 +118,9 @@ func (h *Handler) Handle(ctx context.Context, projectID uuid.UUID) (Result, erro
 		Stages:   make([]Stage, 0, len(stageList)),
 		OpenBugs: openBugs(bugList),
 		Signals:  []Signal{},
+	}
+	for _, b := range bugList {
+		result.Project.LastChangeAt = latest(result.Project.LastChangeAt, b.UpdatedAt)
 	}
 	for _, s := range stageList {
 		stage := Stage{

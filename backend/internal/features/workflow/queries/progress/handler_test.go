@@ -235,15 +235,17 @@ func TestOpenBugsExcludeTerminal(t *testing.T) {
 	}
 }
 
-func TestBugsDoNotMoveLastChange(t *testing.T) {
+func TestBugsMoveLastChange(t *testing.T) {
 	r := reader(projects.StatusWorking)
-	r.bugs = []bugs.Bug{{ID: uuid.New(), Status: bugs.StatusReported, UpdatedAt: base.Add(time.Hour)}}
+	later := base.Add(time.Hour)
+	// Un bug cerrado no sale en open_bugs, pero su cambio sí cuenta.
+	r.bugs = []bugs.Bug{{ID: uuid.New(), Status: bugs.StatusDone, UpdatedAt: later}}
 
 	result, err := New(r).Handle(context.Background(), r.project.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Project.LastChangeAt.Equal(base) {
+	if !result.Project.LastChangeAt.Equal(later) {
 		t.Errorf("last_change_at = %v", result.Project.LastChangeAt)
 	}
 }

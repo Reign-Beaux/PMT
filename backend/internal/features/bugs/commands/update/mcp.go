@@ -27,6 +27,7 @@ type toolOutput struct {
 	StepsToReproduce string `json:"steps_to_reproduce"`
 	ProductVersion   string `json:"product_version"`
 	Status           string `json:"status"`
+	ReportedBy       string `json:"reported_by,omitempty"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
 }
@@ -35,11 +36,11 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "update_bug",
-		Description: "Reemplaza título, descripción, pasos para reproducirlo y versión de un bug, para corregir el reporte, y devuelve el bug completo. No cambia su status. Solo funciona si el proyecto está en working. Usa list_bugs para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+		Description: "Reemplaza título, descripción, pasos para reproducirlo y versión de un bug, para corregir el reporte, y devuelve el bug completo. No cambia su status. Solo PP y el usuario. Solo funciona si el proyecto está en working y el bug no está en done ni rejected. Usa list_bugs para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
 	id, err := uuid.Parse(input.BugID)
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("bug_id inválido"))
@@ -51,6 +52,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Description:      input.Description,
 		StepsToReproduce: input.StepsToReproduce,
 		ProductVersion:   input.ProductVersion,
+		Actor:            platformmcp.ActorFrom(req),
 	})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
@@ -64,6 +66,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		StepsToReproduce: result.StepsToReproduce,
 		ProductVersion:   result.ProductVersion,
 		Status:           string(result.Status),
+		ReportedBy:       result.ReportedBy,
 		CreatedAt:        result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:        result.UpdatedAt.Format(time.RFC3339),
 	}, nil

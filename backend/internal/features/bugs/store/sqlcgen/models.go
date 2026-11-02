@@ -30,6 +30,7 @@ type Bug struct {
 	Status           string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	ReportedBy       pgtype.Text
 }
 
 type BugStatusChange struct {

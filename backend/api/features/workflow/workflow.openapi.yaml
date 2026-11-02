@@ -166,7 +166,7 @@ components:
             last_change_at:
               type: string
               format: date-time
-              description: Última actualización del proyecto, de sus etapas o de sus tareas sin retirar. Los bugs no la mueven.
+              description: Última actualización del proyecto, de sus etapas, de sus tareas sin retirar o de sus bugs, abiertos o no.
         stages:
           type: array
           items:

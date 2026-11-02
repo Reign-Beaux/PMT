@@ -41,6 +41,7 @@ type Result struct {
 	StepsToReproduce string        `json:"steps_to_reproduce"`
 	ProductVersion   string        `json:"product_version"`
 	Status           domain.Status `json:"status"`
+	ReportedBy       string        `json:"reported_by,omitempty"`
 	CreatedAt        time.Time     `json:"created_at"`
 	UpdatedAt        time.Time     `json:"updated_at"`
 }
@@ -64,7 +65,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := h.projects.EnsureWorking(ctx, cmd.ProjectID); err != nil {
 		return Result{}, err
 	}
-	b, err := domain.NewBug(cmd.ProjectID, cmd.Title, cmd.Description, cmd.StepsToReproduce, cmd.ProductVersion)
+	b, err := domain.NewBug(cmd.ProjectID, cmd.Title, cmd.Description, cmd.StepsToReproduce, cmd.ProductVersion, cmd.Actor.Name)
 	if err != nil {
 		return Result{}, err
 	}

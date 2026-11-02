@@ -23,6 +23,7 @@ type toolBug struct {
 	StepsToReproduce string `json:"steps_to_reproduce"`
 	ProductVersion   string `json:"product_version"`
 	Status           string `json:"status"`
+	ReportedBy       string `json:"reported_by,omitempty"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
 }
@@ -60,6 +61,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 			StepsToReproduce: item.StepsToReproduce,
 			ProductVersion:   item.ProductVersion,
 			Status:           string(item.Status),
+			ReportedBy:       item.ReportedBy,
 			CreatedAt:        item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:        item.UpdatedAt.Format(time.RFC3339),
 		})

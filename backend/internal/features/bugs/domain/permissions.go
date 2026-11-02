@@ -27,6 +27,17 @@ func EnsureCanCreate(actor kernel.Actor) error {
 	return nil
 }
 
+// ErrUpdateForbidden indica que el perfil no corrige bugs.
+var ErrUpdateForbidden = kernel.Forbidden("solo PP o el usuario corrigen bugs")
+
+// EnsureCanUpdate exige que el actor pueda corregir un bug.
+func EnsureCanUpdate(actor kernel.Actor) error {
+	if !slices.Contains(reporters, actor.Profile) {
+		return ErrUpdateForbidden
+	}
+	return nil
+}
+
 // statusProfiles indica qué perfiles pueden hacer cada transición. Un bug no tiene
 // etapa: todos son por perfil, sin asignación. Dev es DevFrontend o DevBackend.
 var statusProfiles = map[Status]map[Status][]kernel.Profile{

@@ -47,7 +47,7 @@ func TestHandleCreatesBug(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Status != domain.StatusReported || result.ProjectID != projectID || len(repo.saved) != 1 {
+	if result.Status != domain.StatusReported || result.ProjectID != projectID || result.ReportedBy != planner.Name || len(repo.saved) != 1 {
 		t.Errorf("result = %+v", result)
 	}
 }
