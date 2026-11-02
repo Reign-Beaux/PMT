@@ -3,6 +3,7 @@ package mcp
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -25,13 +26,29 @@ func Handler(server *sdk.Server) http.Handler {
 	)
 }
 
-// ToolError prepara un error para el agente. Los errores que no son de negocio
-// se registran y no exponen su detalle.
+// ToolError prepara un error para el agente. Los de negocio anteponen su tipo
+// al mensaje, para que el agente los distinga sin interpretar el texto. Los
+// demás se registran y no exponen su detalle.
 func ToolError(err error) error {
 	var businessErr *kernel.Error
 	if errors.As(err, &businessErr) {
-		return businessErr
+		return fmt.Errorf("%s: %w", kindCode(businessErr.Kind), businessErr)
 	}
 	log.Printf("error interno: %v", err)
 	return errors.New("error interno")
+}
+
+// kindCode nombra el tipo de un error de negocio. Como en REST, un tipo sin
+// clasificar cuenta como entrada inválida.
+func kindCode(kind kernel.ErrorKind) string {
+	switch kind {
+	case kernel.KindNotFound:
+		return "not_found"
+	case kernel.KindConflict:
+		return "conflict"
+	case kernel.KindForbidden:
+		return "forbidden"
+	default:
+		return "invalid"
+	}
 }

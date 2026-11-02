@@ -170,7 +170,7 @@ El esquema publicado por MCP se infiere, por lo que su fuente de verdad es el c�
 - Cada adaptador los entrega a `platform/rest.WriteError`, que responde 400, 403, 404 o 409 con el formato `{"error": "mensaje"}`.
 - `store` traduce a errores de negocio las violaciones de la base de datos, con `postgres.IsForeignKeyViolation` y `postgres.IsUniqueViolation`.
 - Cualquier otro error se registra en el log y responde 500 con un mensaje genérico, sin exponer su detalle.
-- `platform/mcp.ToolError` aplica la misma regla a las herramientas MCP.
+- `platform/mcp.ToolError` aplica la misma regla a las herramientas MCP y antepone el tipo al mensaje de los errores de negocio, para que un agente los distinga sin interpretar el texto: `invalid: `, `not_found: `, `conflict: ` o `forbidden: `, como en `forbidden: solo el TL descarta un hallazgo`. El prefijo de `kernel.Prefix` va después del tipo: `conflict: tarea <id>: ...`. Cualquier otro error sale como `error interno`, sin tipo. Los comandos no cambian y REST conserva `{"error": "mensaje"}`.
 
 ## Configuración
 
