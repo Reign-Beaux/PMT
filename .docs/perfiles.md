@@ -46,7 +46,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 | Perfil | Una sesión por |
 | --- | --- |
-| DevFrontend y DevBackend | Cada tarea o grupo de tareas que toman juntas |
+| DevFrontend y DevBackend | Cada grupo de tareas, hasta que todas estén en `done` |
 | CR | Cada revisión |
 | QAP | Cada plan de pruebas |
 | QA | Cada ronda de pruebas |
@@ -54,10 +54,10 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | PP | Cada planeación o cada bug que registra |
 | PC | Cada consulta o seguimiento |
 
-- **Correcciones:** si un trabajo regresa, también se inicia sesión nueva.
-- **Coordinación:** el TL coordina su etapa. Dev, CR, QAP y QA le avisan al terminar y él levanta al siguiente. El usuario levanta a PP, a PC y al TL.
+- **Correcciones:** si un trabajo regresa, Dev lo corrige en su misma sesión, con el contexto cargado. CR, QAP y QA siempre usan sesión nueva.
+- **Coordinación:** el TL coordina su etapa. Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP, a PC y al TL.
 - **Encargo:** indica proyecto, etapa e ID de las tareas.
-- **Sesión limpia:** es `/exit` seguido de otro lanzamiento, no `/clear`, porque `/clear` hace que herdr le quite el nombre al agente.
+- **Sesión limpia:** se reinicia con `/new`, sin cerrar el programa, y se vuelve a nombrar al agente en herdr, que lo pierde.
 
 **Herramientas de PMT:** un agente carga el esquema de una herramienta antes de llamarla por primera vez, y copia los ID de la salida de PMT, sin escribirlos de memoria.
 
@@ -68,10 +68,10 @@ Completa la tabla del flujo con quién actúa y cuándo.
 1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen, e incluye la preparación de lo que usarán las pruebas, como Vitest o Playwright. Si falta algo al planear, lo incluye el TL. Nadie lo instala a mitad de una prueba.
 2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas.
 3. **Iniciar las etapas:** el TL las inicia sin esperar otra orden, y varias pueden estar en `in_dev` a la vez. Si una etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
-4. **Tomar tareas:** el TL levanta a cada dev con las tareas de su encargo, y levanta a otro al entregarlas.
+4. **Tomar tareas:** el TL levanta a cada dev con un grupo de tareas relacionadas. Un dev no recibe otro grupo hasta cerrar el actual.
 5. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL levanta a QAP si toca frontend; si no, a QA.
 6. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
-7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready` y levanta al dev, porque ese cierre puede destrabar una tarea.
+7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
 8. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar.
 
 **En todo momento:**
