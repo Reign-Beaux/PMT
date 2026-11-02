@@ -2,7 +2,7 @@
 
 ## Qué es
 
-PMT es una herramienta de gestión de proyectos, similar a Monday o Jira. Guarda principalmente:
+PMT es una herramienta de gestión de proyectos, similar a Monday o Jira. Guarda principalmente el estado de:
 
 - **Proyectos**
 - **Etapas** de cada proyecto
@@ -10,7 +10,7 @@ PMT es una herramienta de gestión de proyectos, similar a Monday o Jira. Guarda
 
 ## Integración con IA
 
-La parte más importante de PMT es su integración con IA. PMT tendrá un MCP que servirá como medio de comunicación con los diferentes agentes, que trabajan usando herdr.
+La parte más importante de PMT es su integración con IA. PMT tiene un MCP con el que los agentes, que trabajan usando herdr, consultan y registran el estado del proyecto. Entre ellos se comunican con herdr.
 
 ## Perfiles
 

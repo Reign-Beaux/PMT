@@ -15,6 +15,12 @@ type Repository interface {
 	Create(ctx context.Context, s domain.Stage) (domain.Stage, error)
 }
 
+// ProjectChecker confirma que un proyecto está en planning. Lo implementa la
+// feature projects, conectada en app.
+type ProjectChecker interface {
+	EnsurePlanning(ctx context.Context, projectID uuid.UUID) error
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ProjectID   uuid.UUID `json:"-"`
@@ -24,27 +30,38 @@ type Command struct {
 
 // Result es la etapa creada.
 type Result struct {
-	ID          uuid.UUID `json:"id"`
-	ProjectID   uuid.UUID `json:"project_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Position    int       `json:"position"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uuid.UUID     `json:"id"`
+	ProjectID   uuid.UUID     `json:"project_id"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Position    int           `json:"position"`
+	Status      domain.Status `json:"status"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
+
+	Lead    string   `json:"lead,omitempty"`
+	Members []string `json:"members,omitempty"`
 }
 
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo     Repository
+	projects ProjectChecker
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, projects ProjectChecker) *Handler {
+	return &Handler{repo: repo, projects: projects}
 }
 
 // Handle crea la etapa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := h.projects.EnsurePlanning(ctx, cmd.ProjectID); err != nil {
+		return Result{}, err
+	}
 	s, err := domain.NewStage(cmd.ProjectID, cmd.Name, cmd.Description)
 	if err != nil {
 		return Result{}, err

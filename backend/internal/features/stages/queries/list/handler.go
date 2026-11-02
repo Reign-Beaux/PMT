@@ -17,13 +17,20 @@ type Reader interface {
 
 // Item es una etapa de la lista.
 type Item struct {
-	ID          uuid.UUID `json:"id"`
-	ProjectID   uuid.UUID `json:"project_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Position    int       `json:"position"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uuid.UUID     `json:"id"`
+	ProjectID   uuid.UUID     `json:"project_id"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Position    int           `json:"position"`
+	Status      domain.Status `json:"status"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
+
+	Lead    string   `json:"lead,omitempty"`
+	Members []string `json:"members,omitempty"`
 }
 
 // Handler ejecuta la operación.

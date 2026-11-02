@@ -1,6 +1,67 @@
 [
   {
-    "name": "create_project",
+    "description": "Cambia el status de un proyecto de PMT. Deja un registro inmutable, consultable con list_project_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende de las etapas: planning → stand_by exige al menos una etapa activa y ninguna en planning; stand_by → in_dev, al menos una en stand_by; in_dev → working no existe aquí: ocurre solo al cerrar o cancelar la última etapa abierta de la versión 1. stopped → working exige, entre las etapas de la versión 1, al menos una en done y las demás en done o cancelled, salvo que el proyecto ya haya estado en working. Usa list_projects para obtener el ID del proyecto y su status actual.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio de status; queda en el historial",
+          "type": "string"
+        },
+        "status": {
+          "description": "Nuevo status: planning, stand_by, in_dev, working, stopped o cancelled",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "name": "change_project_status",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "status",
+        "product_version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "description": "Crea un proyecto en PMT. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
@@ -20,6 +81,7 @@
       ],
       "type": "object"
     },
+    "name": "create_project",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -34,24 +96,32 @@
         },
         "name": {
           "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
         }
       },
       "required": [
         "id",
         "name",
         "description",
+        "status",
+        "product_version",
         "created_at"
       ],
       "type": "object"
     }
   },
   {
-    "name": "list_projects",
     "description": "Lista los proyectos de PMT. Úsala para obtener el ID de un proyecto a partir de su nombre, por ejemplo antes de usar create_stage.",
     "inputSchema": {
       "additionalProperties": false,
       "type": "object"
     },
+    "name": "list_projects",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -71,6 +141,12 @@
               "name": {
                 "type": "string"
               },
+              "product_version": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
               "updated_at": {
                 "type": "string"
               }
@@ -79,6 +155,8 @@
               "id",
               "name",
               "description",
+              "status",
+              "product_version",
               "created_at",
               "updated_at"
             ],
@@ -92,6 +170,175 @@
       },
       "required": [
         "projects"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Nueva descripción del proyecto",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nuevo nombre del proyecto",
+          "type": "string"
+        },
+        "product_version": {
+          "description": "Nueva versión del producto; vacía si no tiene",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "name",
+        "description",
+        "product_version"
+      ],
+      "type": "object"
+    },
+    "name": "update_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "status",
+        "product_version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene bugs ni etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "delete_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "deleted_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "deleted_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista el historial inmutable de cambios de status de un proyecto por orden de fecha: desde, hacia, actor, perfil, fecha y motivo. Funciona aunque el proyecto esté retirado o eliminado. Sin cambios devuelve una lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto; sirve aunque ya no exista",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_project_status_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "changed_at": {
+                "type": "string"
+              },
+              "from_status": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "to_status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "project_id",
+              "from_status",
+              "to_status",
+              "actor_name",
+              "actor_profile",
+              "reason",
+              "changed_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "changes"
       ],
       "type": "object"
     }

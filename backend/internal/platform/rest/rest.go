@@ -94,6 +94,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		status = http.StatusNotFound
 	case kernel.KindConflict:
 		status = http.StatusConflict
+	case kernel.KindForbidden:
+		status = http.StatusForbidden
 	}
 	writeMessage(w, status, businessErr.Message)
 }

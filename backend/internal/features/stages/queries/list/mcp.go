@@ -21,8 +21,15 @@ type toolStage struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Position    int    `json:"position"`
+	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+
+	AddReason      string `json:"add_reason,omitempty"`
+	AddRequestedBy string `json:"add_requested_by,omitempty"`
+
+	Lead    string   `json:"lead,omitempty"`
+	Members []string `json:"members,omitempty"`
 }
 
 type toolOutput struct {
@@ -33,7 +40,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "list_stages",
-		Description: "Lista las etapas de un proyecto de PMT, ordenadas por posición. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
+		Description: "Lista las etapas de un proyecto de PMT, ordenadas por posición, con su TL y su equipo. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
 	}, h.callTool)
 }
 
@@ -56,8 +63,15 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 			Name:        item.Name,
 			Description: item.Description,
 			Position:    item.Position,
+			Status:      string(item.Status),
 			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   item.UpdatedAt.Format(time.RFC3339),
+
+			AddReason:      item.AddReason,
+			AddRequestedBy: item.AddRequestedBy,
+
+			Lead:    item.Lead,
+			Members: item.Members,
 		})
 	}
 	return nil, toolOutput{Stages: stages}, nil

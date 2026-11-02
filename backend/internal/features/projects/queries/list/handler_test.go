@@ -31,14 +31,14 @@ func TestRESTReturnsEmptyArray(t *testing.T) {
 }
 
 func TestHandleReturnsProjects(t *testing.T) {
-	reader := &fakeReader{projects: []domain.Project{{Name: "A"}, {Name: "B"}}}
+	reader := &fakeReader{projects: []domain.Project{{Name: "A"}, {Name: "B", Status: domain.StatusInDev, ProductVersion: "1.0.0"}}}
 
 	items, err := New(reader).Handle(context.Background())
 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 2 || items[1].Name != "B" {
+	if len(items) != 2 || items[1].Name != "B" || items[1].Status != domain.StatusInDev || items[1].ProductVersion != "1.0.0" {
 		t.Errorf("items = %+v", items)
 	}
 }

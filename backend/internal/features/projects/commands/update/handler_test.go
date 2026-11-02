@@ -52,6 +52,28 @@ func TestHandleUpdatesProject(t *testing.T) {
 	}
 }
 
+func TestHandleReplacesProductVersion(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	result, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "PMT", ProductVersion: " 1.0.0 "})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ProductVersion != "1.0.0" {
+		t.Errorf("result = %+v", result)
+	}
+
+	result, err = New(repo).Handle(context.Background(), Command{ID: id, Name: "PMT"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ProductVersion != "" || repo.projects[id].ProductVersion != "" {
+		t.Errorf("result = %+v", result)
+	}
+}
+
 func TestHandleKeepsProjectWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
@@ -75,6 +97,69 @@ func TestHandleMissingProject(t *testing.T) {
 	}
 }
 
+func TestHandleOutsidePlanning(t *testing.T) {
+	statuses := []domain.Status{
+		domain.StatusStandBy, domain.StatusInDev, domain.StatusWorking, domain.StatusStopped, domain.StatusCancelled,
+	}
+
+	for _, status := range statuses {
+		t.Run(string(status), func(t *testing.T) {
+			repo, id := newRepoWith(t)
+			p := repo.projects[id]
+			p.Status = status
+			p.ProductVersion = "1.0.0"
+			repo.projects[id] = p
+
+			result, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "Otro", Description: "Nueva", ProductVersion: "1.0.0"})
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Name != "Otro" || result.Description != "Nueva" {
+				t.Errorf("result = %+v", result)
+			}
+
+			_, err = New(repo).Handle(context.Background(), Command{ID: id, Name: "Tercero", ProductVersion: "2.0.0"})
+
+			if !errors.Is(err, domain.ErrProductVersionFrozen) {
+				t.Fatalf("err = %v", err)
+			}
+			if repo.projects[id].Name != "Otro" || repo.projects[id].ProductVersion != "1.0.0" {
+				t.Errorf("proyecto = %+v", repo.projects[id])
+			}
+		})
+	}
+}
+
+func TestRESTOutsidePlanning(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   string
+		status int
+	}{
+		{"nombre", `{"name":"Otro"}`, http.StatusOK},
+		{"versión de producto", `{"name":"Otro","product_version":"2.0.0"}`, http.StatusConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, id := newRepoWith(t)
+			p := repo.projects[id]
+			p.Status = domain.StatusStandBy
+			repo.projects[id] = p
+			mux := http.NewServeMux()
+			New(repo).Register(mux)
+			rec := httptest.NewRecorder()
+
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String(), strings.NewReader(tt.body)))
+
+			if rec.Code != tt.status {
+				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+			}
+		})
+	}
+}
+
 func TestREST(t *testing.T) {
 	repo, id := newRepoWith(t)
 	tests := []struct {
@@ -87,6 +172,8 @@ func TestREST(t *testing.T) {
 		{"id inválido", "abc", `{"name":"PMT"}`, http.StatusBadRequest},
 		{"no existe", uuid.NewString(), `{"name":"PMT"}`, http.StatusNotFound},
 		{"nombre vacío", id.String(), `{"name":""}`, http.StatusBadRequest},
+		{"con versión de producto", id.String(), `{"name":"PMT","product_version":"1.0.0"}`, http.StatusOK},
+		{"status no editable", id.String(), `{"name":"PMT","status":"stopped"}`, http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {

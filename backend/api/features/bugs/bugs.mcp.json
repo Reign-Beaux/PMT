@@ -1,0 +1,394 @@
+[
+  {
+    "description": "Registra un bug en un proyecto de PMT. Solo PP y el usuario. No pertenece a ninguna etapa y nace en status reported. Solo funciona si el proyecto está en working. Pide steps_to_reproduce y product_version, la versión donde apareció, antes de llamar a esta herramienta.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Descripción del bug; puede ir vacía",
+          "type": "string"
+        },
+        "product_version": {
+          "description": "Versión del producto donde apareció",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto, que debe estar en working",
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "description": "Pasos para reproducirlo",
+          "type": "string"
+        },
+        "title": {
+          "description": "Título del bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version"
+      ],
+      "type": "object"
+    },
+    "name": "create_bug",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "reported_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Reemplaza título, descripción, pasos para reproducirlo y versión de un bug, para corregir el reporte, y devuelve el bug completo. No cambia su status. Solo PP y el usuario. Solo funciona si el proyecto está en working y el bug no está en done ni rejected. Usa list_bugs para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug",
+          "type": "string"
+        },
+        "description": {
+          "description": "Descripción del bug; puede ir vacía",
+          "type": "string"
+        },
+        "product_version": {
+          "description": "Versión del producto donde apareció",
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "description": "Pasos para reproducirlo",
+          "type": "string"
+        },
+        "title": {
+          "description": "Título del bug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bug_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version"
+      ],
+      "type": "object"
+    },
+    "name": "update_bug",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "reported_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Una corrección vuelve de changes_requested a in_dev. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Usa list_bugs para obtener el ID del bug y su status actual.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio de status; queda en el historial. Al aprobar, QA escribe el resumen de lo verificado y la ruta del script o resultado",
+          "type": "string"
+        },
+        "status": {
+          "description": "Nuevo status: reported, confirmed, in_dev, in_review, changes_requested, in_qa, pending_close, done o rejected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bug_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "name": "change_bug_status",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "steps_to_reproduce": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "reported_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "title",
+        "description",
+        "steps_to_reproduce",
+        "product_version",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista los bugs de un proyecto de PMT por fecha de creación. Funciona con cualquier status del proyecto. Para obtener project_id usa list_projects.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_bugs",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bugs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "product_version": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "steps_to_reproduce": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              },
+              "reported_by": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "project_id",
+              "title",
+              "description",
+              "steps_to_reproduce",
+              "product_version",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "bugs"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista el historial inmutable de cambios de status de un bug por orden de fecha: desde, hacia, actor, perfil, fecha y motivo. Funciona aunque el bug esté retirado o eliminado. Sin cambios devuelve una lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug; sirve aunque ya no exista",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bug_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_bug_status_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "bug_id": {
+                "type": "string"
+              },
+              "changed_at": {
+                "type": "string"
+              },
+              "from_status": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "to_status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "bug_id",
+              "from_status",
+              "to_status",
+              "actor_name",
+              "actor_profile",
+              "reason",
+              "changed_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "changes"
+      ],
+      "type": "object"
+    }
+  }
+]

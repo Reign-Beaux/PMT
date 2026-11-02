@@ -1,0 +1,335 @@
+[
+  {
+    "description": "Libera un proyecto de PMT en planning: lo pasa a stand_by junto con sus etapas en planning, todo o nada, y devuelve las etapas que movió. Solo PP y el usuario. Exige al menos una etapa activa, y cada etapa en planning necesita una tarea activa; si una falla, nada cambia y el error la nombra. Las etapas en otro status no se tocan y las tareas siguen en backlog. Deja un registro inmutable por elemento. Una etapa en planning propio sale con su registro add. Usa list_projects para obtener el ID del proyecto.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo; queda en el historial de status del proyecto y de cada etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "release_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "stages": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "stages"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Inicia una etapa de PMT en stand_by: la pasa a in_dev, sus tareas en backlog a ready y el proyecto a in_dev si sigue en stand_by, todo o nada. Solo el TL de la etapa. Exige proyecto en stand_by, in_dev o working. Las tareas en otro status no se tocan. Deja un registro inmutable por elemento; el del proyecto lleva al TL como actor y el motivo inicio de la etapa. Usa list_stages para obtener el ID de la etapa.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Motivo; queda en el historial de status de la etapa y de cada tarea",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id"
+      ],
+      "type": "object"
+    },
+    "name": "start_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "project_status": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tasks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "project_id",
+        "project_status",
+        "tasks"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Muestra el avance de un proyecto de PMT en una sola llamada: sus etapas por posición, con TL, equipo, conteo por status y tareas, sus bugs abiertos y las señales de un posible atasco. open_bugs trae el conteo por status y los bugs que no están en done ni rejected, por fecha de creación. Solo lectura, para todos los perfiles. Lo retirado no aparece. Señales: ready_without_work, etapa en in_dev con tareas en ready y ninguna en curso; stage_not_closed, etapa en in_dev con todas sus tareas en done o cancelled y al menos una en done; stage_not_started, proyecto en stand_by, in_dev o working, ninguna etapa en in_dev y alguna en stand_by, y nombra la primera por posición. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed. Son hechos, sin umbrales de tiempo. Usa list_projects para obtener el ID del proyecto.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_project_progress",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "open_bugs": {
+          "additionalProperties": false,
+          "properties": {
+            "counts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "status",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            }
+          },
+          "required": [
+            "counts",
+            "items"
+          ],
+          "type": "object"
+        },
+        "project": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "last_change_at": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "status",
+            "last_change_at"
+          ],
+          "type": "object"
+        },
+        "signals": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "stage_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "stage_id",
+              "stage_name"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "stages": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "counts": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "lead": {
+                "type": "string"
+              },
+              "members": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tasks": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assignee": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "status",
+              "members",
+              "counts",
+              "tasks"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "project",
+        "stages",
+        "open_bugs",
+        "signals"
+      ],
+      "type": "object"
+    }
+  }
+]

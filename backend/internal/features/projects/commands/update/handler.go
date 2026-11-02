@@ -18,18 +18,21 @@ type Repository interface {
 
 // Command contiene los datos de entrada.
 type Command struct {
-	ID          uuid.UUID `json:"-"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
+	ID             uuid.UUID `json:"-"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	ProductVersion string    `json:"product_version"`
 }
 
 // Result es el proyecto actualizado.
 type Result struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uuid.UUID     `json:"id"`
+	Name           string        `json:"name"`
+	Description    string        `json:"description"`
+	Status         domain.Status `json:"status"`
+	ProductVersion string        `json:"product_version"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
 }
 
 // Handler ejecuta la operación.
@@ -48,7 +51,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := p.Update(cmd.Name, cmd.Description); err != nil {
+	if err := p.Update(cmd.Name, cmd.Description, cmd.ProductVersion); err != nil {
 		return Result{}, err
 	}
 

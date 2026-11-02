@@ -7,12 +7,14 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/tasks/domain"
 	"pmt/internal/kernel"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
 type toolInput struct {
 	StageID string `json:"stage_id" jsonschema:"UUID de la etapa"`
+	Status  string `json:"status,omitempty" jsonschema:"Filtra por este status; sin él devuelve todas"`
 }
 
 type toolTask struct {
@@ -21,10 +23,9 @@ type toolTask struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
-	Blocked     bool   `json:"blocked"`
-	Version     int64  `json:"version"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+	Assignee    string `json:"assignee,omitempty"`
 }
 
 type toolOutput struct {
@@ -35,7 +36,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "list_tasks",
-		Description: "Lista las tareas de una etapa de PMT, de la más antigua a la más reciente. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+		Description: "Lista las tareas de una etapa de PMT, de la más antigua a la más reciente, con su dueño. Acepta filtrar por status. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
 	}, h.callTool)
 }
 
@@ -45,7 +46,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("stage_id inválido"))
 	}
 
-	items, err := h.Handle(ctx, stageID)
+	items, err := h.Handle(ctx, stageID, domain.Status(input.Status))
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}
@@ -58,10 +59,9 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 			Title:       item.Title,
 			Description: item.Description,
 			Status:      string(item.Status),
-			Blocked:     item.Blocked,
-			Version:     item.Version,
 			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   item.UpdatedAt.Format(time.RFC3339),
+			Assignee:    item.Assignee,
 		})
 	}
 	return nil, toolOutput{Tasks: tasks}, nil

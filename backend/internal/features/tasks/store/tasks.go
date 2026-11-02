@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"pmt/internal/features/tasks/domain"
 	"pmt/internal/features/tasks/store/sqlcgen"
@@ -32,8 +33,6 @@ func (s *Tasks) Create(ctx context.Context, task domain.Task) (domain.Task, erro
 		Title:       task.Title,
 		Description: task.Description,
 		Status:      string(task.Status),
-		Blocked:     task.Blocked,
-		Version:     task.Version,
 	})
 	if postgres.IsForeignKeyViolation(err) {
 		return domain.Task{}, domain.ErrStageNotFound
@@ -44,7 +43,7 @@ func (s *Tasks) Create(ctx context.Context, task domain.Task) (domain.Task, erro
 	return toDomain(row), nil
 }
 
-// Get busca una tarea por su ID.
+// Get busca la última versión de una tarea sin retirar por su ID.
 func (s *Tasks) Get(ctx context.Context, id uuid.UUID) (domain.Task, error) {
 	row, err := s.queries.GetTask(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -53,34 +52,45 @@ func (s *Tasks) Get(ctx context.Context, id uuid.UUID) (domain.Task, error) {
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("obtener tarea: %w", err)
 	}
-	return toDomain(row), nil
+	return toDomain(sqlcgen.Task(row)), nil
 }
 
-// List devuelve las tareas de una etapa, de la más antigua a la más reciente.
+// List devuelve la última versión de las tareas sin retirar de una etapa, de la más antigua a la más reciente.
 func (s *Tasks) List(ctx context.Context, stageID uuid.UUID) ([]domain.Task, error) {
-	rows, err := s.queries.ListTasks(ctx, stageID)
+	return s.ListByStatus(ctx, stageID, "")
+}
+
+// ListIDs devuelve los ID de las tareas de una etapa, incluidas las retiradas.
+func (s *Tasks) ListIDs(ctx context.Context, stageID uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := s.queries.ListTaskIDs(ctx, stageID)
+	if err != nil {
+		return nil, fmt.Errorf("listar ID de tareas: %w", err)
+	}
+	return ids, nil
+}
+
+// ListByStatus es List filtrada por status. Un status vacío no filtra.
+func (s *Tasks) ListByStatus(ctx context.Context, stageID uuid.UUID, status domain.Status) ([]domain.Task, error) {
+	rows, err := s.queries.ListTasks(ctx, sqlcgen.ListTasksParams{StageID: stageID, Status: string(status)})
 	if err != nil {
 		return nil, fmt.Errorf("listar tareas: %w", err)
 	}
 	tasks := make([]domain.Task, 0, len(rows))
 	for _, row := range rows {
-		tasks = append(tasks, toDomain(row))
+		tasks = append(tasks, toDomain(sqlcgen.Task(row)))
 	}
 	return tasks, nil
 }
 
-// Update guarda los cambios de una tarea si sigue en expectedVersion. Si ninguna
-// fila coincide, informa un conflicto: quien relea verá la versión nueva, o un
-// 404 si otra operación borró la tarea.
-func (s *Tasks) Update(ctx context.Context, task domain.Task, expectedVersion int64) (domain.Task, error) {
+// Update guarda los cambios de una tarea.
+func (s *Tasks) Update(ctx context.Context, task domain.Task) (domain.Task, error) {
 	row, err := s.queries.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
-		ID:              task.ID,
-		Title:           task.Title,
-		Description:     task.Description,
-		ExpectedVersion: expectedVersion,
+		ID:          task.ID,
+		Title:       task.Title,
+		Description: task.Description,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Task{}, domain.ErrTaskVersionConflict
+		return domain.Task{}, domain.ErrTaskNotFound
 	}
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("actualizar tarea: %w", err)
@@ -88,9 +98,55 @@ func (s *Tasks) Update(ctx context.Context, task domain.Task, expectedVersion in
 	return toDomain(row), nil
 }
 
+// UpdateAssignee guarda el dueño de una tarea sin retirar y devuelve su última versión.
+func (s *Tasks) UpdateAssignee(ctx context.Context, task domain.Task) (domain.Task, error) {
+	row, err := s.queries.UpdateTaskAssignee(ctx, sqlcgen.UpdateTaskAssigneeParams{
+		ID:       task.ID,
+		Assignee: pgtype.Text{String: task.Assignee, Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("actualizar dueño de tarea: %w", err)
+	}
+	return toDomain(sqlcgen.Task(row)), nil
+}
+
+// HasOpenAssigned indica si el agente tiene tareas sin terminar en la etapa.
+func (s *Tasks) HasOpenAssigned(ctx context.Context, stageID uuid.UUID, agent string) (bool, error) {
+	has, err := s.queries.HasOpenAssignedTasks(ctx, sqlcgen.HasOpenAssignedTasksParams{
+		StageID:  stageID,
+		Assignee: pgtype.Text{String: agent, Valid: true},
+	})
+	if err != nil {
+		return false, fmt.Errorf("consultar tareas asignadas: %w", err)
+	}
+	return has, nil
+}
+
+// UpdateStatus guarda el status de una tarea sin retirar y devuelve su última versión.
+func (s *Tasks) UpdateStatus(ctx context.Context, task domain.Task) (domain.Task, error) {
+	row, err := s.queries.UpdateTaskStatus(ctx, sqlcgen.UpdateTaskStatusParams{
+		ID:       task.ID,
+		Status:   string(task.Status),
+		Assignee: task.Assignee,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Task{}, domain.ErrTaskNotFound
+	}
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("actualizar status de tarea: %w", err)
+	}
+	return toDomain(sqlcgen.Task(row)), nil
+}
+
 // Delete elimina una tarea.
 func (s *Tasks) Delete(ctx context.Context, id uuid.UUID) error {
 	deleted, err := s.queries.DeleteTask(ctx, id)
+	if postgres.IsForeignKeyViolation(err) {
+		return domain.ErrTaskHasChanges
+	}
 	if err != nil {
 		return fmt.Errorf("eliminar tarea: %w", err)
 	}
@@ -100,6 +156,15 @@ func (s *Tasks) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// HasChanges indica si la tarea tiene historial de cambios.
+func (s *Tasks) HasChanges(ctx context.Context, id uuid.UUID) (bool, error) {
+	has, err := s.queries.HasTaskChanges(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("consultar cambios: %w", err)
+	}
+	return has, nil
+}
+
 func toDomain(row sqlcgen.Task) domain.Task {
 	return domain.Task{
 		ID:          row.ID,
@@ -107,9 +172,8 @@ func toDomain(row sqlcgen.Task) domain.Task {
 		Title:       row.Title,
 		Description: row.Description,
 		Status:      domain.Status(row.Status),
-		Blocked:     row.Blocked,
-		Version:     row.Version,
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
+		Assignee:    row.Assignee.String,
 	}
 }

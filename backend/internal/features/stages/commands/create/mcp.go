@@ -23,6 +23,7 @@ type toolOutput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Position    int    `json:"position"`
+	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -31,7 +32,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_stage",
-		Description: "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+		Description: "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Solo funciona si el proyecto está en planning; si no, usa add_stage. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
 	}, h.callTool)
 }
 
@@ -56,6 +57,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Name:        result.Name,
 		Description: result.Description,
 		Position:    result.Position,
+		Status:      string(result.Status),
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
 	}, nil

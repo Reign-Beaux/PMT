@@ -15,10 +15,12 @@ type toolInput struct {
 }
 
 type toolOutput struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"created_at"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Status         string `json:"status"`
+	ProductVersion string `json:"product_version"`
+	CreatedAt      string `json:"created_at"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
@@ -36,9 +38,11 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 	}
 
 	return nil, toolOutput{
-		ID:          result.ID.String(),
-		Name:        result.Name,
-		Description: result.Description,
-		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
+		ID:             result.ID.String(),
+		Name:           result.Name,
+		Description:    result.Description,
+		Status:         string(result.Status),
+		ProductVersion: result.ProductVersion,
+		CreatedAt:      result.CreatedAt.Format(time.RFC3339),
 	}, nil
 }

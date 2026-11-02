@@ -23,8 +23,6 @@ type toolOutput struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
-	Blocked     bool   `json:"blocked"`
-	Version     int64  `json:"version"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }
@@ -33,7 +31,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_task",
-		Description: "Crea una tarea en una etapa de PMT. Nace en estado backlog, sin bloquear y con versión 1. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
+		Description: "Crea una tarea en una etapa de PMT. Nace en estado backlog. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si el proyecto de la etapa está en planning y la etapa no nació con add_stage; si no, usa add_task. Si el usuario no indicó la etapa, el título o la descripción, pídeselos antes de llamar a esta herramienta. Para obtener stage_id a partir de nombres usa list_projects y list_stages.",
 	}, h.callTool)
 }
 
@@ -58,8 +56,6 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Title:       result.Title,
 		Description: result.Description,
 		Status:      string(result.Status),
-		Blocked:     result.Blocked,
-		Version:     result.Version,
 		CreatedAt:   result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   result.UpdatedAt.Format(time.RFC3339),
 	}, nil

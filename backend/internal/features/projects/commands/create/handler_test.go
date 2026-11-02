@@ -33,6 +33,17 @@ func TestHandleCreatesProject(t *testing.T) {
 	}
 }
 
+func TestHandleStartsInPlanningWithoutProductVersion(t *testing.T) {
+	result, err := New(&fakeRepo{}).Handle(context.Background(), Command{Name: "PMT"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != domain.StatusPlanning || result.ProductVersion != "" {
+		t.Errorf("result = %+v", result)
+	}
+}
+
 func TestHandleRejectsInvalidProject(t *testing.T) {
 	repo := &fakeRepo{}
 

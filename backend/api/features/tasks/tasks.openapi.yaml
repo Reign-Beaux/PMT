@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: PMT - Tareas
   version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
 paths:
   /api/stages/{stage_id}/tasks:
     parameters:
@@ -12,8 +15,17 @@ paths:
           type: string
           format: uuid
     get:
-      summary: Lista las tareas de una etapa por fecha de creación
+      summary: Lista las tareas sin retirar de una etapa por fecha de creación
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filtra por este status.
+          schema:
+            type: string
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Tareas
           content:
@@ -27,7 +39,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     post:
-      summary: Crea una tarea en estado backlog
+      summary: Crea una tarea en estado backlog si la etapa está en su planning propio con el proyecto en working, o si el proyecto está en planning y la etapa no nació con add_stage
       requestBody:
         required: true
         content:
@@ -42,11 +54,15 @@ paths:
                 description:
                   type: string
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "201":
           $ref: "#/components/responses/Task"
         "400":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/tasks/{id}:
     parameters:
@@ -59,6 +75,8 @@ paths:
     get:
       summary: Obtiene una tarea
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Task"
         "400":
@@ -66,7 +84,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de una tarea si sigue en la versión esperada
+      summary: Reemplaza los datos editables de una tarea de una etapa en su planning propio, o de una tarea sin historial cuyo proyecto está en planning y cuya etapa no nació con add_stage
       requestBody:
         required: true
         content:
@@ -74,17 +92,15 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [title, expected_version]
+              required: [title]
               properties:
                 title:
                   type: string
                 description:
                   type: string
-                expected_version:
-                  type: integer
-                  format: int64
-                  minimum: 1
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Task"
         "400":
@@ -94,16 +110,348 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina una tarea
+      summary: Elimina una tarea de una etapa en su planning propio, o una tarea sin historial cuyo proyecto está en planning y cuya etapa no nació con add_stage
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "204":
           description: Tarea eliminada
         "400":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{stage_id}/tasks/add:
+    parameters:
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Agrega una tarea como cambio inmutable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/stages/{stage_id}/task-changes:
+    parameters:
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: task_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista la evolución completa de lo que tiene cambios, incluido lo retirado
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Evolución de cada tarea con cambios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/History"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/stages/{stage_id}/tasks/status:
+    parameters:
+      - name: stage_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de varias tareas de una etapa, todas o ninguna
+      description: Cada tarea valida por separado lo mismo que PUT /api/tasks/{id}/status y puede tener otro origen. Si una falla, ninguna cambia y el error nombra la tarea. Deja un registro de status por tarea.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [task_ids, status]
+              properties:
+                task_ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    format: uuid
+                status:
+                  type: string
+                  enum: [backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done, cancelled]
+                reason:
+                  type: string
+                  description: Motivo del cambio, el mismo para todas; queda en el historial de status.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Tareas actualizadas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de una tarea
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Exigen reason cancelar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No escribe en task_changes y devuelve la última versión de la tarea. Deja un registro inmutable en el historial de status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done, cancelled]
+                reason:
+                  type: string
+                  description: Motivo del cambio; queda en el historial de status.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Task"
+        "400":
+          description: Identificador inválido o status desconocido
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Tarea inexistente o retirada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+        "409":
+          description: Transición no permitida, incluida la del status a sí mismo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+  /api/tasks/{id}/revise:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Registra una nueva versión como cambio inmutable
+      description: Una tarea en in_review, in_qa o pending_close vuelve a changes_requested, conserva su dueño y deja un registro de status. Una tarea en done se rechaza con 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/retire:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Retira la tarea sin borrar nada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, requested_by]
+              properties:
+                reason:
+                  type: string
+                requested_by:
+                  type: string
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Retiro registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retired_id, version]
+                properties:
+                  retired_id:
+                    type: string
+                    format: uuid
+                  version:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/assignee:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Pone o cambia el dueño de una tarea ya tomada
+      description: Solo el TL de la etapa. El agente debe estar activo y en el equipo. Se rechaza en backlog, ready, done y cancelled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [agent]
+              properties:
+                agent:
+                  type: string
+                  description: Nombre del dev.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Tarea con su nuevo dueño
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/tasks/{id}/status-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de status de una tarea
+      description: Funciona aunque ya no exista o esté retirado. Un ID sin registros responde lista vacía.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios por orden de fecha
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChange"
+        "400":
+          $ref: "#/components/responses/Error"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Versioned:
+      description: Task y su versión
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Task"
+              - type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
     Task:
       description: Tarea
       content:
@@ -121,9 +469,93 @@ components:
               error:
                 type: string
   schemas:
+    StatusChange:
+      type: object
+      required: [id, task_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+        to_status:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+          description: Vacío si actuó `sin-autenticar`.
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
+    ChangeContent:
+      type: object
+      additionalProperties: false
+      required: [title, reason, requested_by]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+    History:
+      type: object
+      required: [task_id, original, changes]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        original:
+          $ref: "#/components/schemas/Original"
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+    Original:
+      type: object
+      required: [title, description, created_at]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Change:
+      type: object
+      required: [id, version, kind, title, description, reason, requested_by, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        kind:
+          type: string
+          enum: [add, edit, retire]
+        title:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     Task:
       type: object
-      required: [id, stage_id, title, description, status, blocked, version, created_at, updated_at]
+      required: [id, stage_id, title, description, status, created_at, updated_at]
       properties:
         id:
           type: string
@@ -137,13 +569,10 @@ components:
           type: string
         status:
           type: string
-          enum: [backlog, ready, in_progress, in_review, changes_requested, in_qa, pending_close, done]
-        blocked:
-          type: boolean
-        version:
-          type: integer
-          format: int64
-          minimum: 1
+          enum: [backlog, ready, in_dev, in_review, changes_requested, in_qa, pending_close, done, cancelled]
+        assignee:
+          type: string
+          description: Dev dueño de la tarea. Ausente si nadie la ha tomado.
         created_at:
           type: string
           format: date-time

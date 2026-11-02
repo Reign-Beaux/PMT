@@ -11,10 +11,27 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
+var errNotPlanning = kernel.Conflict("el proyecto no está en planning")
+
+type fakeProjects struct {
+	err     error
+	working error
+}
+
+func (p fakeProjects) EnsurePlanning(context.Context, uuid.UUID) error {
+	return p.err
+}
+
+func (p fakeProjects) EnsureWorking(context.Context, uuid.UUID) error {
+	return p.working
+}
+
 type fakeRepo struct {
-	stages map[uuid.UUID]domain.Stage
+	stages     map[uuid.UUID]domain.Stage
+	hasChanges bool
 }
 
 func newRepoWith(t *testing.T) (*fakeRepo, uuid.UUID) {
@@ -39,10 +56,14 @@ func (r *fakeRepo) Update(_ context.Context, s domain.Stage) (domain.Stage, erro
 	return s, nil
 }
 
+func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
+	return r.hasChanges, nil
+}
+
 func TestHandleUpdatesStage(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{ID: id, Name: "Desarrollo", Description: "Otra"})
+	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Name: "Desarrollo", Description: "Otra"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -55,13 +76,54 @@ func TestHandleUpdatesStage(t *testing.T) {
 func TestHandleKeepsStageWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{ID: id, Name: " "})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Name: " "})
 
 	if !errors.Is(err, domain.ErrStageNameRequired) {
 		t.Fatalf("err = %v", err)
 	}
 	if repo.stages[id].Name != "Diseño" {
 		t.Errorf("etapa = %+v", repo.stages[id])
+	}
+}
+
+func TestHandleRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Name: "Otra"})
+
+	if !errors.Is(err, errNotPlanning) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.stages[id].Name != "Diseño" {
+		t.Errorf("etapa = %+v", repo.stages[id])
+	}
+}
+
+func TestHandleRejectsElementWithChanges(t *testing.T) {
+	repo, id := newRepoWith(t)
+	repo.hasChanges = true
+	before := repo.stages[id].Name
+
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ID: id, Name: "Otra"})
+
+	if !errors.Is(err, domain.ErrStageHasChanges) {
+		t.Fatalf("err = %v", err)
+	}
+	if repo.stages[id].Name != before {
+		t.Errorf("elemento = %+v", repo.stages[id])
+	}
+}
+
+func TestRESTRejectsOutsidePlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+	mux := http.NewServeMux()
+	New(repo, fakeProjects{err: errNotPlanning}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String(), strings.NewReader(`{"name":"Otra"}`)))
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 	}
 }
 
@@ -78,12 +140,13 @@ func TestREST(t *testing.T) {
 		{"no existe", uuid.NewString(), `{"name":"A"}`, http.StatusNotFound},
 		{"nombre vacío", id.String(), `{"name":""}`, http.StatusBadRequest},
 		{"position no editable", id.String(), `{"name":"A","position":2}`, http.StatusBadRequest},
+		{"status no editable", id.String(), `{"name":"A","status":"stand_by"}`, http.StatusBadRequest},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
-			New(repo).Register(mux)
+			New(repo, fakeProjects{}).Register(mux)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+tt.id, strings.NewReader(tt.body)))
@@ -92,5 +155,48 @@ func TestREST(t *testing.T) {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func ownPlanningRepo(t *testing.T) (*fakeRepo, uuid.UUID) {
+	t.Helper()
+	s, err := domain.NewOwnPlanningStage(uuid.New(), "Pagos", "Inicial", "Petición", "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}, s.ID
+}
+
+func TestHandleEditsStageInOwnPlanning(t *testing.T) {
+	repo, id := ownPlanningRepo(t)
+
+	result, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Name: "Cobros"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Name != "Cobros" || result.AddReason != "Petición" {
+		t.Errorf("result = %+v", result)
+	}
+}
+
+func TestHandleRejectsOwnPlanningOutsideWorking(t *testing.T) {
+	repo, id := ownPlanningRepo(t)
+	errNotWorking := kernel.Conflict("el proyecto no está en working")
+
+	_, err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), Command{ID: id, Name: "Cobros"})
+
+	if !errors.Is(err, errNotWorking) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestHandleKeepsProjectRuleForStageDefinedInPlanning(t *testing.T) {
+	repo, id := newRepoWith(t)
+
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ID: id, Name: "Cobros"})
+
+	if !errors.Is(err, errNotPlanning) {
+		t.Errorf("status planning no debe bastar: err = %v", err)
 	}
 }

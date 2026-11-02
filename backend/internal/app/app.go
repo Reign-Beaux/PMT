@@ -12,9 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/activity"
+	"pmt/internal/features/agents"
+	"pmt/internal/features/bugs"
+	"pmt/internal/features/imports"
 	"pmt/internal/features/projects"
+	"pmt/internal/features/qa"
+	"pmt/internal/features/reviews"
 	"pmt/internal/features/stages"
 	"pmt/internal/features/tasks"
+	"pmt/internal/features/workflow"
+	"pmt/internal/kernel"
 	"pmt/internal/platform/mcp"
 	"pmt/internal/platform/postgres"
 	"pmt/internal/platform/rest"
@@ -44,14 +52,33 @@ func Run() error {
 	mux := http.NewServeMux()
 	tools := mcp.NewServer()
 	registerFeatures(mux, tools, pool)
-	mux.Handle("/mcp", mcp.Handler(tools))
 
-	return rest.Serve(ctx, cfg.ServerAddr, mux)
+	return rest.Serve(ctx, cfg.ServerAddr, routes(mux, tools, agents.NewAuthenticator(pool)))
+}
+
+// routes protege la API y el MCP con la autenticación por token.
+func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator) http.Handler {
+	root := http.NewServeMux()
+	root.Handle("/api/", rest.Authenticate(authenticator)(api))
+	root.Handle("/mcp", mcp.Authenticate(authenticator)(mcp.Handler(tools)))
+	return root
 }
 
 // registerFeatures registra las rutas REST y las herramientas MCP de cada feature.
 func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool) {
-	projects.Register(mux, tools, pool)
-	stages.Register(mux, tools, pool)
-	tasks.Register(mux, tools, pool, stages.NewChecker(pool))
+	projectChecker := projects.NewChecker(pool)
+	agentChecker := agents.NewChecker(pool)
+
+	projects.Register(mux, tools, pool, stages.NewProgress(pool))
+	taskChecker := tasks.NewChecker(pool)
+	stages.Register(mux, tools, pool, taskChecker, projectChecker, agentChecker, workflow.NewCloser(pool))
+	stageChecker := stages.NewChecker(pool, projectChecker)
+	tasks.Register(mux, tools, pool, stageChecker, agentChecker)
+	imports.Register(tools, pool)
+	workflow.Register(mux, tools, pool, taskChecker)
+	bugs.Register(mux, tools, pool, projectChecker)
+	bugChecker := bugs.NewChecker(pool)
+	reviews.Register(mux, tools, pool, taskChecker, bugChecker, stageChecker)
+	qa.Register(mux, tools, pool, taskChecker, stageChecker)
+	activity.Register(mux, tools, pool, projectChecker, stageChecker, taskChecker, bugChecker)
 }

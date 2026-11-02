@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: PMT - Etapas
   version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
 paths:
   /api/projects/{project_id}/stages:
     parameters:
@@ -14,6 +17,8 @@ paths:
     get:
       summary: Lista las etapas de un proyecto en orden
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Etapas. La lista viene vacía si el proyecto no existe.
           content:
@@ -25,10 +30,12 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
     post:
-      summary: Crea una etapa al final del proyecto
+      summary: Crea una etapa al final de un proyecto en planning
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "201":
           $ref: "#/components/responses/Stage"
         "400":
@@ -48,6 +55,8 @@ paths:
     get:
       summary: Obtiene una etapa
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Stage"
         "400":
@@ -55,19 +64,25 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de una etapa
+      summary: Reemplaza los datos editables de una etapa en su planning propio con el proyecto en working, o de una etapa sin historial cuyo proyecto está en planning
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Stage"
         "400":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina una etapa
+      summary: Elimina una etapa sin tareas en su planning propio con el proyecto en working, o sin historial cuyo proyecto está en planning
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "204":
           description: Etapa eliminada
         "400":
@@ -76,8 +91,304 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/stages/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de una etapa
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working; planning → stand_by, al menos una tarea activa; done, tareas en done o cancelled con al menos una en done. Al cerrar o cancelar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done; si todas quedan canceladas, no cambia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/StageStatus"
+                reason:
+                  type: string
+                  description: Motivo del cambio; queda en el historial de status.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Stage"
+        "400":
+          description: Identificador inválido o status desconocido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Transición no permitida, incluida la del status a sí mismo, o cierre con tareas sin terminar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/projects/{project_id}/stages/add:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Agrega una etapa. Con el proyecto en working nace en su planning propio, sin registro y con version 0; en otro status se registra como cambio inmutable, con version 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/projects/{project_id}/stage-changes:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stage_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista la evolución completa de lo que tiene cambios, incluido lo retirado
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Evolución de cada etapa con cambios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/History"
+        "400":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/revise:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Registra una nueva versión como cambio inmutable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeContent"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Versioned"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/retire:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Retira la etapa sin borrar nada
+      description: Al retirar la última etapa abierta de la versión 1, el proyecto pasa solo de in_dev a working, en la misma transacción, si al menos una quedó en done y las demás en done, cancelled o retiradas. El actor es quien retira y el motivo, `cierre de la versión 1`. Retirar una etapa agregada no mueve el proyecto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, requested_by]
+              properties:
+                reason:
+                  type: string
+                requested_by:
+                  type: string
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Retiro y su versión
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retired_id, version]
+                properties:
+                  retired_id:
+                    type: string
+                    format: uuid
+                  version:
+                    type: integer
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/lead:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Fija o reemplaza el TL de una etapa
+      description: Solo PP o el usuario. El agente debe estar activo y tener perfil TL.
+      requestBody:
+        $ref: "#/components/requestBodies/AgentInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Añade un dev al equipo de una etapa
+      description: Solo el TL de la etapa. El agente debe estar activo y ser DevFrontend o DevBackend.
+      requestBody:
+        $ref: "#/components/requestBodies/AgentInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/members/{agent}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      summary: Quita un dev del equipo de una etapa
+      description: Solo el TL de la etapa. Se rechaza si el dev tiene tareas abiertas en ella.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/stages/{id}/status-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de status de una etapa
+      description: Funciona aunque ya no exista o esté retirado. Un ID sin registros responde lista vacía.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios por orden de fecha
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChange"
+        "400":
+          $ref: "#/components/responses/Error"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   requestBodies:
+    AgentInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [agent]
+            properties:
+              agent:
+                type: string
+                description: Nombre del agente.
     StageInput:
       required: true
       content:
@@ -92,6 +403,41 @@ components:
               description:
                 type: string
   responses:
+    Team:
+      description: Equipo de la etapa
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [id, lead, members]
+            properties:
+              id:
+                type: string
+                format: uuid
+              lead:
+                type: string
+              members:
+                type: array
+                items:
+                  type: string
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Versioned:
+      description: Etapa y su versión
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Stage"
+              - type: object
+                required: [version]
+                properties:
+                  version:
+                    type: integer
     Stage:
       description: Etapa
       content:
@@ -103,15 +449,104 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            required: [error]
-            properties:
-              error:
-                type: string
+            $ref: "#/components/schemas/Error"
   schemas:
+    StatusChange:
+      type: object
+      required: [id, stage_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stage_id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+        to_status:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+          description: Vacío si actuó `sin-autenticar`.
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
+    ChangeContent:
+      type: object
+      additionalProperties: false
+      required: [name, reason, requested_by]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+    History:
+      type: object
+      required: [stage_id, original, changes]
+      properties:
+        stage_id:
+          type: string
+          format: uuid
+        original:
+          $ref: "#/components/schemas/Original"
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+    Original:
+      type: object
+      required: [name, description, created_at]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Change:
+      type: object
+      required: [id, version, kind, name, description, reason, requested_by, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        kind:
+          type: string
+          enum: [add, edit, retire]
+        name:
+          type: string
+        description:
+          type: string
+        reason:
+          type: string
+        requested_by:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    StageStatus:
+      type: string
+      enum: [planning, stand_by, in_dev, done, stopped, cancelled]
     Stage:
       type: object
-      required: [id, project_id, name, description, position, created_at, updated_at]
+      required: [id, project_id, name, description, position, status, created_at, updated_at]
       properties:
         id:
           type: string
@@ -126,6 +561,22 @@ components:
         position:
           type: integer
           minimum: 1
+        status:
+          $ref: "#/components/schemas/StageStatus"
+        add_reason:
+          type: string
+          description: Motivo del registro add pendiente. Su presencia indica que la etapa está en su planning propio.
+        lead:
+          type: string
+          description: Nombre del TL responsable. Ausente si no tiene.
+        members:
+          type: array
+          description: Nombres de los devs del equipo. Ausente si no tiene.
+          items:
+            type: string
+        add_requested_by:
+          type: string
+          description: Quién pidió la etapa, mientras esté en su planning propio.
         created_at:
           type: string
           format: date-time

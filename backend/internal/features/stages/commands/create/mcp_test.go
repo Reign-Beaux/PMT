@@ -17,7 +17,7 @@ func connect(t *testing.T, repo Repository) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
-	New(repo).RegisterTool(server)
+	New(repo, fakeProjects{}).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverTransport, nil); err != nil {
@@ -72,6 +72,9 @@ func TestToolCreatesStage(t *testing.T) {
 	}
 	if len(repo.saved) != 1 || repo.saved[0].Name != "Diseño" || repo.saved[0].ProjectID != projectID {
 		t.Errorf("guardadas = %+v", repo.saved)
+	}
+	if text := result.Content[0].(*sdk.TextContent).Text; !strings.Contains(text, `"status":"planning"`) {
+		t.Errorf("salida = %s", text)
 	}
 }
 

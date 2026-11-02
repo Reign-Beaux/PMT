@@ -2,11 +2,16 @@ openapi: 3.1.0
 info:
   title: PMT - Proyectos
   version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
 paths:
   /api/projects:
     get:
       summary: Lista los proyectos, del más reciente al más antiguo
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           description: Proyectos
           content:
@@ -20,6 +25,8 @@ paths:
       requestBody:
         $ref: "#/components/requestBodies/ProjectInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "201":
           $ref: "#/components/responses/Project"
         "400":
@@ -35,6 +42,8 @@ paths:
     get:
       summary: Obtiene un proyecto
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Project"
         "400":
@@ -42,19 +51,25 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de un proyecto
+      summary: Reemplaza los datos editables de un proyecto. Fuera de planning, product_version debe ser la actual. Un campo omitido queda vacío; status tiene su propia ruta
       requestBody:
-        $ref: "#/components/requestBodies/ProjectInput"
+        $ref: "#/components/requestBodies/ProjectUpdateInput"
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "200":
           $ref: "#/components/responses/Project"
         "400":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
     delete:
-      summary: Elimina un proyecto
+      summary: Elimina un proyecto en planning, sin bugs ni etapas, activas o retiradas
       responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "204":
           description: Proyecto eliminado
         "409":
@@ -63,7 +78,77 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/projects/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de un proyecto
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Depende de las etapas; planning → stand_by exige al menos una etapa activa y ninguna en planning; stand_by → in_dev, al menos una en stand_by; in_dev → working no existe aquí, ocurre solo al cerrar o cancelar la última etapa abierta de la versión 1; stopped → working exige, entre las etapas de la versión 1, al menos una en done y las demás en done o cancelled, salvo que el proyecto ya haya estado en working.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/ProjectStatus"
+                reason:
+                  type: string
+                  description: Motivo del cambio; queda en el historial de status.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/projects/{id}/status-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de status de un proyecto
+      description: Funciona aunque ya no exista o esté retirado. Un ID sin registros responde lista vacía.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios por orden de fecha
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChange"
+        "400":
+          $ref: "#/components/responses/Error"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   requestBodies:
     ProjectInput:
       required: true
@@ -78,7 +163,29 @@ components:
                 type: string
               description:
                 type: string
+    ProjectUpdateInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              product_version:
+                type: string
+                description: Versión del producto, de texto libre. No es control de concurrencia.
   responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     Project:
       description: Proyecto
       content:
@@ -96,9 +203,33 @@ components:
               error:
                 type: string
   schemas:
+    StatusChange:
+      type: object
+      required: [id, project_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+        to_status:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+          description: Vacío si actuó `sin-autenticar`.
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     Project:
       type: object
-      required: [id, name, description, created_at, updated_at]
+      required: [id, name, description, status, product_version, created_at, updated_at]
       properties:
         id:
           type: string
@@ -107,9 +238,17 @@ components:
           type: string
         description:
           type: string
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        product_version:
+          type: string
+          description: Versión del producto, de texto libre. No es control de concurrencia.
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    ProjectStatus:
+      type: string
+      enum: [planning, stand_by, in_dev, working, stopped, cancelled]

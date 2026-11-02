@@ -1,0 +1,247 @@
+openapi: 3.1.0
+info:
+  title: PMT - Bugs
+  version: 0.1.0
+security:
+  - bearerAuth: []
+  - {}
+paths:
+  /api/projects/{project_id}/bugs:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista los bugs de un proyecto por fecha de creación, con cualquier status del proyecto
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Bugs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Registra un bug en status reported si el proyecto está en working
+      description: Solo PP y el usuario.
+      requestBody:
+        $ref: "#/components/requestBodies/BugInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/bugs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Corrige los datos de un bug, solo PP y User, si el proyecto está en working y el bug no está en done ni rejected; no cambia su status
+      requestBody:
+        $ref: "#/components/requestBodies/BugInput"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/bugs/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      summary: Cambia el status de un bug
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Exige el proyecto en working y devuelve el bug completo. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Deja un registro inmutable en el historial de status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [reported, confirmed, in_dev, in_review, changes_requested, in_qa, pending_close, done, rejected]
+                reason:
+                  type: string
+                  description: Motivo del cambio; queda en el historial de status.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          description: Perfil o ámbito no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/bugs/{id}/status-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de status de un bug
+      description: Funciona aunque ya no exista o esté retirado. Un ID sin registros responde lista vacía.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios por orden de fecha
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusChange"
+        "400":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  requestBodies:
+    BugInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [title, steps_to_reproduce, product_version]
+            properties:
+              title:
+                type: string
+              description:
+                type: string
+              steps_to_reproduce:
+                type: string
+              product_version:
+                type: string
+                description: Versión del producto donde apareció, de texto libre.
+  responses:
+    Unauthorized:
+      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Bug:
+      description: Bug
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Bug"
+    Error:
+      description: Error de negocio
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    StatusChange:
+      type: object
+      required: [id, bug_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        bug_id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+        to_status:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+          description: Vacío si actuó `sin-autenticar`.
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    BugStatus:
+      type: string
+      enum: [reported, confirmed, in_dev, in_review, changes_requested, in_qa, pending_close, done, rejected]
+    Bug:
+      type: object
+      required: [id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        steps_to_reproduce:
+          type: string
+        product_version:
+          type: string
+        status:
+          $ref: "#/components/schemas/BugStatus"
+        reported_by:
+          type: string
+          description: Quien registró el bug. Falta en los bugs anteriores a este campo.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
