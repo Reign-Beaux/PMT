@@ -128,7 +128,7 @@
     }
   },
   {
-    "description": "Muestra el avance de un proyecto de PMT en una sola llamada: sus etapas por posición, con TL, equipo, conteo por status y tareas, y las señales de un posible atasco. Solo lectura, para todos los perfiles. Lo retirado no aparece. Señales: ready_without_work, etapa en in_dev con tareas en ready y ninguna en curso; stage_not_closed, etapa en in_dev con todas sus tareas en done o cancelled y al menos una en done; stage_not_started, proyecto en stand_by, in_dev o working, ninguna etapa en in_dev y alguna en stand_by, y nombra la primera por posición. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed. Son hechos, sin umbrales de tiempo. Usa list_projects para obtener el ID del proyecto.",
+    "description": "Muestra el avance de un proyecto de PMT en una sola llamada: sus etapas por posición, con TL, equipo, conteo por status y tareas, sus bugs abiertos y las señales de un posible atasco. open_bugs trae el conteo por status y los bugs que no están en done ni rejected, por fecha de creación. Solo lectura, para todos los perfiles. Lo retirado no aparece. Señales: ready_without_work, etapa en in_dev con tareas en ready y ninguna en curso; stage_not_closed, etapa en in_dev con todas sus tareas en done o cancelled y al menos una en done; stage_not_started, proyecto en stand_by, in_dev o working, ninguna etapa en in_dev y alguna en stand_by, y nombra la primera por posición. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed. Son hechos, sin umbrales de tiempo. Usa list_projects para obtener el ID del proyecto.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -146,6 +146,52 @@
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "open_bugs": {
+          "additionalProperties": false,
+          "properties": {
+            "counts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "status",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            }
+          },
+          "required": [
+            "counts",
+            "items"
+          ],
+          "type": "object"
+        },
         "project": {
           "additionalProperties": false,
           "properties": {
@@ -280,6 +326,7 @@
       "required": [
         "project",
         "stages",
+        "open_bugs",
         "signals"
       ],
       "type": "object"

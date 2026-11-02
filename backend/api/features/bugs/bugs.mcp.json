@@ -1,6 +1,6 @@
 [
   {
-    "description": "Registra un bug en un proyecto de PMT. No pertenece a ninguna etapa y nace en status reported. Solo funciona si el proyecto está en working. Pide steps_to_reproduce y product_version, la versión donde apareció, antes de llamar a esta herramienta.",
+    "description": "Registra un bug en un proyecto de PMT. Solo PP y el usuario. No pertenece a ninguna etapa y nace en status reported. Solo funciona si el proyecto está en working. Pide steps_to_reproduce y product_version, la versión donde apareció, antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

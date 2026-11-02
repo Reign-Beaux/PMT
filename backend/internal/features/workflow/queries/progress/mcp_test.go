@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	bugs "pmt/internal/features/bugs/domain"
 	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
 	tasks "pmt/internal/features/tasks/domain"
@@ -70,6 +71,33 @@ func TestToolReturnsProgress(t *testing.T) {
 	}
 }
 
+func TestToolReturnsOpenBugs(t *testing.T) {
+	r := reader(projects.StatusWorking)
+	id := uuid.New()
+	r.bugs = []bugs.Bug{
+		{ID: id, Title: "B", Status: bugs.StatusConfirmed, UpdatedAt: base},
+		{ID: uuid.New(), Title: "C", Status: bugs.StatusDone, UpdatedAt: base},
+	}
+
+	result := callTool(t, r, r.project.ID.String())
+
+	if result.IsError {
+		t.Fatalf("resultado = %+v", result)
+	}
+	raw, err := json.Marshal(result.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output toolOutput
+	if err := json.Unmarshal(raw, &output); err != nil {
+		t.Fatal(err)
+	}
+	open := output.OpenBugs
+	if open.Counts["confirmed"] != 1 || len(open.Items) != 1 || open.Items[0].ID != id.String() || open.Items[0].UpdatedAt == "" {
+		t.Errorf("bugs = %+v", open)
+	}
+}
+
 func TestToolReturnsEmptyLists(t *testing.T) {
 	r := reader(projects.StatusPlanning, stageFixture{"A", stages.StatusPlanning, nil})
 
@@ -82,7 +110,7 @@ func TestToolReturnsEmptyLists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"signals":[]`, `"tasks":[]`, `"members":[]`, `"counts":{}`} {
+	for _, want := range []string{`"open_bugs":{"counts":{},"items":[]}`, `"signals":[]`, `"tasks":[]`, `"members":[]`, `"counts":{}`} {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("falta %s en %s", want, raw)
 		}

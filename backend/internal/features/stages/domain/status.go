@@ -50,7 +50,7 @@ type Status string
 const (
 	// StatusPlanning es el estado inicial de toda etapa: se definen sus tareas.
 	StatusPlanning Status = "planning"
-	// StatusStandBy indica que la etapa está lista, esperando su turno.
+	// StatusStandBy indica que la etapa está lista para iniciarse.
 	StatusStandBy Status = "stand_by"
 	// StatusInDev indica que sus tareas se están trabajando.
 	StatusInDev Status = "in_dev"

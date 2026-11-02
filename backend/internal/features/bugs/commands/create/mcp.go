@@ -35,11 +35,11 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_bug",
-		Description: "Registra un bug en un proyecto de PMT. No pertenece a ninguna etapa y nace en status reported. Solo funciona si el proyecto está en working. Pide steps_to_reproduce y product_version, la versión donde apareció, antes de llamar a esta herramienta.",
+		Description: "Registra un bug en un proyecto de PMT. Solo PP y el usuario. No pertenece a ninguna etapa y nace en status reported. Solo funciona si el proyecto está en working. Pide steps_to_reproduce y product_version, la versión donde apareció, antes de llamar a esta herramienta.",
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
 	id, err := uuid.Parse(input.ProjectID)
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("project_id inválido"))
@@ -51,6 +51,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Description:      input.Description,
 		StepsToReproduce: input.StepsToReproduce,
 		ProductVersion:   input.ProductVersion,
+		Actor:            platformmcp.ActorFrom(req),
 	})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)

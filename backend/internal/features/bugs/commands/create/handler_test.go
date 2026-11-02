@@ -12,6 +12,7 @@ import (
 
 	"pmt/internal/features/bugs/domain"
 	"pmt/internal/kernel"
+	"pmt/internal/platform/rest"
 )
 
 var errNotWorking = kernel.Conflict("el proyecto no está en working")
@@ -33,12 +34,14 @@ func (r *fakeRepo) Create(_ context.Context, b domain.Bug) (domain.Bug, error) {
 	return b, nil
 }
 
+var planner = kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}
+
 func TestHandleCreatesBug(t *testing.T) {
 	repo := &fakeRepo{}
 	projectID := uuid.New()
 
 	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{
-		ProjectID: projectID, Title: "Falla", StepsToReproduce: "Paso 1", ProductVersion: "1.2.0",
+		ProjectID: projectID, Title: "Falla", StepsToReproduce: "Paso 1", ProductVersion: "1.2.0", Actor: planner,
 	})
 
 	if err != nil {
@@ -53,7 +56,7 @@ func TestHandleRejectsOutsideWorking(t *testing.T) {
 	repo := &fakeRepo{}
 
 	_, err := New(repo, fakeProjects{err: errNotWorking}).Handle(context.Background(), Command{
-		ProjectID: uuid.New(), Title: "Falla", StepsToReproduce: "Paso 1", ProductVersion: "1.2.0",
+		ProjectID: uuid.New(), Title: "Falla", StepsToReproduce: "Paso 1", ProductVersion: "1.2.0", Actor: planner,
 	})
 
 	if !errors.Is(err, errNotWorking) || len(repo.saved) != 0 {
@@ -62,10 +65,54 @@ func TestHandleRejectsOutsideWorking(t *testing.T) {
 }
 
 func TestHandleRejectsInvalidBug(t *testing.T) {
-	_, err := New(&fakeRepo{}, fakeProjects{}).Handle(context.Background(), Command{ProjectID: uuid.New(), Title: "Falla"})
+	_, err := New(&fakeRepo{}, fakeProjects{}).Handle(context.Background(), Command{ProjectID: uuid.New(), Title: "Falla", Actor: planner})
 
 	if !errors.Is(err, domain.ErrBugStepsRequired) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestHandleChecksProfile(t *testing.T) {
+	allowed := []kernel.Profile{kernel.ProfilePP, kernel.ProfileUser}
+	rejected := []kernel.Profile{
+		kernel.ProfilePC, kernel.ProfileTL, kernel.ProfileDevFrontend, kernel.ProfileDevBackend,
+		kernel.ProfileCR, kernel.ProfileQAP, kernel.ProfileQA, "",
+	}
+	command := func(profile kernel.Profile) Command {
+		return Command{
+			ProjectID: uuid.New(), Title: "Falla", StepsToReproduce: "Paso 1", ProductVersion: "1.2.0",
+			Actor: kernel.Actor{Name: "agente", Profile: profile},
+		}
+	}
+
+	for _, profile := range allowed {
+		repo := &fakeRepo{}
+		if _, err := New(repo, fakeProjects{}).Handle(context.Background(), command(profile)); err != nil || len(repo.saved) != 1 {
+			t.Errorf("%s: err = %v, guardados = %d", profile, err, len(repo.saved))
+		}
+	}
+	for _, profile := range rejected {
+		repo := &fakeRepo{}
+		// El proyecto fuera de working confirma que el perfil se comprueba primero.
+		_, err := New(repo, fakeProjects{err: errNotWorking}).Handle(context.Background(), command(profile))
+		if !errors.Is(err, domain.ErrCreateForbidden) || len(repo.saved) != 0 {
+			t.Errorf("%s: err = %v, guardados = %d", profile, err, len(repo.saved))
+		}
+	}
+}
+
+func TestRESTRejectsProfile(t *testing.T) {
+	mux := http.NewServeMux()
+	New(&fakeRepo{}, fakeProjects{}).Register(mux)
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/"+uuid.NewString()+"/bugs",
+		strings.NewReader(`{"title":"F","steps_to_reproduce":"P","product_version":"1"}`))
+	req = req.WithContext(rest.WithActor(req.Context(), kernel.Actor{Name: "qa", Profile: kernel.ProfileQA}))
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("código = %d: %s", rec.Code, rec.Body)
 	}
 }
 

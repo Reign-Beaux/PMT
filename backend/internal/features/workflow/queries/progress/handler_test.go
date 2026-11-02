@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	bugs "pmt/internal/features/bugs/domain"
 	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
 	tasks "pmt/internal/features/tasks/domain"
@@ -24,6 +25,7 @@ type fakeReader struct {
 	projectErr error
 	stages     []stages.Stage
 	tasks      map[uuid.UUID][]tasks.Task
+	bugs       []bugs.Bug
 }
 
 func (r *fakeReader) Project(context.Context, uuid.UUID) (projects.Project, error) {
@@ -36,6 +38,10 @@ func (r *fakeReader) Stages(context.Context, uuid.UUID) ([]stages.Stage, error) 
 
 func (r *fakeReader) Tasks(_ context.Context, stageID uuid.UUID) ([]tasks.Task, error) {
 	return r.tasks[stageID], nil
+}
+
+func (r *fakeReader) Bugs(context.Context, uuid.UUID) ([]bugs.Bug, error) {
+	return r.bugs, nil
 }
 
 // reader arma un proyecto con una etapa por cada lista de status de tareas.
@@ -179,8 +185,9 @@ func TestEmptyProjectUsesEmptyLists(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got struct {
-		Signals []Signal `json:"signals"`
-		Stages  []struct {
+		OpenBugs OpenBugs `json:"open_bugs"`
+		Signals  []Signal `json:"signals"`
+		Stages   []struct {
 			Members []string       `json:"members"`
 			Counts  map[string]int `json:"counts"`
 			Tasks   []Task         `json:"tasks"`
@@ -189,8 +196,55 @@ func TestEmptyProjectUsesEmptyLists(t *testing.T) {
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatal(err)
 	}
+	if got.OpenBugs.Counts == nil || got.OpenBugs.Items == nil {
+		t.Errorf("salida = %s", raw)
+	}
 	if got.Signals == nil || got.Stages[0].Members == nil || got.Stages[0].Counts == nil || got.Stages[0].Tasks == nil {
 		t.Errorf("salida = %s", raw)
+	}
+}
+
+func TestOpenBugsExcludeTerminal(t *testing.T) {
+	r := reader(projects.StatusWorking)
+	for _, status := range []bugs.Status{
+		bugs.StatusReported, bugs.StatusConfirmed, bugs.StatusConfirmed, bugs.StatusInDev, bugs.StatusInReview,
+		bugs.StatusChangesRequested, bugs.StatusInQA, bugs.StatusPendingClose, bugs.StatusDone, bugs.StatusRejected,
+	} {
+		r.bugs = append(r.bugs, bugs.Bug{ID: uuid.New(), Title: string(status), Status: status, UpdatedAt: base})
+	}
+
+	result, err := New(r).Handle(context.Background(), r.project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	open := result.OpenBugs
+	if len(open.Items) != 8 || open.Counts["confirmed"] != 2 || open.Counts["pending_close"] != 1 {
+		t.Errorf("bugs = %+v", open)
+	}
+	if _, found := open.Counts["done"]; found {
+		t.Errorf("done cuenta como abierto: %+v", open.Counts)
+	}
+	if _, found := open.Counts["rejected"]; found {
+		t.Errorf("rejected cuenta como abierto: %+v", open.Counts)
+	}
+	for _, b := range open.Items {
+		if !b.Status.IsOpen() {
+			t.Errorf("bug terminal en la lista: %+v", b)
+		}
+	}
+}
+
+func TestBugsDoNotMoveLastChange(t *testing.T) {
+	r := reader(projects.StatusWorking)
+	r.bugs = []bugs.Bug{{ID: uuid.New(), Status: bugs.StatusReported, UpdatedAt: base.Add(time.Hour)}}
+
+	result, err := New(r).Handle(context.Background(), r.project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Project.LastChangeAt.Equal(base) {
+		t.Errorf("last_change_at = %v", result.Project.LastChangeAt)
 	}
 }
 

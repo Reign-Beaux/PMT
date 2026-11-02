@@ -1,5 +1,5 @@
-// Package progress consulta el avance de un proyecto: sus etapas, sus tareas y las
-// señales de un posible atasco.
+// Package progress consulta el avance de un proyecto: sus etapas, sus tareas, sus
+// bugs abiertos y las señales de un posible atasco.
 package progress
 
 import (
@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	bugs "pmt/internal/features/bugs/domain"
 	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
 	tasks "pmt/internal/features/tasks/domain"
@@ -25,10 +26,11 @@ type Reader interface {
 	Project(ctx context.Context, id uuid.UUID) (projects.Project, error)
 	Stages(ctx context.Context, projectID uuid.UUID) ([]stages.Stage, error)
 	Tasks(ctx context.Context, stageID uuid.UUID) ([]tasks.Task, error)
+	Bugs(ctx context.Context, projectID uuid.UUID) ([]bugs.Bug, error)
 }
 
 // Project es el proyecto. LastChangeAt es la última actualización del proyecto, de
-// sus etapas o de sus tareas sin retirar.
+// sus etapas o de sus tareas sin retirar; los bugs no la mueven.
 type Project struct {
 	ID           uuid.UUID       `json:"id"`
 	Name         string          `json:"name"`
@@ -56,6 +58,21 @@ type Stage struct {
 	Tasks   []Task         `json:"tasks"`
 }
 
+// Bug es un bug abierto del proyecto.
+type Bug struct {
+	ID        uuid.UUID   `json:"id"`
+	Title     string      `json:"title"`
+	Status    bugs.Status `json:"status"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
+// OpenBugs son los bugs que no están en done ni rejected, por fecha de creación.
+// Counts solo incluye los status presentes.
+type OpenBugs struct {
+	Counts map[string]int `json:"counts"`
+	Items  []Bug          `json:"items"`
+}
+
 // Signal es un hecho que apunta a un posible atasco, sobre una etapa.
 type Signal struct {
 	Code      string    `json:"code"`
@@ -65,9 +82,10 @@ type Signal struct {
 
 // Result es el avance del proyecto.
 type Result struct {
-	Project Project  `json:"project"`
-	Stages  []Stage  `json:"stages"`
-	Signals []Signal `json:"signals"`
+	Project  Project  `json:"project"`
+	Stages   []Stage  `json:"stages"`
+	OpenBugs OpenBugs `json:"open_bugs"`
+	Signals  []Signal `json:"signals"`
 }
 
 // Handler ejecuta la operación.
@@ -90,11 +108,16 @@ func (h *Handler) Handle(ctx context.Context, projectID uuid.UUID) (Result, erro
 	if err != nil {
 		return Result{}, err
 	}
+	bugList, err := h.reader.Bugs(ctx, projectID)
+	if err != nil {
+		return Result{}, err
+	}
 
 	result := Result{
-		Project: Project{ID: project.ID, Name: project.Name, Status: project.Status, LastChangeAt: project.UpdatedAt},
-		Stages:  make([]Stage, 0, len(stageList)),
-		Signals: []Signal{},
+		Project:  Project{ID: project.ID, Name: project.Name, Status: project.Status, LastChangeAt: project.UpdatedAt},
+		Stages:   make([]Stage, 0, len(stageList)),
+		OpenBugs: openBugs(bugList),
+		Signals:  []Signal{},
 	}
 	for _, s := range stageList {
 		stage := Stage{
@@ -124,6 +147,18 @@ func (h *Handler) Handle(ctx context.Context, projectID uuid.UUID) (Result, erro
 		result.Signals = append(result.Signals, Signal{Code: SignalStageNotStarted, StageID: next.ID, StageName: next.Name})
 	}
 	return result, nil
+}
+
+func openBugs(list []bugs.Bug) OpenBugs {
+	open := OpenBugs{Counts: map[string]int{}, Items: []Bug{}}
+	for _, b := range list {
+		if !b.Status.IsOpen() {
+			continue
+		}
+		open.Items = append(open.Items, Bug{ID: b.ID, Title: b.Title, Status: b.Status, UpdatedAt: b.UpdatedAt})
+		open.Counts[string(b.Status)]++
+	}
+	return open
 }
 
 // stageSignal devuelve la señal de una etapa en in_dev, si la tiene. Con el proyecto

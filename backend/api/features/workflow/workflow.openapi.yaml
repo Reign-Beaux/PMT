@@ -103,7 +103,7 @@ paths:
           format: uuid
     get:
       summary: Muestra el avance de un proyecto
-      description: Solo lectura, para todos los perfiles. Devuelve las etapas por posición, con TL, equipo, conteo por status y tareas, y las señales de un posible atasco. Lo retirado no aparece. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed.
+      description: Solo lectura, para todos los perfiles. Devuelve las etapas por posición, con TL, equipo, conteo por status y tareas, los bugs abiertos y las señales de un posible atasco. Lo retirado no aparece. Con el proyecto en stopped o cancelled no se emite ready_without_work ni stage_not_closed.
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -150,7 +150,7 @@ components:
   schemas:
     Progress:
       type: object
-      required: [project, stages, signals]
+      required: [project, stages, open_bugs, signals]
       properties:
         project:
           type: object
@@ -166,11 +166,13 @@ components:
             last_change_at:
               type: string
               format: date-time
-              description: Última actualización del proyecto, de sus etapas o de sus tareas sin retirar.
+              description: Última actualización del proyecto, de sus etapas o de sus tareas sin retirar. Los bugs no la mueven.
         stages:
           type: array
           items:
             $ref: "#/components/schemas/ProgressStage"
+        open_bugs:
+          $ref: "#/components/schemas/ProgressOpenBugs"
         signals:
           type: array
           items:
@@ -213,6 +215,34 @@ components:
         status:
           type: string
         assignee:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    ProgressOpenBugs:
+      type: object
+      description: Bugs que no están en done ni rejected, por fecha de creación.
+      required: [counts, items]
+      properties:
+        counts:
+          type: object
+          description: Bugs abiertos por status; solo los status presentes.
+          additionalProperties:
+            type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgressBug"
+    ProgressBug:
+      type: object
+      required: [id, title, status, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
           type: string
         updated_at:
           type: string

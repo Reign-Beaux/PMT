@@ -50,6 +50,11 @@ var statusTransitions = map[Status][]Status{
 	StatusRejected:         {StatusReported},
 }
 
+// IsOpen indica si el status aún espera trabajo: no es done ni rejected.
+func (s Status) IsOpen() bool {
+	return s != StatusDone && s != StatusRejected
+}
+
 // ChangeStatus pasa el bug a otro estado si la transición está permitida.
 func (b *Bug) ChangeStatus(status Status, actor kernel.Actor, reason string) error {
 	if _, known := statusTransitions[status]; !known {

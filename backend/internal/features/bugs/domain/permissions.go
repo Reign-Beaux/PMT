@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 
 	"pmt/internal/kernel"
@@ -12,7 +13,19 @@ var (
 	testers   = []kernel.Profile{kernel.ProfileQA}
 	leads     = []kernel.Profile{kernel.ProfileTL}
 	triagers  = []kernel.Profile{kernel.ProfileQA, kernel.ProfileTL}
+	reporters = []kernel.Profile{kernel.ProfilePP, kernel.ProfileUser}
 )
+
+// ErrCreateForbidden indica que el perfil no registra bugs.
+var ErrCreateForbidden = kernel.Forbidden("solo PP o el usuario registran bugs")
+
+// EnsureCanCreate exige que el actor pueda registrar un bug.
+func EnsureCanCreate(actor kernel.Actor) error {
+	if !slices.Contains(reporters, actor.Profile) {
+		return ErrCreateForbidden
+	}
+	return nil
+}
 
 // statusProfiles indica qué perfiles pueden hacer cada transición. Un bug no tiene
 // etapa: todos son por perfil, sin asignación. Dev es DevFrontend o DevBackend.

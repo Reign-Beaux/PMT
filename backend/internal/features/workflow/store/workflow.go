@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	bugdomain "pmt/internal/features/bugs/domain"
+	bugs "pmt/internal/features/bugs/store"
 	projectdomain "pmt/internal/features/projects/domain"
 	projects "pmt/internal/features/projects/store"
 	stagedomain "pmt/internal/features/stages/domain"
@@ -57,6 +59,11 @@ func (s *Workflow) Stages(ctx context.Context, projectID uuid.UUID) ([]stagedoma
 // Tasks devuelve las tareas sin retirar de una etapa.
 func (s *Workflow) Tasks(ctx context.Context, stageID uuid.UUID) ([]taskdomain.Task, error) {
 	return tasks.NewTasks(s.db).List(ctx, stageID)
+}
+
+// Bugs devuelve los bugs de un proyecto. Los bugs no se retiran.
+func (s *Workflow) Bugs(ctx context.Context, projectID uuid.UUID) ([]bugdomain.Bug, error) {
+	return bugs.NewBugs(s.db).List(ctx, projectID)
 }
 
 // Release mueve el proyecto y sus etapas. Si algo falla, no guarda nada.
