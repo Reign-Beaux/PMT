@@ -42,6 +42,23 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 **Comunicación entre agentes:** se comunican con avisos de herdr, fuera de PMT. Los comandos de PMT solo afectan la base de datos; PMT no envía avisos ni notificaciones. Un aviso no se guarda: lo que deba quedar registrado va en PMT.
 
+**Sesiones:** una sesión de agente dura un solo encargo. PMT guarda el estado, así que cada agente arranca limpio y lee en PMT lo que necesita.
+
+| Perfil | Una sesión por |
+| --- | --- |
+| DevFrontend y DevBackend | Cada tarea o grupo de tareas que toman juntas |
+| CR | Cada revisión |
+| QAP | Cada plan de pruebas |
+| QA | Cada ronda de pruebas |
+| TL | Cada etapa |
+| PP | Cada planeación o cada bug que registra |
+| PC | Cada consulta o seguimiento |
+
+- **Correcciones:** si un trabajo regresa, también se inicia sesión nueva.
+- **Coordinación:** el TL coordina su etapa. Dev, CR, QAP y QA le avisan al terminar y él levanta al siguiente. El usuario levanta a PP, a PC y al TL.
+- **Encargo:** indica proyecto, etapa e ID de las tareas.
+- **Sesión limpia:** es `/exit` seguido de otro lanzamiento, no `/clear`, porque `/clear` hace que herdr le quite el nombre al agente.
+
 **Herramientas de PMT:** un agente carga el esquema de una herramienta antes de llamarla por primera vez, y copia los ID de la salida de PMT, sin escribirlos de memoria.
 
 ## Coordinación paso a paso
@@ -51,32 +68,32 @@ Completa la tabla del flujo con quién actúa y cuándo.
 1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen, e incluye la preparación de lo que usarán las pruebas, como Vitest o Playwright. Si falta algo al planear, lo incluye el TL. Nadie lo instala a mitad de una prueba.
 2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas.
 3. **Iniciar las etapas:** el TL las inicia sin esperar otra orden, y varias pueden estar en `in_dev` a la vez. Si una etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
-4. **Tomar tareas:** al entregar una tarea, el dev toma la siguiente en `ready` de su etapa que no dependa de otra abierta.
-5. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL da aviso a QAP si toca frontend; si no, a QA.
+4. **Tomar tareas:** el TL levanta a cada dev con las tareas de su encargo, y levanta a otro al entregarlas.
+5. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL levanta a QAP si toca frontend; si no, a QA.
 6. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
-7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready` y da aviso al dev, porque ese cierre puede destrabar una tarea cuando el turno del dev ya terminó.
+7. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready` y levanta al dev, porque ese cierre puede destrabar una tarea.
 8. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar.
 
 **En todo momento:**
 
 - **Registro:** el TL registra con `add_comment` la decisión del paso 5 y las demás que no sean una transición, y PC los bloqueos. Todos los perfiles los consultan con `list_comments`. No se copian los avisos.
 - **Avance:** PC revisa siempre `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
-- **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y da aviso a quien le toque seguir, o informa al usuario si nadie puede seguir.
+- **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y avisa al TL, o informa al usuario si nadie puede seguir.
 - **Detener:** el usuario o PC pueden detener una etapa o el proyecto en cualquier paso.
 - **Limpieza:** quien levanta un proceso lo baja.
 
 ## Flujo de bugs
 
-Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: cada paso termina con un aviso por herdr a quien sigue.
+Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: PP y cada perfil avisan al TL, y él levanta al siguiente con sesión nueva.
 
-| Paso | Quién | Qué hace | Aviso a |
+| Paso | Quién | Qué hace | El TL levanta a |
 | --- | --- | --- | --- |
 | 1 | Usuario con PP | Registra el bug con `create_bug`, en `reported` | QA |
-| 2 | QA | Lo reproduce. Real: `confirmed`. Si no: `rejected` con motivo | TL si es real; PP si se rechaza |
+| 2 | QA | Lo reproduce. Real: `confirmed`. Si no: `rejected` con motivo | Dev si es real; si se rechaza, avisa a PP |
 | 3 | TL | Decide a qué dev le toca y lo deja en un comentario con `add_comment` | Ese dev |
 | 4 | Dev | `in_dev`, corrige, `in_review` | CR |
-| 5 | CR | Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev, TL o QA, en ese orden |
-| 6 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | TL o dev |
+| 5 | CR | Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 7 |
+| 6 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | Dev; si está bien, hace el paso 7 |
 | 7 | TL | Cierra en `done`, o regresa a CR o QA | CR o QA si lo regresa |
 
 - **Crear y corregir:** solo PP y `User` ejecutan `create_bug` y `update_bug`. Otro perfil que detecte un fallo se lo pasa al usuario o a PP. Un bug en `done` o `rejected` ya no se corrige.
