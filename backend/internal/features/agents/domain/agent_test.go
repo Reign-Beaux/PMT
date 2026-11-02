@@ -18,6 +18,7 @@ func TestNewAgent(t *testing.T) {
 	}{
 		{"válido", " dev ", kernel.ProfileDevBackend, nil},
 		{"usuario", "persona", kernel.ProfileUser, nil},
+		{"planeación de desarrollo", "dev", kernel.ProfileDP, nil},
 		{"sin nombre", "  ", kernel.ProfileTL, ErrAgentNameRequired},
 		{"sin perfil", "dev", "", ErrAgentProfileInvalid},
 		{"perfil desconocido", "dev", "Dev", ErrAgentProfileInvalid},

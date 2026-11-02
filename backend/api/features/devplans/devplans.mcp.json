@@ -1,0 +1,347 @@
+[
+  {
+    "description": "Crea un plan de desarrollo, versión 1. Solo DP. Pertenece a una etapa, con stage_id y al menos una tarea de ella sin repetir y sin retirar, o a un bug, con bug_id y sin tareas: exactamente uno de los dos. Todos los campos de contenido son obligatorios; si uno no aplica, se escribe el motivo. No tiene status ni aprobación y no frena transiciones. Usa list_stages, list_tasks y list_bugs para obtener los ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "description": "Cada criterio con el comando o la pantalla que lo comprueba contra la API real",
+          "type": "string"
+        },
+        "bug_id": {
+          "description": "UUID del bug. Excluye stage_id y task_ids",
+          "type": "string"
+        },
+        "edge_cases": {
+          "description": "Valores extremos, caracteres especiales y datos corruptos",
+          "type": "string"
+        },
+        "error_handling": {
+          "description": "Qué falla con mensaje, nunca en silencio",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Archivos a crear o tocar y lo que queda fuera",
+          "type": "string"
+        },
+        "screen_states": {
+          "description": "Estados de pantalla: carga, vacío, error y móvil. Si no aplica, escribe el motivo",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa. Exige task_ids; excluye bug_id",
+          "type": "string"
+        },
+        "task_ids": {
+          "description": "UUID de las tareas de la etapa que cubre el plan",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "technical_decisions": {
+          "description": "Estructura, contrato y bibliotecas",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "technical_decisions",
+        "screen_states",
+        "edge_cases",
+        "error_handling",
+        "acceptance_criteria"
+      ],
+      "type": "object"
+    },
+    "name": "create_dev_plan",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista todas las versiones de un plan de desarrollo, en orden. Son inmutables. Disponible para todos los perfiles. Un ID sin versiones responde lista vacía. Usa list_dev_plans para obtener su ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "description": "UUID del plan",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_dev_plan_versions",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "versions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance_criteria": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "created_by": {
+                "type": "string"
+              },
+              "edge_cases": {
+                "type": "string"
+              },
+              "error_handling": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "screen_states": {
+                "type": "string"
+              },
+              "technical_decisions": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "version",
+              "scope",
+              "technical_decisions",
+              "screen_states",
+              "edge_cases",
+              "error_handling",
+              "acceptance_criteria",
+              "created_by",
+              "created_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "versions"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista los planes de desarrollo de una etapa, una tarea o un bug, cada uno con su versión más reciente, que es la que vale, y sus tareas. Exige exactamente uno de stage_id, task_id y bug_id. Disponible para todos los perfiles. No comprueba que el elemento exista: sin planes responde lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        },
+        "task_id": {
+          "description": "UUID de una tarea: los planes que la vinculan",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_dev_plans",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "plans": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance_criteria": {
+                "type": "string"
+              },
+              "bug_id": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "created_by": {
+                "type": "string"
+              },
+              "edge_cases": {
+                "type": "string"
+              },
+              "error_handling": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "screen_states": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "task_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "technical_decisions": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              },
+              "version_created_by": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "created_by",
+              "version",
+              "scope",
+              "technical_decisions",
+              "screen_states",
+              "edge_cases",
+              "error_handling",
+              "acceptance_criteria",
+              "version_created_by",
+              "task_ids",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "plans"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Añade una versión nueva e inmutable a un plan de desarrollo y reemplaza sus tareas; las versiones anteriores se conservan. Solo DP, con motivo obligatorio. Lleva completo todo el contenido, y vale la versión más reciente. Usa list_dev_plans para obtener su ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "description": "Cada criterio con el comando o la pantalla que lo comprueba contra la API real",
+          "type": "string"
+        },
+        "edge_cases": {
+          "description": "Valores extremos, caracteres especiales y datos corruptos",
+          "type": "string"
+        },
+        "error_handling": {
+          "description": "Qué falla con mensaje, nunca en silencio",
+          "type": "string"
+        },
+        "plan_id": {
+          "description": "UUID del plan",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo de la versión nueva",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Archivos a crear o tocar y lo que queda fuera",
+          "type": "string"
+        },
+        "screen_states": {
+          "description": "Estados de pantalla: carga, vacío, error y móvil. Si no aplica, escribe el motivo",
+          "type": "string"
+        },
+        "task_ids": {
+          "description": "UUID de las tareas de la etapa; reemplazan a las vinculadas. Un plan de bug no lleva tareas",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "technical_decisions": {
+          "description": "Estructura, contrato y bibliotecas",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "scope",
+        "technical_decisions",
+        "screen_states",
+        "edge_cases",
+        "error_handling",
+        "acceptance_criteria",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "revise_dev_plan",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "type": "object"
+    }
+  }
+]

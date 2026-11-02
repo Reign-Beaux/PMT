@@ -46,11 +46,14 @@ Lenguaje ubicuo de PMT. La documentación usa el término en español y el códi
 | **Camino feliz** | `HappyPath` | Casos de un plan QAP en los que todo sale bien. Obligatorio para enviarlo. |
 | **Casos de error** | `ErrorCases` | Casos de un plan QAP en los que algo debe rechazarse o fallar. Obligatorios para enviarlo. |
 | **Correcciones** | `ReviewNotes` | Lo que el TL pide cambiar al devolver un plan QAP. Son obligatorias al devolver, siguen visibles al revisar y aprobar las limpia. |
+| **Development Planning** | `ProfileDP` | Perfil que define el cómo de un grupo de tareas o de un bug antes de que Dev empiece. Registra su plan en PMT; no escribe código, no cambia status y no aprueba nada. |
+| **Plan de desarrollo** | `DevPlan` | Cómo se hará un grupo de tareas de una etapa, o un bug. DP lo registra y Dev lo sigue; CR revisa también contra él. No tiene status ni aprobación y no frena transiciones: vale su versión más reciente. Es la raíz de su propio agregado y referencia a su etapa y sus tareas, o a su bug, por ID. |
+| **Versión de un plan de desarrollo** | `Version` | Registro inmutable del contenido de un plan de desarrollo: alcance, decisiones técnicas, estados de pantalla, casos límite, manejo de errores y criterios de aceptación, todos obligatorios, con motivo en las versiones nuevas, autor y fecha. Es una entidad del agregado `DevPlan`. |
 | **Agente** | `Agent` | Trabajador de IA que opera en herdr y consulta y registra el estado en PMT por MCP. |
 | **Aviso** | | Mensaje que se envía a un agente con `herdr agent prompt`. Es la única forma en que los agentes se comunican. No se guarda en PMT: lo que deba quedar registrado va en PMT. |
 | **Sesión** | | Conversación de un agente. Dura un solo encargo y arranca limpia: el estado se lee en PMT. |
 | **Vigía** | | Observa a los agentes con herramientas de herdr y da aviso a PC si todos llevan un rato quietos. Queda fuera de PMT. |
-| **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DevFrontend, DevBackend, CR, QAP o QA. |
+| **Perfil** | `Profile` | Conjunto de responsabilidades de quien actúa: PP, PC, TL, DP, DevFrontend, DevBackend, CR, QAP o QA. |
 | **Actor** | `Actor` | Quien realiza una operación, sea agente o usuario humano, con su perfil. Lo resuelve el servidor a partir del token. |
 | **Token** | | Credencial de un agente o del usuario. Determina su `Actor`. PMT solo guarda su hash. |
 | **Historial de status** | `StatusChange` | Registro inmutable de cada cambio de status: desde, hacia, actor, fecha y motivo. Sobrevive al elemento eliminado. |

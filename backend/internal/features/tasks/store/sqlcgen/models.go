@@ -54,6 +54,34 @@ type Comment struct {
 	CreatedAt    time.Time
 }
 
+type DevPlan struct {
+	ID        uuid.UUID
+	StageID   pgtype.UUID
+	BugID     pgtype.UUID
+	CreatedBy string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type DevPlanTask struct {
+	PlanID uuid.UUID
+	TaskID uuid.UUID
+}
+
+type DevPlanVersion struct {
+	PlanID             uuid.UUID
+	Version            int32
+	Scope              string
+	TechnicalDecisions string
+	ScreenStates       string
+	EdgeCases          string
+	ErrorHandling      string
+	AcceptanceCriteria string
+	Reason             string
+	CreatedBy          string
+	CreatedAt          time.Time
+}
+
 type Finding struct {
 	ID           uuid.UUID
 	ItemKind     string

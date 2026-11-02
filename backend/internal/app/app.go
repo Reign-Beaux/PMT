@@ -15,6 +15,7 @@ import (
 	"pmt/internal/features/activity"
 	"pmt/internal/features/agents"
 	"pmt/internal/features/bugs"
+	"pmt/internal/features/devplans"
 	"pmt/internal/features/imports"
 	"pmt/internal/features/projects"
 	"pmt/internal/features/qa"
@@ -80,5 +81,6 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	bugChecker := bugs.NewChecker(pool)
 	reviews.Register(mux, tools, pool, taskChecker, bugChecker, stageChecker)
 	qa.Register(mux, tools, pool, taskChecker, stageChecker)
+	devplans.Register(mux, tools, pool, taskChecker, stageChecker, bugChecker)
 	activity.Register(mux, tools, pool, projectChecker, stageChecker, taskChecker, bugChecker)
 }

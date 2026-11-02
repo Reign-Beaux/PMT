@@ -15,7 +15,7 @@ var (
 	// ErrAgentNameRequired indica que el nombre está vacío.
 	ErrAgentNameRequired = kernel.Invalid("el nombre del agente es obligatorio")
 	// ErrAgentProfileInvalid indica que el perfil no es uno de los conocidos.
-	ErrAgentProfileInvalid = kernel.Invalid("perfil desconocido: usa PP, PC, TL, DevFrontend, DevBackend, CR, QAP, QA o User")
+	ErrAgentProfileInvalid = kernel.Invalid("perfil desconocido: usa PP, PC, TL, DevFrontend, DevBackend, CR, QAP, QA, DP o User")
 	// ErrAgentNameTaken indica que ya existe un agente con ese nombre.
 	ErrAgentNameTaken = kernel.Conflict("ya existe un agente con ese nombre")
 	// ErrAgentNotFound indica que el agente no existe.
@@ -26,7 +26,7 @@ var (
 
 var profiles = []kernel.Profile{
 	kernel.ProfilePP, kernel.ProfilePC, kernel.ProfileTL, kernel.ProfileDevFrontend,
-	kernel.ProfileDevBackend, kernel.ProfileCR, kernel.ProfileQAP, kernel.ProfileQA, kernel.ProfileUser,
+	kernel.ProfileDevBackend, kernel.ProfileCR, kernel.ProfileQAP, kernel.ProfileQA, kernel.ProfileDP, kernel.ProfileUser,
 }
 
 // Agent es quien actúa en PMT: un agente o el usuario humano. Su perfil no cambia
