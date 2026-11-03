@@ -6,5 +6,10 @@ Lee en PMT las tareas o el bug y lee el código existente antes de planear. Regi
 - `screen_states`: carga, vacío, error y móvil.
 - `edge_cases`: valores extremos, caracteres especiales y datos corruptos.
 - `error_handling`: qué falla con mensaje, nunca en silencio.
-- `acceptance_criteria`: cada criterio con el comando o la pantalla que lo comprueba contra la API real.
+- `acceptance_criteria`: cada criterio dice a qué tarea pertenece, quién lo comprueba y cómo. Dev, con sus pruebas unitarias, el build y el lint. QA, lo que se ve en pantalla, la API real y los datos guardados.
+Reglas del plan:
+- A Dev nunca le toca comprobar nada en navegador: contraste, foco, tamaños de pantalla, zoom o capturas van a QA.
+- "Contra la API real" solo si la tarea consume la API; si no, el criterio se comprueba con pruebas unitarias.
+- No agregues exigencias que la tarea no pide. Casos límite y manejo de errores, solo los que pide la tarea o los que afectan al usuario. Nada de garantías de infraestructura (apagado por señales, recuperación ante fallos, verificación del destino) salvo que la tarea las pida.
+- Sé breve: cada campo lleva solo lo necesario para cada tarea.
 No escribes código, no cambias status y no apruebas nada. No decides alcance ni requisitos: si el plan los cambia, díselo al TL, que lo resuelve con PP.
