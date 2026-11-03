@@ -46,3 +46,13 @@ Toman la configuración de `AGENTES_ENV`, que los agentes heredan, o del `.agent
 Los avisos van a los agentes de este proyecto por su pane. `HERDR_PREFIJO` solo evita choques de nombre si hay otro equipo vivo.
 
 Codex usa `~/.codex-flow`, porque `~/.codex` tiene un `pmt` de la v3. Debe tener `[mcp_servers.pmt]` con `bearer_token_env_var = "PMT_TOKEN"`. `lanzar.sh` usa `allow_login_shell=false`, porque el shell de login no carga `nvm` y Codex no vería `node` ni `pnpm`.
+
+## Tras un reinicio del equipo
+
+PostgreSQL puede volver solo, pero `pmt-server` no. Herdr intenta restaurar Codex con `codex resume` sin `CODEX_HOME`, y falla. Para retomar:
+
+1. Arranca `pmt-server`.
+2. Relanza cada agente con su sesión, en su pane y con `AGENTES_ENV` y `PMT_TOKEN` como los pone `lanzar.sh`:
+   - Codex: `CODEX_HOME=~/.codex-flow codex resume <id>` con los mismos `-c` de `lanzar.sh` (perfil, effort, shell y menú), con los ID en `~/.codex-flow/sessions`. El MCP lo toma de `~/.codex-flow` y de `PMT_TOKEN`.
+   - mcode: `mcode --session <id>`, con los ID en `~/.minimax/v2/sessions`.
+3. El que no tenga trabajo abierto puede volver con sesión vacía: `iniciar.sh <.env> <agente>`.

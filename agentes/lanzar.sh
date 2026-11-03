@@ -18,9 +18,11 @@ case "$H" in
   codex)
     # ~/.codex tiene un pmt de la v3: se usa ~/.codex-flow.
     # El shell de login no carga nvm desde .bashrc: Codex no veria node ni pnpm.
+    # Cerca del límite, Codex abre un menú de cambio de modelo: un aviso con el menú abierto se pierde.
     export CODEX_HOME="$HOME/.codex-flow"
     I=$(python3 -c "import json,sys;print(json.dumps(open(sys.argv[1]).read()))" "$F")
     exec codex -m "$M" -c "developer_instructions=$I" -c "model_reasoning_effort=\"$E\"" -c allow_login_shell=false \
+      -c notice.hide_rate_limit_model_nudge=true \
       -c "mcp_servers.pmt.url=\"$PMT_URL\"" -c "projects.\"$PROYECTO_RUTA\".trust_level=\"trusted\"" ;;
   mcode)
     exec mcode --model "$M" --append-system-prompt-file "$F" ;;

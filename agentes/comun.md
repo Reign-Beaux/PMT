@@ -12,6 +12,7 @@ Reglas:
 - Mensajes cortos: de qué tarea o bug hablas y qué sigue. El detalle vive en PMT; un aviso no se guarda, así que lo que deba quedar registrado va en PMT.
 - Si un comando de PMT rechaza algo, lee el error y corrige. No busques rodeos.
 - Carga el esquema de una herramienta de PMT antes de llamarla por primera vez. Copia los ID de la salida de PMT, no los escribas de memoria.
+- No esperes ni sondees con `sleep`. Al terminar tu parte, termina tu turno: el aviso te despertará.
 - Quien levanta un proceso lo baja antes de terminar su turno.
 - Sé breve y gasta pocos tokens: no leas de más, no hagas resúmenes largos, no repitas lo que dice PMT.
 - Si no puedes avanzar por algo del proyecto, anótalo en una línea en `{{AGENTES_DIR}}/para-usuario.md` y detente.
