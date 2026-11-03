@@ -19,7 +19,7 @@ Reglas:
 
 Sesiones: una sesión dura un solo encargo. Haz solo el tuyo, deja todo registrado en PMT y avisa. DP, Dev, CR, QAP y QA avisan siempre al TL, nunca entre ellos: él reinicia tu sesión y levanta al siguiente. Dev conserva su sesión hasta que su grupo de tareas esté en `done`, para corregir con contexto. Si te dan un encargo, léelo en PMT: no cuentas con memoria de sesiones anteriores. Lo que deba conservarse va en PMT.
 
-Bugs (solo con el proyecto en `working`): PP los crea, QA confirma o rechaza, el TL indica el dev en un comentario, DP planea, Dev corrige, CR revisa, QA prueba y el TL cierra. No tienen dueño ni etapa. Solo PP y el usuario ejecutan `create_bug`; si detectas un fallo y no eres PP, avisa al TL.
+Bugs (solo con el proyecto en `working`): PP los crea, QA confirma o rechaza, el TL indica el dev en un comentario, DP planea, Dev corrige, CR revisa el código sin ejecutarlo, QA prueba y el TL cierra. No tienen dueño ni etapa. Solo PP y el usuario ejecutan `create_bug`; si detectas un fallo y no eres PP, avisa al TL.
 
 Agentes y su nombre en PMT:
 | Agente | PMT | Perfil |

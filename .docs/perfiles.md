@@ -9,7 +9,7 @@ La definición acordada contempla 9 perfiles de agentes. DEV se divide en DevFro
 | **TL** | Tech Lead | Dirige técnicamente la etapa: organiza tareas, asigna agentes técnicos y libera tareas para desarrollo. Decide sobre propuestas de cambio, aprueba o rechaza planes QAP y puede descartar hallazgos con justificación. Realiza la verificación final y registra la integración para cerrar tareas como `done`. |
 | **DevFrontend** | Developer Frontend | Lee las especificaciones de frontend e implementa la interfaz con React, Vite y TypeScript. Escribe y ejecuta sus pruebas unitarias con Vitest, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al frontend. |
 | **DevBackend** | Developer Backend | Lee las especificaciones de backend e implementa la lógica con Go. Escribe y ejecuta sus pruebas unitarias con el paquete estándar `testing` mediante `go test`, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al backend. |
-| **CR** | Code Reviewer | Revisa la lógica, integridad y calidad del código, incluyendo prácticas como SOLID y DRY. Registra hallazgos, solicita correcciones, verifica su resolución y aprueba la revisión de código. |
+| **CR** | Code Reviewer | Revisa la lógica, integridad y calidad del código, incluyendo prácticas como SOLID y DRY. Registra hallazgos, solicita correcciones, verifica su resolución y aprueba la revisión de código. No ejecuta pruebas: revisa leyendo el código, y probar le toca a QA. |
 | **QAP** | Quality Assurance Planning | Diseña y versiona planes de pruebas para casos que combinan cambios de frontend y backend. Vincula tareas, define casos de prueba y envía el plan al TL para su aprobación. |
 | **DP** | Development Planning | Define el cómo de un grupo de tareas o de un bug antes de que Dev empiece: PP define el qué y DP lo convierte en un plan de desarrollo que Dev sigue. Lee el código existente antes de planear. No escribe código, no cambia status y no aprueba nada. |
 | **QA** | Quality Assurance | Verifica el funcionamiento mediante pruebas y evidencias. Ejecuta planes aprobados, comprueba persistencia y realiza exploración y regresión cuando corresponde. Registra hallazgos, solicita correcciones y aprueba QA; después queda pendiente el cierre del TL. |
@@ -26,7 +26,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | 4 | DP | `create_dev_plan` | Registra el plan de desarrollo del grupo de tareas |
 | 5 | Dev | `list_dev_plans`, `change_tasks_status` a `in_dev` | Lee el plan y toma tareas de su equipo, que quedan a su nombre |
 | 6 | Dev | a `in_review` | Entrega, con evidencia por criterio de aceptación |
-| 7 | CR | a `in_qa`, `changes_requested` o, con motivo, `pending_close` | Revisa también contra el plan. Aprueba, pide corrección o cierra su parte en un cambio interno |
+| 7 | CR | a `in_qa`, `changes_requested` o, con motivo, `pending_close` | Revisa el código sin ejecutarlo, también contra el plan. Aprueba, pide corrección o cierra su parte en un cambio interno |
 | 8 | Dev | de `changes_requested` a `in_dev` | Corrige y vuelve a entregar |
 | 9 | QA | a `pending_close`, con evidencia en el motivo, o `changes_requested` | Aprueba o pide corrección |
 | 10 | TL | a `done`, o con motivo a `in_review` o `in_qa` | Cierra o devuelve |
@@ -40,7 +40,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 - **Dev** sigue el plan y entrega evidencia por criterio. Si encuentra que el plan está mal, se lo dice al TL y no lo cambia por su cuenta.
 - **El TL** levanta a DP para una versión nueva si el problema es técnico. PP resuelve lo que cambie alcance o requisitos.
-- **CR** revisa el código también contra el plan.
+- **CR** revisa el código también contra el plan, leyéndolo: no ejecuta pruebas, builds ni servidores.
 - **Effort:** si el grupo toca pagos, permisos, migraciones de datos o contratos entre etapas, el TL relanza a DP en `high`; en lo demás usa `medium`.
 
 **Camino que termina en CR:** un cambio interno va de `in_review` a `pending_close` sin pasar por QA, y lo cierra el TL.
@@ -80,7 +80,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas.
 3. **Iniciar las etapas:** el TL las inicia sin esperar otra orden, y varias pueden estar en `in_dev` a la vez. Si una etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
 4. **Planear el desarrollo:** el TL agrupa tareas relacionadas y levanta a DP con proyecto, etapa e ID de las tareas, o con el bug. DP lee el código, registra el plan y avisa al TL, que comprueba en PMT que quedó registrado y reinicia a DP.
-5. **Tomar tareas:** el TL levanta a cada dev con su grupo de tareas. Dev sigue el plan, entrega evidencia por criterio y avisa al TL, que levanta a CR. Un dev no recibe otro grupo hasta cerrar el actual.
+5. **Tomar tareas:** el TL levanta a cada dev con su grupo de tareas. Dev sigue el plan, entrega evidencia por criterio y avisa al TL, que levanta a CR para revisar el código; el encargo nunca le pide ejecutar pruebas. Un dev no recibe otro grupo hasta cerrar el actual.
 6. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL levanta a QAP si toca frontend; si no, a QA.
 7. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
 8. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
@@ -105,7 +105,7 @@ Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: P
 | 3 | TL | Decide a qué dev le toca y lo deja en un comentario con `add_comment` | DP |
 | 4 | DP | Registra el plan del bug con `create_dev_plan` y avisa al TL | Ese dev |
 | 5 | Dev | Sigue el plan: `in_dev`, corrige, `in_review`, con evidencia por criterio | CR |
-| 6 | CR | Revisa también contra el plan. Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 8 |
+| 6 | CR | Revisa el código sin ejecutarlo, también contra el plan. Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 8 |
 | 7 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | Dev; si está bien, hace el paso 8 |
 | 8 | TL | Cierra en `done`, o regresa a CR o QA | CR o QA si lo regresa |
 
