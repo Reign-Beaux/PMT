@@ -5,7 +5,7 @@ La definición acordada contempla 9 perfiles de agentes. DEV se divide en DevFro
 | Perfil | Nombre | Qué hace |
 |---|---|---|
 | **PP** | Project Planning | Interactúa con el usuario para definir proyectos su alcance y requerimientos. Crea la documentación de los requerimientos y planeación de etapas y tareas. |
-| **PC** | Project Coordinator | Interactúa con el usuario para consultar avances, da seguimiento y registra comentarios y bloqueos/desbloqueos. |
+| **PC** | Project Coordinator | Resuelve las dudas del usuario sobre lo que el equipo hace en este momento, leyendo las pestañas de los agentes en herdr. Solo lee: no usa PMT, no avisa a nadie y no afecta el proyecto. Existe para que el usuario consulte sin cargar el contexto de PP. |
 | **TL** | Tech Lead | Dirige técnicamente la etapa: organiza tareas, asigna agentes técnicos y libera tareas para desarrollo. Decide sobre propuestas de cambio, aprueba o rechaza planes QAP y puede descartar hallazgos con justificación. Realiza la verificación final y registra la integración para cerrar tareas como `done`. |
 | **DevFrontend** | Developer Frontend | Lee las especificaciones de frontend e implementa la interfaz con React, Vite y TypeScript. Escribe y ejecuta sus pruebas unitarias con Vitest, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al frontend. |
 | **DevBackend** | Developer Backend | Lee las especificaciones de backend e implementa la lógica con Go. Escribe y ejecuta sus pruebas unitarias con el paquete estándar `testing` mediante `go test`, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al backend. |
@@ -88,10 +88,10 @@ Completa la tabla del flujo con quién actúa y cuándo.
 
 **En todo momento:**
 
-- **Registro:** el TL registra con `add_comment` la decisión del paso 6 y las demás que no sean una transición, y PC los bloqueos. Todos los perfiles los consultan con `list_comments`. No se copian los avisos.
-- **Avance:** PC revisa siempre `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
+- **Registro:** el TL registra con `add_comment` la decisión del paso 6 y las demás que no sean una transición. Todos los perfiles los consultan con `list_comments`. No se copian los avisos.
+- **Avance:** se revisa siempre con `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
 - **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y avisa al TL, o informa al usuario si nadie puede seguir.
-- **Detener:** el usuario o PC pueden detener una etapa o el proyecto en cualquier paso.
+- **Detener:** el usuario puede detener una etapa o el proyecto en cualquier paso.
 - **Limpieza:** quien levanta un proceso lo baja.
 
 ## Flujo de bugs
