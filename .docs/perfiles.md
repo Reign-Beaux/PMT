@@ -48,7 +48,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 **Criterio de QA:** aplica cuando el cambio altera algo observable desde fuera: pantalla, respuesta MCP o API, resultado de un worker o datos guardados. No aplica si es interno y el comportamiento sigue igual: refactor, limpieza o renombre.
 
-**Cómo prueba QA:** con plan, Playwright headless; en frontend, solo con Playwright, sin herramientas propias de navegador, y si no está instalado avisa al TL; en MCP, ejecuta el comando; en un worker, registro falso funcional. Siempre verifica la integridad en la base de datos con `psql`, que viene en el contenedor de PostgreSQL, sin instalar nada ni escribir scripts temporales: `docker exec postgresql psql -U <usuario> -d <base> -c "<consulta>"`. Una falla bloqueante se devuelve de inmediato; las no bloqueantes, juntas al terminar. El script de Playwright se guarda en el repositorio del proyecto probado.
+**Cómo prueba QA:** según lo que afecta el cambio. En frontend, solo con Playwright, sin herramientas propias de navegador: ejecuta las pruebas de regresión y, con plan de QAP aprobado, prueba sus casos a mano con Playwright (CLI o MCP, headless); si Playwright no está instalado, avisa al TL. En MCP, solo el o los comandos afectados. En un worker, agrega la información necesaria para que se ejecute y comprueba lo que hizo. En backend, depende de lo que afecta: frontend, MCP o worker, y prueba como en ese caso. Siempre revisa en la base, con el cliente de la base del proyecto y con todos los accesos, que la información se guardó correctamente y sin incongruencias, sin instalar nada ni escribir scripts temporales. Una falla bloqueante se devuelve de inmediato; las no bloqueantes, juntas al terminar. El script de Playwright se guarda en la carpeta de pruebas de regresión que dejó la configuración del proyecto.
 
 **Comunicación entre agentes:** se comunican con avisos de herdr, fuera de PMT. Los comandos de PMT solo afectan la base de datos; PMT no envía avisos ni notificaciones. Un aviso no se guarda: lo que deba quedar registrado va en PMT.
 
@@ -86,7 +86,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 6. **Decidir el camino tras CR:** con la tarea en `in_qa`, si la tarea crea una funcionalidad nueva o cambia una existente, y afecta frontend y backend, el TL levanta a QAP; si no, a QA.
 7. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
 8. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
-9. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar. Al cerrarla lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
+9. **Cerrar la etapa:** QA limpia sus datos de prueba al terminar cada ronda, y el TL lo comprueba antes de cerrar. Al cerrarla lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
 
 **En todo momento:**
 
