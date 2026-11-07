@@ -40,6 +40,7 @@ paths:
           $ref: "#/components/responses/Error"
     post:
       summary: Crea una tarea en estado backlog si la etapa está en su planning propio con el proyecto en working, o si el proyecto está en planning y la etapa no nació con add_stage
+      description: Solo PP y el usuario.
       requestBody:
         required: true
         content:
@@ -59,6 +60,8 @@ paths:
         "201":
           $ref: "#/components/responses/Task"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
@@ -85,6 +88,7 @@ paths:
           $ref: "#/components/responses/Error"
     put:
       summary: Reemplaza los datos editables de una tarea de una etapa en su planning propio, o de una tarea sin historial cuyo proyecto está en planning y cuya etapa no nació con add_stage
+      description: Solo PP y el usuario.
       requestBody:
         required: true
         content:
@@ -105,18 +109,23 @@ paths:
           $ref: "#/components/responses/Task"
         "400":
           $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
     delete:
       summary: Elimina una tarea de una etapa en su planning propio, o una tarea sin historial cuyo proyecto está en planning y cuya etapa no nació con add_stage
+      description: Solo PP y el usuario.
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "204":
           description: Tarea eliminada
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
@@ -132,6 +141,7 @@ paths:
           format: uuid
     post:
       summary: Agrega una tarea como cambio inmutable
+      description: Solo PP y el usuario.
       requestBody:
         required: true
         content:
@@ -144,6 +154,8 @@ paths:
         "201":
           $ref: "#/components/responses/Versioned"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
@@ -305,7 +317,7 @@ paths:
           format: uuid
     post:
       summary: Registra una nueva versión como cambio inmutable
-      description: Una tarea en in_review, in_qa o pending_close vuelve a changes_requested, conserva su dueño y deja un registro de status. Una tarea en done se rechaza con 409.
+      description: Solo PP y el usuario. Una tarea en in_review, in_qa o pending_close vuelve a changes_requested, conserva su dueño y deja un registro de status. Una tarea en done se rechaza con 409.
       requestBody:
         required: true
         content:
@@ -319,6 +331,8 @@ paths:
           $ref: "#/components/responses/Versioned"
         "400":
           $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
   /api/tasks/{id}/retire:
@@ -331,6 +345,7 @@ paths:
           format: uuid
     post:
       summary: Retira la tarea sin borrar nada
+      description: Solo PP y el usuario.
       requestBody:
         required: true
         content:
@@ -361,6 +376,8 @@ paths:
                   version:
                     type: integer
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"

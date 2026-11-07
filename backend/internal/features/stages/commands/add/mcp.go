@@ -38,7 +38,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "add_stage",
-		Description: "Agrega una etapa nueva al final de un proyecto cuando ya no está en planning, con su motivo y quién la pidió. Con el proyecto en working nace en su planning propio: se define con update_stage y create_task, devuelve version 0 y add_reason, y su registro inmutable se escribe al sacarla de planning con change_stage_status. En otro status se registra de inmediato como cambio, con version 1.",
+		Description: "Agrega una etapa nueva al final de un proyecto cuando ya no está en planning, con su motivo y quién la pidió. Solo PP y el usuario. Con el proyecto en working nace en su planning propio: se define con update_stage y create_task, devuelve version 0 y add_reason, y su registro inmutable se escribe al sacarla de planning con change_stage_status. En otro status se registra de inmediato como cambio, con version 1.",
 	}, h.callTool)
 }
 

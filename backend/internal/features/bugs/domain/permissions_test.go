@@ -53,12 +53,12 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		{"TL devuelve a CR", StatusPendingClose, StatusInReview, actor(kernel.ProfileTL), "falta", nil},
 		{"TL devuelve a QA", StatusPendingClose, StatusInQA, actor(kernel.ProfileTL), "falta", nil},
 		{"devolver sin motivo", StatusPendingClose, StatusInQA, actor(kernel.ProfileTL), "", kernel.ErrReasonRequired},
-		{"TL rechaza en cierre", StatusPendingClose, StatusRejected, actor(kernel.ProfileTL), "x", nil},
 		{"dev reentrega por in_dev", StatusChangesRequested, StatusInDev, actor(kernel.ProfileDevBackend), "", nil},
 		{"QA rechaza reportado", StatusReported, StatusRejected, actor(kernel.ProfileQA), "duplicado", nil},
-		{"QA no rechaza en curso", StatusInDev, StatusRejected, actor(kernel.ProfileQA), "x", kernel.ErrTransitionForbidden},
-		{"TL rechaza en curso", StatusInDev, StatusRejected, actor(kernel.ProfileTL), "x", nil},
-		{"rechazar sin motivo", StatusReported, StatusRejected, actor(kernel.ProfileTL), " ", kernel.ErrReasonRequired},
+		{"QA no rechaza en curso", StatusInDev, StatusRejected, actor(kernel.ProfileQA), "x", ErrBugStatusTransition},
+		{"TL no rechaza reportado", StatusReported, StatusRejected, actor(kernel.ProfileTL), "x", kernel.ErrTransitionForbidden},
+		{"TL reabre", StatusRejected, StatusReported, actor(kernel.ProfileTL), "sí se reproduce", nil},
+		{"rechazar sin motivo", StatusReported, StatusRejected, actor(kernel.ProfileQA), " ", kernel.ErrReasonRequired},
 		{"reabrir sin motivo", StatusRejected, StatusReported, actor(kernel.ProfileQA), "", kernel.ErrReasonRequired},
 	}
 	for _, tt := range tests {
@@ -66,6 +66,23 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 			bug := Bug{Status: tt.from}
 			if err := bug.ChangeStatus(tt.to, tt.actor, tt.reason); !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, quiero %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestTLNeverRejects(t *testing.T) {
+	tl := kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}
+	for from := range statusTransitions {
+		t.Run(string(from), func(t *testing.T) {
+			bug := Bug{Status: from}
+			err := bug.ChangeStatus(StatusRejected, tl, "no es un bug")
+			want := ErrBugStatusTransition
+			if from == StatusReported {
+				want = kernel.ErrTransitionForbidden
+			}
+			if !errors.Is(err, want) || bug.Status != from {
+				t.Fatalf("err = %v, status = %s", err, bug.Status)
 			}
 		})
 	}

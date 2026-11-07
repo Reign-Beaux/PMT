@@ -31,6 +31,7 @@ paths:
           $ref: "#/components/responses/Error"
     post:
       summary: Crea una etapa al final de un proyecto en planning
+      description: Solo PP y el usuario.
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
@@ -39,6 +40,8 @@ paths:
         "201":
           $ref: "#/components/responses/Stage"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
@@ -65,6 +68,7 @@ paths:
           $ref: "#/components/responses/Error"
     put:
       summary: Reemplaza los datos editables de una etapa en su planning propio con el proyecto en working, o de una etapa sin historial cuyo proyecto está en planning
+      description: Solo PP y el usuario.
       requestBody:
         $ref: "#/components/requestBodies/StageInput"
       responses:
@@ -74,18 +78,23 @@ paths:
           $ref: "#/components/responses/Stage"
         "400":
           $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
     delete:
       summary: Elimina una etapa sin tareas en su planning propio con el proyecto en working, o sin historial cuyo proyecto está en planning
+      description: Solo PP y el usuario.
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "204":
           description: Etapa eliminada
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
@@ -151,6 +160,7 @@ paths:
           format: uuid
     post:
       summary: Agrega una etapa. Con el proyecto en working nace en su planning propio, sin registro y con version 0; en otro status se registra como cambio inmutable, con version 1
+      description: Solo PP y el usuario.
       requestBody:
         required: true
         content:
@@ -163,6 +173,8 @@ paths:
         "201":
           $ref: "#/components/responses/Versioned"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
@@ -205,6 +217,7 @@ paths:
           format: uuid
     post:
       summary: Registra una nueva versión como cambio inmutable
+      description: Solo PP, el usuario o el TL de la etapa.
       requestBody:
         required: true
         content:
@@ -218,6 +231,8 @@ paths:
           $ref: "#/components/responses/Versioned"
         "400":
           $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
   /api/stages/{id}/retire:
@@ -230,7 +245,7 @@ paths:
           format: uuid
     post:
       summary: Retira la etapa sin borrar nada
-      description: Al retirar la última etapa abierta de la versión 1, el proyecto pasa solo de in_dev a working, en la misma transacción, si al menos una quedó en done y las demás en done, cancelled o retiradas. El actor es quien retira y el motivo, `cierre de la versión 1`. Retirar una etapa agregada no mueve el proyecto.
+      description: Solo PP y el usuario. Al retirar la última etapa abierta de la versión 1, el proyecto pasa solo de in_dev a working, en la misma transacción, si al menos una quedó en done y las demás en done, cancelled o retiradas. El actor es quien retira y el motivo, `cierre de la versión 1`. Retirar una etapa agregada no mueve el proyecto.
       requestBody:
         required: true
         content:
@@ -261,6 +276,8 @@ paths:
                   version:
                     type: integer
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"

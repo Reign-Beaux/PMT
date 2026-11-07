@@ -26,7 +26,7 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
    Para levantar solo algunos, añade sus nombres al final. Un agente que ya corre no se toca.
 
-5. **PP.** Abre su pestaña en herdr y descríbele el proyecto. Con tu visto bueno libera y avisa al TL.
+5. **PP.** Abre su pestaña en herdr y descríbele el proyecto. Con tu visto bueno libera y levanta al TL con la etapa 1. Se trabaja una etapa por vez: cada etapa siguiente la levantas tú, o PP si se lo pides.
 
 6. **Vigía (opcional).** Desde la raíz del proyecto, en una pestaña aparte: `/ruta/a/agentes/vigia.sh`.
 

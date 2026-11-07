@@ -35,7 +35,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "update_stage",
-		Description: "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+		Description: "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo PP y el usuario. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
 	}, h.callTool)
 }
 

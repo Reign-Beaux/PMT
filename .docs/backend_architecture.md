@@ -588,25 +588,25 @@ Todo bug nace en `reported`. Estos son sus status:
 | `in_qa` | En verificación de QA. |
 | `pending_close` | Aprobado, falta el cierre del TL. |
 | `done` | Corregido y verificado. |
-| `rejected` | No se corregirá: no se reproduce, está duplicado o no es un bug. |
+| `rejected` | No se corregirá: QA no lo reprodujo en `reported`. |
 
 Una tabla de transiciones en `bugs/domain` define los cambios permitidos:
 
 | Desde | Puede pasar a |
 | --- | --- |
 | `reported` | `confirmed`, `rejected` |
-| `confirmed` | `in_dev`, `rejected` |
-| `in_dev` | `in_review`, `rejected` |
-| `in_review` | `in_qa`, `changes_requested`, `pending_close`, `rejected` |
-| `changes_requested` | `in_dev`, `rejected` |
-| `in_qa` | `pending_close`, `changes_requested`, `rejected` |
-| `pending_close` | `done`, `in_review`, `in_qa`, `rejected` |
+| `confirmed` | `in_dev` |
+| `in_dev` | `in_review` |
+| `in_review` | `in_qa`, `changes_requested`, `pending_close` |
+| `changes_requested` | `in_dev` |
+| `in_qa` | `pending_close`, `changes_requested` |
+| `pending_close` | `done`, `in_review`, `in_qa` |
 | `done` | ninguna |
 | `rejected` | `reported` |
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. Un bug inexistente responde `NotFound`. El status solo cambia con la slice `bugs/commands/changestatus` (`change_bug_status`, `PUT /api/bugs/{id}/status`), no con `update_bug`. Cambiar el status exige el proyecto en `working` (regla 15) y devuelve el bug completo.
 
-**Perfiles:** un bug no tiene etapa ni dueño, así que todo es por perfil: el TL indica al dev en un comentario y PMT no restringe qué dev o TL lo mueve. QA confirma; Dev inicia, entrega y retoma; CR aprueba, pide corrección o lleva un cambio interno a `pending_close`; QA aprueba o pide corrección en `in_qa`; el TL cierra o devuelve a `in_review` o `in_qa`. QA o TL rechazan un bug `reported` y reabren uno `rejected`; solo TL rechaza desde los demás. Rechazar, reabrir, `in_review → pending_close`, `in_qa → pending_close` y devolver exigen motivo. El flujo paso a paso está en `perfiles.md`.
+**Perfiles:** un bug no tiene etapa ni dueño, así que todo es por perfil: el TL indica al dev en un comentario y PMT no restringe qué dev o TL lo mueve. QA confirma; Dev inicia, entrega y retoma; CR aprueba, pide corrección o lleva un cambio interno a `pending_close`; QA aprueba o pide corrección en `in_qa`; el TL cierra o devuelve a `in_review` o `in_qa`. Solo QA rechaza, y solo un bug `reported` que no reproduce: uno que ya pasó de `reported` es real y se corrige, así que nadie lo rechaza, tampoco el TL. QA o TL reabren uno `rejected`. Rechazar, reabrir, `in_review → pending_close`, `in_qa → pending_close` y devolver exigen motivo. El flujo paso a paso está en `perfiles.md`.
 
 ## Hallazgos
 

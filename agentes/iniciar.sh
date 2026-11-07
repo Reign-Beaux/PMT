@@ -18,7 +18,7 @@ for A in $L; do
   T=$(token "$A")
   [ -n "$T" ] && [ -r "$HOME/.config/pmt/tokens/$T" ] || { echo "falta el token de $A: ${T:-sin nombre}" >&2; exit 1; }
 done
-for V in PROYECTO_RUTA DB_URL DB_CONTENEDOR PUERTO_BACKEND PUERTO_FRONTEND PMT_URL HERDR_WORKSPACE; do
+for V in PROYECTO_RUTA DB_URL DB_CONSULTA PUERTO_BACKEND PUERTO_FRONTEND PMT_URL HERDR_WORKSPACE; do
   [ -n "${!V:-}" ] || { echo "falta $V en $AGENTES_ENV" >&2; exit 1; }
 done
 [ -d "$PROYECTO_RUTA" ] || { echo "no existe el proyecto: $PROYECTO_RUTA" >&2; exit 1; }
@@ -84,7 +84,7 @@ JSON
 [ -e "$PROYECTO_RUTA/.mcp.json" ] || cp "$AGENTES_DIR/mcp.json" "$PROYECTO_RUTA/.mcp.json"
 
 # Perfil final: rol + comun.md con los datos del proyecto, para los nueve.
-export KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCRIPCION DB_URL DB_CONTENEDOR PUERTO_BACKEND PUERTO_FRONTEND
+export KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCRIPCION DB_URL DB_CONSULTA PUERTO_BACKEND PUERTO_FRONTEND
 TABLA=""
 for A in $TODOS; do
   T=$(token "$A"); [ -n "$T" ] || continue
@@ -98,11 +98,9 @@ done
 export TABLA="${TABLA%$'\n'}"
 python3 - "$KIT" "$AGENTES_DIR/perfiles" $TODOS <<'PY'
 import os,re,sys
-from urllib.parse import urlparse
 kit,dest,agentes=sys.argv[1],sys.argv[2],sys.argv[3:]
-u=urlparse(os.environ['DB_URL'])
-v={k:os.environ.get(k,'') for k in 'KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCRIPCION DB_URL DB_CONTENEDOR PUERTO_BACKEND PUERTO_FRONTEND'.split()}
-v.update(DB_USUARIO=u.username or '',DB_NOMBRE=u.path.lstrip('/'),TABLA_AGENTES=os.environ['TABLA'])
+v={k:os.environ.get(k,'') for k in 'KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCRIPCION DB_URL DB_CONSULTA PUERTO_BACKEND PUERTO_FRONTEND'.split()}
+v.update(TABLA_AGENTES=os.environ['TABLA'])
 comun=open(f'{kit}/comun.md').read()
 for a in agentes:
     t=open(f'{kit}/perfiles/{a}.md').read()

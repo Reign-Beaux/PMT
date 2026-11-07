@@ -22,6 +22,7 @@ paths:
                   $ref: "#/components/schemas/Project"
     post:
       summary: Crea un proyecto
+      description: Solo PP y el usuario.
       requestBody:
         $ref: "#/components/requestBodies/ProjectInput"
       responses:
@@ -30,6 +31,8 @@ paths:
         "201":
           $ref: "#/components/responses/Project"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
   /api/projects/{id}:
     parameters:
@@ -52,6 +55,7 @@ paths:
           $ref: "#/components/responses/Error"
     put:
       summary: Reemplaza los datos editables de un proyecto. Fuera de planning, product_version debe ser la actual. Un campo omitido queda vacío; status tiene su propia ruta
+      description: Solo PP y el usuario.
       requestBody:
         $ref: "#/components/requestBodies/ProjectUpdateInput"
       responses:
@@ -61,12 +65,15 @@ paths:
           $ref: "#/components/responses/Project"
         "400":
           $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
     delete:
       summary: Elimina un proyecto en planning, sin bugs ni etapas, activas o retiradas
+      description: Solo PP y el usuario.
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -75,6 +82,8 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"

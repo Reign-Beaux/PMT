@@ -26,7 +26,7 @@ const (
 	StatusPendingClose Status = "pending_close"
 	// StatusDone indica que está corregido y verificado.
 	StatusDone Status = "done"
-	// StatusRejected indica que no se corregirá: no se reproduce, está duplicado o no es un bug.
+	// StatusRejected indica que QA no lo reprodujo en reported: no se corregirá.
 	StatusRejected Status = "rejected"
 )
 
@@ -40,12 +40,12 @@ var (
 // statusTransitions indica a qué estados puede pasar cada estado.
 var statusTransitions = map[Status][]Status{
 	StatusReported:         {StatusConfirmed, StatusRejected},
-	StatusConfirmed:        {StatusInDev, StatusRejected},
-	StatusInDev:            {StatusInReview, StatusRejected},
-	StatusInReview:         {StatusInQA, StatusChangesRequested, StatusPendingClose, StatusRejected},
-	StatusChangesRequested: {StatusInDev, StatusRejected},
-	StatusInQA:             {StatusPendingClose, StatusChangesRequested, StatusRejected},
-	StatusPendingClose:     {StatusDone, StatusInReview, StatusInQA, StatusRejected},
+	StatusConfirmed:        {StatusInDev},
+	StatusInDev:            {StatusInReview},
+	StatusInReview:         {StatusInQA, StatusChangesRequested, StatusPendingClose},
+	StatusChangesRequested: {StatusInDev},
+	StatusInQA:             {StatusPendingClose, StatusChangesRequested},
+	StatusPendingClose:     {StatusDone, StatusInReview, StatusInQA},
 	StatusDone:             {},
 	StatusRejected:         {StatusReported},
 }

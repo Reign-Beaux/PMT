@@ -1,6 +1,6 @@
 [
   {
-    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
+    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Solo PP y el usuario. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -41,7 +41,7 @@
     }
   },
   {
-    "description": "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
+    "description": "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. Solo PP y el usuario. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

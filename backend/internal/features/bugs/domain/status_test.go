@@ -31,12 +31,12 @@ func TestStatusValues(t *testing.T) {
 func TestChangeStatusTransitions(t *testing.T) {
 	allowed := map[Status]map[Status]bool{
 		StatusReported:         {StatusConfirmed: true, StatusRejected: true},
-		StatusConfirmed:        {StatusInDev: true, StatusRejected: true},
-		StatusInDev:            {StatusInReview: true, StatusRejected: true},
-		StatusInReview:         {StatusInQA: true, StatusChangesRequested: true, StatusPendingClose: true, StatusRejected: true},
-		StatusChangesRequested: {StatusInDev: true, StatusRejected: true},
-		StatusInQA:             {StatusPendingClose: true, StatusChangesRequested: true, StatusRejected: true},
-		StatusPendingClose:     {StatusDone: true, StatusInReview: true, StatusInQA: true, StatusRejected: true},
+		StatusConfirmed:        {StatusInDev: true},
+		StatusInDev:            {StatusInReview: true},
+		StatusInReview:         {StatusInQA: true, StatusChangesRequested: true, StatusPendingClose: true},
+		StatusChangesRequested: {StatusInDev: true},
+		StatusInQA:             {StatusPendingClose: true, StatusChangesRequested: true},
+		StatusPendingClose:     {StatusDone: true, StatusInReview: true, StatusInQA: true},
 		StatusDone:             {},
 		StatusRejected:         {StatusReported: true},
 	}

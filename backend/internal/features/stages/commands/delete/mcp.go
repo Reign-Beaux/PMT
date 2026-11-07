@@ -22,7 +22,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "delete_stage",
-		Description: "Elimina una etapa de PMT y devuelve su ID. Solo funciona si la etapa no tiene tareas, activas o retiradas, y además está en su planning propio con el proyecto en working, o su proyecto está en planning y la etapa no tiene historial; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
+		Description: "Elimina una etapa de PMT y devuelve su ID. Solo PP y el usuario. Solo funciona si la etapa no tiene tareas, activas o retiradas, y además está en su planning propio con el proyecto en working, o su proyecto está en planning y la etapa no tiene historial; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
 	}, h.callTool)
 }
 

@@ -32,7 +32,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "add_comment",
-		Description: "Registra un comentario sobre un proyecto, una etapa, una tarea o un bug: decisiones que no son una transición y bloqueos, sin copiar los avisos. Disponible para todos los perfiles. El elemento debe existir, sin retirar. No cambia su status, y el comentario no se edita ni se borra.",
+		Description: "Registra un comentario sobre un proyecto, una etapa, una tarea o un bug: decisiones que no son una transición y bloqueos, sin copiar los avisos. Disponible para todos los perfiles menos PC, que solo lee. El elemento debe existir, sin retirar. No cambia su status, y el comentario no se edita ni se borra.",
 	}, h.callTool)
 }
 

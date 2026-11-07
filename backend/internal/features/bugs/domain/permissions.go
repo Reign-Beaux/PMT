@@ -12,7 +12,7 @@ var (
 	reviewers = []kernel.Profile{kernel.ProfileCR}
 	testers   = []kernel.Profile{kernel.ProfileQA}
 	leads     = []kernel.Profile{kernel.ProfileTL}
-	triagers  = []kernel.Profile{kernel.ProfileQA, kernel.ProfileTL}
+	reopeners = []kernel.Profile{kernel.ProfileQA, kernel.ProfileTL}
 	reporters = []kernel.Profile{kernel.ProfilePP, kernel.ProfileUser}
 )
 
@@ -40,16 +40,18 @@ func EnsureCanUpdate(actor kernel.Actor) error {
 
 // statusProfiles indica qué perfiles pueden hacer cada transición. Un bug no tiene
 // etapa: todos son por perfil, sin asignación. Dev es DevFrontend o DevBackend.
+// Solo QA rechaza, y solo en reported, cuando no lo reproduce: un bug que ya pasó
+// de reported es real y se corrige.
 var statusProfiles = map[Status]map[Status][]kernel.Profile{
-	StatusReported:         {StatusConfirmed: testers, StatusRejected: triagers},
-	StatusConfirmed:        {StatusInDev: devs, StatusRejected: leads},
-	StatusInDev:            {StatusInReview: devs, StatusRejected: leads},
-	StatusInReview:         {StatusInQA: reviewers, StatusChangesRequested: reviewers, StatusPendingClose: reviewers, StatusRejected: leads},
-	StatusChangesRequested: {StatusInDev: devs, StatusRejected: leads},
-	StatusInQA:             {StatusPendingClose: testers, StatusChangesRequested: testers, StatusRejected: leads},
-	StatusPendingClose:     {StatusDone: leads, StatusInReview: leads, StatusInQA: leads, StatusRejected: leads},
+	StatusReported:         {StatusConfirmed: testers, StatusRejected: testers},
+	StatusConfirmed:        {StatusInDev: devs},
+	StatusInDev:            {StatusInReview: devs},
+	StatusInReview:         {StatusInQA: reviewers, StatusChangesRequested: reviewers, StatusPendingClose: reviewers},
+	StatusChangesRequested: {StatusInDev: devs},
+	StatusInQA:             {StatusPendingClose: testers, StatusChangesRequested: testers},
+	StatusPendingClose:     {StatusDone: leads, StatusInReview: leads, StatusInQA: leads},
 	StatusDone:             {},
-	StatusRejected:         {StatusReported: triagers},
+	StatusRejected:         {StatusReported: reopeners},
 }
 
 func ensureReason(from, to Status, reason string) error {

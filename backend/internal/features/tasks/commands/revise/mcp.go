@@ -34,7 +34,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "revise_task",
-		Description: "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Una tarea en in_review, in_qa o pending_close vuelve a changes_requested, conserva su dueño y deja un registro de status; las demás no cambian de status, y una en done se rechaza: usa add_task. Se rechaza si su etapa está en su planning propio: ahí usa update_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+		Description: "Registra una nueva versión de una tarea como cambio inmutable, con su motivo y quién lo pidió, y devuelve la tarea y su versión. Solo PP y el usuario. Es la forma de editar una tarea cuando el proyecto ya no está en planning o la tarea ya tiene historial. Una tarea en in_review, in_qa o pending_close vuelve a changes_requested, conserva su dueño y deja un registro de status; las demás no cambian de status, y una en done se rechaza: usa add_task. Se rechaza si su etapa está en su planning propio: ahí usa update_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
 	}, h.callTool)
 }
 

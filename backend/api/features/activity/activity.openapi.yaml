@@ -9,7 +9,7 @@ paths:
   /api/comments:
     post:
       summary: Registra un comentario sobre un elemento
-      description: Todos los perfiles. El actor sale del token. El elemento debe existir, sin retirar. No cambia su status.
+      description: Todos los perfiles menos PC, que solo lee. El actor sale del token. El elemento debe existir, sin retirar. No cambia su status.
       requestBody:
         required: true
         content:

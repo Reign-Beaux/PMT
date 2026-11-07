@@ -25,7 +25,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "import_project",
-		Description: "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
+		Description: "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Solo PP y el usuario. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
 	}, h.callTool)
 }
 

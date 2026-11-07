@@ -62,7 +62,7 @@
     }
   },
   {
-    "description": "Crea un proyecto en PMT. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+    "description": "Crea un proyecto en PMT. Solo PP y el usuario. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -175,7 +175,7 @@
     }
   },
   {
-    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Solo PP y el usuario. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -243,7 +243,7 @@
     }
   },
   {
-    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo funciona si el proyecto está en planning y no tiene bugs ni etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
+    "description": "Elimina un proyecto de PMT y devuelve su ID. Solo PP y el usuario. Solo funciona si el proyecto está en planning y no tiene bugs ni etapas, activas o retiradas. Usa list_projects para obtener el ID del proyecto.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

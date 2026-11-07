@@ -29,7 +29,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "import_stage",
-		Description: "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
+		Description: "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. Solo PP y el usuario. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
 	}, h.callTool)
 }
 

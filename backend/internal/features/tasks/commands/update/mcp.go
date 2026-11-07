@@ -31,7 +31,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "update_task",
-		Description: "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si el proyecto de su etapa está en planning y ni la tarea tiene historial ni la etapa nació con add_stage; si no, usa revise_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+		Description: "Reemplaza el título y la descripción de una tarea de PMT y devuelve la tarea completa. Solo PP y el usuario. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si el proyecto de su etapa está en planning y ni la tarea tiene historial ni la etapa nació con add_stage; si no, usa revise_task. Usa list_tasks para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
 	}, h.callTool)
 }
 

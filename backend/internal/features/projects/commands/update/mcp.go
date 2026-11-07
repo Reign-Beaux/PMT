@@ -32,7 +32,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "update_project",
-		Description: "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+		Description: "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Solo PP y el usuario. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
 	}, h.callTool)
 }
 

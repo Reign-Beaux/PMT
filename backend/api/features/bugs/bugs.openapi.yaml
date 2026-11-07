@@ -82,7 +82,7 @@ paths:
           format: uuid
     put:
       summary: Cambia el status de un bug
-      description: Solo admite las transiciones permitidas, cada una con su perfil. Exige el proyecto en working y devuelve el bug completo. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Deja un registro inmutable en el historial de status.
+      description: Solo admite las transiciones permitidas, cada una con su perfil. Exige el proyecto en working y devuelve el bug completo. Solo QA rechaza, y solo un bug reported que no reproduce; desde otro status no se rechaza. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Deja un registro inmutable en el historial de status.
       requestBody:
         required: true
         content:

@@ -72,7 +72,7 @@
     }
   },
   {
-    "description": "Crea una etapa al final de un proyecto de PMT. La posición se asigna sola. Solo funciona si el proyecto está en planning; si no, usa add_stage. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+    "description": "Crea una etapa al final de un proyecto de PMT. Solo PP y el usuario. La posición se asigna sola. Solo funciona si el proyecto está en planning; si no, usa add_stage. Si el usuario no indicó el proyecto, el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -229,7 +229,7 @@
     }
   },
   {
-    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el nombre y la descripción de una etapa de PMT y devuelve la etapa completa. Solo PP y el usuario. Solo funciona si la etapa está en su planning propio con el proyecto en working, o si su proyecto está en planning y la etapa no tiene historial; si no, usa revise_stage. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -302,7 +302,7 @@
     }
   },
   {
-    "description": "Elimina una etapa de PMT y devuelve su ID. Solo funciona si la etapa no tiene tareas, activas o retiradas, y además está en su planning propio con el proyecto en working, o su proyecto está en planning y la etapa no tiene historial; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
+    "description": "Elimina una etapa de PMT y devuelve su ID. Solo PP y el usuario. Solo funciona si la etapa no tiene tareas, activas o retiradas, y además está en su planning propio con el proyecto en working, o su proyecto está en planning y la etapa no tiene historial; si no, usa retire_stage. Usa list_stages para obtener el ID de la etapa.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -331,7 +331,7 @@
     }
   },
   {
-    "description": "Agrega una etapa nueva al final de un proyecto cuando ya no está en planning, con su motivo y quién la pidió. Con el proyecto en working nace en su planning propio: se define con update_stage y create_task, devuelve version 0 y add_reason, y su registro inmutable se escribe al sacarla de planning con change_stage_status. En otro status se registra de inmediato como cambio, con version 1.",
+    "description": "Agrega una etapa nueva al final de un proyecto cuando ya no está en planning, con su motivo y quién la pidió. Solo PP y el usuario. Con el proyecto en working nace en su planning propio: se define con update_stage y create_task, devuelve version 0 y add_reason, y su registro inmutable se escribe al sacarla de planning con change_stage_status. En otro status se registra de inmediato como cambio, con version 1.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -418,7 +418,7 @@
     }
   },
   {
-    "description": "Registra una nueva versión de una etapa como cambio inmutable, con su motivo y quién lo pidió, y devuelve la etapa y su versión. Es la forma de editar una etapa cuando el proyecto ya no está en planning o la etapa ya tiene historial. Se rechaza si la etapa está en su planning propio. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Registra una nueva versión de una etapa como cambio inmutable, con su motivo y quién lo pidió, y devuelve la etapa y su versión. Solo PP, el usuario o el TL de la etapa. Es la forma de editar una etapa cuando el proyecto ya no está en planning o la etapa ya tiene historial. Se rechaza si la etapa está en su planning propio. Usa list_stages para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -499,7 +499,7 @@
     }
   },
   {
-    "description": "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas sin retirar, aunque estén en done o cancelled: primero retira sus tareas. Se rechaza si la etapa está en su planning propio. Al retirar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done y las demás en done, cancelled o retiradas; retirar una agregada no lo mueve. Usa list_stages para obtener su ID.",
+    "description": "Retira una etapa de PMT y registra el cambio inmutable, con su motivo y quién lo pidió. Solo PP y el usuario. No borra nada: deja de aparecer en list_stages y sigue en list_stage_changes. El retiro no se deshace. Solo funciona si la etapa no tiene tareas sin retirar, aunque estén en done o cancelled: primero retira sus tareas. Se rechaza si la etapa está en su planning propio. Al retirar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done y las demás en done, cancelled o retiradas; retirar una agregada no lo mueve. Usa list_stages para obtener su ID.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
