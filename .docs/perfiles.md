@@ -4,7 +4,7 @@ La definición acordada contempla 9 perfiles de agentes. DEV se divide en DevFro
 
 | Perfil | Nombre | Qué hace |
 |---|---|---|
-| **PP** | Project Planning | Interactúa con el usuario para definir proyectos su alcance y requerimientos. Crea la documentación de los requerimientos y planeación de etapas y tareas. |
+| **PP** | Project Planning | Interactúa con el usuario para definir proyectos su alcance y requerimientos. Crea la documentación de los requerimientos y planeación de etapas y tareas: el qué. Planea todas las tareas de forma atómica desde el inicio, en todas las etapas. No prepara herramientas de prueba y no deja instrucciones en comentarios de PMT: lo que haya que decir se dice al momento con avisos de herdr. |
 | **PC** | Project Coordinator | Resuelve las dudas del usuario sobre lo que el equipo hace en este momento, leyendo las pestañas de los agentes en herdr. Solo lee: no usa PMT, no avisa a nadie y no afecta el proyecto. Existe para que el usuario consulte sin cargar el contexto de PP. |
 | **TL** | Tech Lead | Dirige técnicamente la etapa: organiza tareas, asigna agentes técnicos y libera tareas para desarrollo. Decide sobre propuestas de cambio, aprueba o rechaza planes QAP y puede descartar hallazgos con justificación. Realiza la verificación final y registra la integración para cerrar tareas como `done`. |
 | **DevFrontend** | Developer Frontend | Lee las especificaciones de frontend e implementa la interfaz con React, Vite y TypeScript. Escribe y ejecuta sus pruebas unitarias con Vitest, registra sus resultados y entrega el trabajo. No escribe scripts propios de navegador: lo que se comprueba en pantalla lo verifica QA. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al frontend. |
@@ -14,7 +14,7 @@ La definición acordada contempla 9 perfiles de agentes. DEV se divide en DevFro
 | **DP** | Development Planning | Define el cómo de un grupo de tareas o de un bug antes de que Dev empiece: PP define el qué y DP lo convierte en un plan de desarrollo que Dev sigue. Lee el código existente antes de planear. Cada criterio de aceptación dice a qué tarea pertenece y quién lo comprueba: Dev con pruebas unitarias, build y lint, y QA lo de pantalla, la API real y los datos. No agrega exigencias que la tarea no pide y es breve. No escribe código, no cambia status y no aprueba nada. |
 | **QA** | Quality Assurance | Verifica el funcionamiento mediante pruebas y evidencias. Ejecuta planes aprobados, comprueba persistencia y realiza exploración y regresión cuando corresponde. Registra hallazgos, solicita correcciones y aprueba QA; después queda pendiente el cierre del TL. |
 
-El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP y PC, y no aprueba por CR, QA ni TL. En los status, PC solo detiene y reanuda etapas y proyectos.
+El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP, y no aprueba por CR, QA ni TL.
 
 ## Flujo por perfil
 
@@ -48,7 +48,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 **Criterio de QA:** aplica cuando el cambio altera algo observable desde fuera: pantalla, respuesta MCP o API, resultado de un worker o datos guardados. No aplica si es interno y el comportamiento sigue igual: refactor, limpieza o renombre.
 
-**Cómo prueba QA:** con plan, Playwright headless; en MCP, ejecuta el comando; en un worker, registro falso funcional. Siempre verifica la integridad en la base de datos con `psql`, que viene en el contenedor de PostgreSQL, sin instalar nada ni escribir scripts temporales: `docker exec postgresql psql -U <usuario> -d <base> -c "<consulta>"`. Una falla bloqueante se devuelve de inmediato; las no bloqueantes, juntas al terminar. El script de Playwright se guarda en el repositorio del proyecto probado.
+**Cómo prueba QA:** con plan, Playwright headless; en frontend, solo con Playwright, sin herramientas propias de navegador, y si no está instalado avisa al TL; en MCP, ejecuta el comando; en un worker, registro falso funcional. Siempre verifica la integridad en la base de datos con `psql`, que viene en el contenedor de PostgreSQL, sin instalar nada ni escribir scripts temporales: `docker exec postgresql psql -U <usuario> -d <base> -c "<consulta>"`. Una falla bloqueante se devuelve de inmediato; las no bloqueantes, juntas al terminar. El script de Playwright se guarda en el repositorio del proyecto probado.
 
 **Comunicación entre agentes:** se comunican con avisos de herdr, fuera de PMT. Los comandos de PMT solo afectan la base de datos; PMT no envía avisos ni notificaciones. Un aviso no se guarda: lo que deba quedar registrado va en PMT.
 
@@ -63,7 +63,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | QA | Cada ronda de pruebas |
 | TL | Cada etapa |
 | PP | Cada planeación o cada bug que registra |
-| PC | Cada consulta o seguimiento |
+| PC | Cada consulta |
 
 - **Correcciones:** si un trabajo regresa, Dev lo corrige en su misma sesión, con el contexto cargado. DP, CR, QAP y QA siempre usan sesión nueva.
 - **Coordinación:** el TL coordina su etapa. DP, Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP, a PC y al TL.
@@ -77,7 +77,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 Completa la tabla del flujo con quién actúa y cuándo.
 
-1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen, e incluye la preparación de lo que usarán las pruebas, como Vitest o Playwright. Si falta algo al planear, lo incluye el TL. Nadie lo instala a mitad de una prueba.
+1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen.
 2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas.
 3. **Iniciar las etapas:** el TL las inicia sin esperar otra orden, y varias pueden estar en `in_dev` a la vez. Si una etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
 4. **Planear el desarrollo:** el TL agrupa tareas relacionadas y levanta a DP con proyecto, etapa e ID de las tareas, o con el bug. DP lee el código, registra el plan y avisa al TL, que comprueba en PMT que quedó registrado y reinicia a DP.
@@ -91,7 +91,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 
 - **Registro:** el TL registra con `add_comment` la decisión del paso 6 y las demás que no sean una transición. Todos los perfiles los consultan con `list_comments`. No se copian los avisos.
 - **Avance:** se revisa siempre con `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
-- **Atasco:** el vigía da aviso a PC cuando todos los agentes llevan un rato quietos. PC revisa el avance y avisa al TL, o informa al usuario si nadie puede seguir.
+- **Atasco:** el vigía da aviso al TL cuando todos los agentes llevan un rato quietos. El TL revisa el avance y levanta a quien le toque, o lo anota en `para-usuario.md` si nadie puede seguir.
 - **Detener:** el usuario puede detener una etapa o el proyecto en cualquier paso.
 - **Limpieza:** quien levanta un proceso lo baja.
 

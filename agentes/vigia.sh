@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vigía: observa a los agentes del proyecto y da aviso a pc si todos llevan
+# Vigía: observa a los agentes del proyecto y da aviso al TL si todos llevan
 # QUIETO segundos sin trabajar. Tras un aviso no repite hasta que otro agente trabaje.
 # Termina si alguien queda blocked o si hay aviso nuevo para el usuario.
 # Si mcode falla (título Failed; herdr sigue en working), le envía /retry hasta
@@ -38,11 +38,12 @@ print(' '.join(n[p['pane_id']]+':'+e(p) for p in json.load(sys.stdin)['result'][
     "$HERDR" pane run "$(pane "$A")" /retry >/dev/null
   done
   if grep -q working <<<"$S"; then q=0; else q=$((q+PULSO)); fi
-  # pc no rearma: si solo trabajó pc por el aviso, nada cambió en el flujo.
-  grep -qE '(^| )[^ ]+:working' <<<"${S//pc:working/}" && armado=1
+  # pp, pc y tl no rearman: hablar con el usuario o atender el aviso no cambia el flujo.
+  R=" $S "; for X in pp pc tl; do R=${R// $X:working / }; done
+  grep -qE '(^| )[^ ]+:working' <<<"$R" && armado=1
   if [ "$q" -ge "$QUIETO" ] && [ "$armado" = 1 ]; then
-    echo "TODOS QUIETOS: aviso a pc"
-    "$K/avisar.sh" pc "Vigía: todos llevan ${QUIETO} s quietos. Revisa el avance en PMT y avisa a quien le toque seguir; si nadie puede seguir, informa al usuario."
+    echo "TODOS QUIETOS: aviso al TL"
+    "$K/avisar.sh" tl "Vigía: todos llevan ${QUIETO} s quietos. Revisa el avance en PMT y levanta a quien le toque seguir; si nadie puede seguir, anótalo en para-usuario.md."
     armado=0; q=0
   fi
 done

@@ -41,7 +41,7 @@ Toman la configuración de `AGENTES_ENV`, que los agentes heredan, o del `.agent
 | `levantar.sh <agente> "encargo"` | Reinicia y da el encargo |
 | `relanzar-dp.sh <medium\|high>` | Relanza a DP; el effort se conserva al reiniciar |
 | `relanzar-mcode.sh <agente\|todos>` | Relanza mcode para que lea su configuración |
-| `vigia.sh` | Avisa a PC si todos llevan un rato quietos |
+| `vigia.sh` | Avisa al TL si todos llevan un rato quietos |
 
 Los avisos van a los agentes de este proyecto por su pane. `HERDR_PREFIJO` solo evita choques de nombre si hay otro equipo vivo.
 

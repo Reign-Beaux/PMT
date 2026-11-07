@@ -105,7 +105,9 @@ v={k:os.environ.get(k,'') for k in 'KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCR
 v.update(DB_USUARIO=u.username or '',DB_NOMBRE=u.path.lstrip('/'),TABLA_AGENTES=os.environ['TABLA'])
 comun=open(f'{kit}/comun.md').read()
 for a in agentes:
-    t=open(f'{kit}/perfiles/{a}.md').read()+comun
+    t=open(f'{kit}/perfiles/{a}.md').read()
+    # PC solo lee herdr: sin reglas de PMT ni de avisos.
+    t+=(f"\nProyecto: `{{{{PROYECTO_RUTA}}}}`.\n\nAgentes:\n| Agente | PMT | Perfil |\n|---|---|---|\n{{{{TABLA_AGENTES}}}}\n" if a=='pc' else comun)
     open(f'{dest}/{a}.md','w').write(re.sub(r'\{\{(\w+)\}\}',lambda m:v[m[1]],t))
 PY
 
