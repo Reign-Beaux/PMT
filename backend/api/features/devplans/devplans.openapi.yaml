@@ -188,7 +188,7 @@ components:
           description: Qué falla con mensaje, nunca en silencio
         acceptance_criteria:
           type: string
-          description: Cada criterio con el comando o la pantalla que lo comprueba contra la API real
+          description: Cada criterio con la tarea a la que pertenece, quién lo comprueba y cómo: Dev con pruebas unitarias, build y lint; QA en pantalla, contra la API real solo si la tarea la consume, y en los datos guardados
     PlanSummary:
       type: object
       required: [id, version]

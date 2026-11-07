@@ -18,7 +18,7 @@ type toolInput struct {
 	ScreenStates       string   `json:"screen_states" jsonschema:"Estados de pantalla: carga, vacío, error y móvil. Si no aplica, escribe el motivo"`
 	EdgeCases          string   `json:"edge_cases" jsonschema:"Valores extremos, caracteres especiales y datos corruptos"`
 	ErrorHandling      string   `json:"error_handling" jsonschema:"Qué falla con mensaje, nunca en silencio"`
-	AcceptanceCriteria string   `json:"acceptance_criteria" jsonschema:"Cada criterio con el comando o la pantalla que lo comprueba contra la API real"`
+	AcceptanceCriteria string   `json:"acceptance_criteria" jsonschema:"Cada criterio con la tarea a la que pertenece, quién lo comprueba y cómo: Dev con pruebas unitarias, build y lint; QA en pantalla, contra la API real solo si la tarea la consume, y en los datos guardados"`
 	Reason             string   `json:"reason" jsonschema:"Motivo de la versión nueva"`
 }
 

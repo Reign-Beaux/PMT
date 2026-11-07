@@ -6,12 +6,12 @@ La definición acordada contempla 9 perfiles de agentes. DEV se divide en DevFro
 |---|---|---|
 | **PP** | Project Planning | Interactúa con el usuario para definir proyectos su alcance y requerimientos. Crea la documentación de los requerimientos y planeación de etapas y tareas: el qué. Planea todas las tareas de forma atómica desde el inicio, en todas las etapas. No prepara herramientas de prueba y no deja instrucciones en comentarios de PMT: lo que haya que decir se dice al momento con avisos de herdr. |
 | **PC** | Project Coordinator | Resuelve las dudas del usuario sobre lo que el equipo hace en este momento, leyendo las pestañas de los agentes en herdr. Solo lee: no usa PMT, no avisa a nadie y no afecta el proyecto. Existe para que el usuario consulte sin cargar el contexto de PP. |
-| **TL** | Tech Lead | Dirige técnicamente la etapa: organiza tareas, asigna agentes técnicos y libera tareas para desarrollo. Decide sobre propuestas de cambio, aprueba o rechaza planes QAP y puede descartar hallazgos con justificación. Realiza la verificación final y registra la integración para cerrar tareas como `done`. |
+| **TL** | Tech Lead | Dirige técnicamente la etapa de su encargo, una por vez, y solo cambia el status de esa etapa: organiza tareas, asigna agentes técnicos y libera tareas para desarrollo. Decide sobre propuestas de cambio, aprueba o rechaza planes QAP y puede descartar hallazgos con justificación. Realiza la verificación final y registra la integración para cerrar tareas como `done`. |
 | **DevFrontend** | Developer Frontend | Lee las especificaciones de frontend e implementa la interfaz con React, Vite y TypeScript. Escribe y ejecuta sus pruebas unitarias con Vitest, registra sus resultados y entrega el trabajo. No escribe scripts propios de navegador: lo que se comprueba en pantalla lo verifica QA. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al frontend. |
 | **DevBackend** | Developer Backend | Lee las especificaciones de backend e implementa la lógica con Go. Escribe y ejecuta sus pruebas unitarias con el paquete estándar `testing` mediante `go test`, registra sus resultados y entrega el trabajo. Propone cambios técnicos y corrige los hallazgos de CR o QA correspondientes al backend. |
 | **CR** | Code Reviewer | Revisa la lógica, integridad y calidad del código, incluyendo prácticas como SOLID y DRY. Registra hallazgos, solicita correcciones, verifica su resolución y aprueba la revisión de código. No ejecuta pruebas: revisa leyendo el código, y probar le toca a QA. Solo revisa el código del producto, no los scripts de evidencia de Dev, y en cada hallazgo anota la corrección exacta para que Dev la aplique. |
 | **QAP** | Quality Assurance Planning | Diseña y versiona planes de pruebas para casos que combinan cambios de frontend y backend. Vincula tareas, define casos de prueba, incluye los criterios que el plan de desarrollo le asigna a QA y envía el plan al TL para su aprobación. |
-| **DP** | Development Planning | Define el cómo de un grupo de tareas o de un bug antes de que Dev empiece: PP define el qué y DP lo convierte en un plan de desarrollo que Dev sigue. Lee el código existente antes de planear. Cada criterio de aceptación dice a qué tarea pertenece y quién lo comprueba: Dev con pruebas unitarias, build y lint, y QA lo de pantalla, la API real y los datos. No agrega exigencias que la tarea no pide y es breve. No escribe código, no cambia status y no aprueba nada. |
+| **DP** | Development Planning | Define el cómo de un grupo de tareas o de un bug antes de que Dev empiece: PP define el qué y DP lo convierte en un plan de desarrollo que Dev sigue. Lee el código existente antes de planear. Cada criterio de aceptación dice a qué tarea pertenece y quién lo comprueba: Dev con pruebas unitarias, build y lint, y QA lo de pantalla, la API real si la tarea la consume y los datos. No agrega exigencias que la tarea no pide y es breve. No escribe código, no cambia status y no aprueba nada. |
 | **QA** | Quality Assurance | Verifica el funcionamiento mediante pruebas y evidencias. Ejecuta planes aprobados, comprueba persistencia y realiza exploración y regresión cuando corresponde. Registra hallazgos, solicita correcciones y aprueba QA; después queda pendiente el cierre del TL. |
 
 El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede todo lo de PP, y no aprueba por CR, QA ni TL.
@@ -36,7 +36,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 
 **Planes QAP:** QAP crea el plan con `create_test_plan`, lo versiona con `revise_test_plan` y lo envía con `submit_test_plan`. El TL de la etapa lo aprueba con `approve_test_plan` o lo devuelve con correcciones con `return_test_plan`; un plan devuelto exige una versión nueva antes de reenviarse. QA y los demás perfiles los consultan con `list_test_plans` y `list_test_plan_versions`. No frenan transiciones, y el script de Playwright y los resultados no se guardan en PMT.
 
-**Planes de desarrollo:** el flujo es TL → DP → Dev. DP registra el plan con `create_dev_plan`, de una etapa con sus tareas o de un bug, y lo versiona con `revise_dev_plan`, con motivo. Cada versión define `scope` (archivos a crear o tocar y lo que queda fuera), `technical_decisions` (estructura, contrato y bibliotecas), `screen_states` (carga, vacío, error y móvil), `edge_cases` (valores extremos, caracteres especiales y datos corruptos), `error_handling` (qué falla con mensaje, nunca en silencio) y `acceptance_criteria` (cada criterio con la tarea a la que pertenece, quién lo comprueba y cómo: Dev con pruebas unitarias, build y lint; QA en pantalla, contra la API real y en los datos guardados). Todos son obligatorios: si uno no aplica, se escribe el motivo. No tiene status ni aprobación: el TL solo comprueba que quedó registrado, y vale la versión más reciente. No frena transiciones. Todos los perfiles los consultan con `list_dev_plans`, por etapa, por tarea o por bug, y `list_dev_plan_versions`.
+**Planes de desarrollo:** el flujo es TL → DP → Dev. DP registra el plan con `create_dev_plan`, de una etapa con sus tareas o de un bug, y lo versiona con `revise_dev_plan`, con motivo. Cada versión define `scope` (archivos a crear o tocar y lo que queda fuera), `technical_decisions` (estructura, contrato y bibliotecas), `screen_states` (carga, vacío, error y móvil), `edge_cases` (valores extremos, caracteres especiales y datos corruptos), `error_handling` (qué falla con mensaje, nunca en silencio) y `acceptance_criteria` (cada criterio con la tarea a la que pertenece, quién lo comprueba y cómo: Dev con pruebas unitarias, build y lint; QA en pantalla, contra la API real solo si la tarea la consume, y en los datos guardados). Todos son obligatorios: si uno no aplica, se escribe el motivo. No tiene status ni aprobación: el TL solo comprueba que quedó registrado, y vale la versión más reciente. No frena transiciones. Todos los perfiles los consultan con `list_dev_plans`, por etapa, por tarea o por bug, y `list_dev_plan_versions`.
 
 - **Dev** sigue el plan y entrega evidencia de los criterios que le tocan. Si encuentra que el plan está mal, se lo dice al TL y no lo cambia por su cuenta.
 - **El TL** levanta a DP para una versión nueva si el problema es técnico. PP resuelve lo que cambie alcance o requisitos.
@@ -66,7 +66,7 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 | PC | Cada consulta |
 
 - **Correcciones:** si un trabajo regresa, Dev lo corrige en su misma sesión, con el contexto cargado. DP, CR, QAP y QA siempre usan sesión nueva.
-- **Coordinación:** el TL coordina su etapa. DP, Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP, a PC y al TL.
+- **Coordinación:** el TL coordina su etapa. DP, Dev, CR, QAP y QA le avisan al terminar. Él revisa en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente. A Dev solo lo reinicia al cerrar su grupo. El usuario levanta a PP y a PC; el usuario o PP levantan al TL, con una sesión nueva por etapa.
 - **Encargo:** indica proyecto, etapa e ID de las tareas.
 - **Sesión limpia:** en Claude y mcode se reinicia con `/new`, sin cerrar el programa; en Codex se relanza el proceso, porque tras `/new` descarta el primer mensaje. Después se vuelve a nombrar al agente en herdr, que lo pierde.
 - **Levantar Claude:** se usa `claude-400`, comando propio del usuario definido en su `~/.bashrc`, que ejecuta `claude --dangerously-skip-permissions --autocompact 400k` y acepta los argumentos de `claude`. Por ser una función de shell, solo existe en un shell interactivo.
@@ -78,14 +78,15 @@ El usuario humano tiene el perfil `User`: actúa sin token como `saul`, puede to
 Completa la tabla del flujo con quién actúa y cuándo.
 
 1. **Planear:** PP escribe los tipos del contrato también en las tareas que lo consumen.
-2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Esa es la orden para todas las etapas.
-3. **Iniciar las etapas:** el TL las inicia sin esperar otra orden, y varias pueden estar en `in_dev` a la vez. Si una etapa depende de otra, antes fija el contrato en su descripción con `revise_stage`.
+2. **Liberar:** PP ejecuta `release_project` con el visto bueno del usuario. Se trabaja una etapa por vez: el usuario o PP levantan al TL con la etapa que sigue.
+3. **Iniciar la etapa:** el TL inicia solo la etapa de su encargo y solo cambia el status de esa etapa. Si depende de otra, antes fija el contrato en su descripción con `revise_stage`.
+   - **Configuración del proyecto:** la tarea que configura las tecnologías e instala dependencias y herramientas de prueba la toma el dev de ese lado. Si solo dejó configuración y el cascarón funcionando, sin lógica, termina en CR, que valida los archivos.
 4. **Planear el desarrollo:** el TL agrupa tareas relacionadas y levanta a DP con proyecto, etapa e ID de las tareas, o con el bug. DP lee el código, registra el plan y avisa al TL, que comprueba en PMT que quedó registrado y reinicia a DP.
 5. **Tomar tareas:** el TL levanta a cada dev con su grupo de tareas. Dev sigue el plan, entrega evidencia de los criterios que le tocan y avisa al TL, que levanta a CR para revisar el código; el encargo nunca le pide ejecutar pruebas. Un dev no recibe otro grupo hasta cerrar el actual.
 6. **Decidir el camino tras CR:** con la tarea en `in_qa`, el TL levanta a QAP si toca frontend; si no, a QA.
 7. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
 8. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
-9. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar.
+9. **Cerrar la etapa:** QA limpia sus datos de prueba y el TL lo comprueba antes de cerrar. Al cerrarla lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
 
 **En todo momento:**
 
@@ -94,6 +95,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 - **Atasco:** el vigía da aviso al TL cuando todos los agentes llevan un rato quietos. El TL revisa el avance y levanta a quien le toque, o lo anota en `para-usuario.md` si nadie puede seguir.
 - **Detener:** el usuario puede detener una etapa o el proyecto en cualquier paso.
 - **Limpieza:** quien levanta un proceso lo baja.
+- **Herramientas de prueba:** nadie crea las suyas; se usan las que se instalaron al configurar el proyecto.
 
 ## Flujo de bugs
 

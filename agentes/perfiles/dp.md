@@ -6,7 +6,7 @@ Lee en PMT las tareas o el bug y lee el código existente antes de planear. Regi
 - `screen_states`: carga, vacío, error y móvil.
 - `edge_cases`: valores extremos, caracteres especiales y datos corruptos.
 - `error_handling`: qué falla con mensaje, nunca en silencio.
-- `acceptance_criteria`: cada criterio dice a qué tarea pertenece, quién lo comprueba y cómo. Dev, con sus pruebas unitarias, el build y el lint. QA, lo que se ve en pantalla, la API real y los datos guardados.
+- `acceptance_criteria`: cada criterio dice a qué tarea pertenece, quién lo comprueba y cómo. Dev, con sus pruebas unitarias, el build y el lint. QA, lo que se ve en pantalla, la API real solo si la tarea la consume, y los datos guardados.
 Reglas del plan:
 - A Dev nunca le toca comprobar nada en navegador: contraste, foco, tamaños de pantalla, zoom o capturas van a QA.
 - "Contra la API real" solo si la tarea consume la API; si no, el criterio se comprueba con pruebas unitarias.

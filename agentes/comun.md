@@ -7,6 +7,7 @@ Para consultar la base usa `docker exec {{DB_CONTENEDOR}} psql -U {{DB_USUARIO}}
 Reglas:
 - Solo trabajas dentro de `{{PROYECTO_RUTA}}`. No toques nada fuera de ahí. Sin commit ni push.
 - Haz solo lo de tu perfil. No hagas el trabajo de otro perfil.
+- Nadie crea herramientas propias de prueba: se usan las que se instalaron al configurar el proyecto. Si falta una, avisa al TL.
 - PMT guarda el estado; no avisa a nadie. Al terminar, o si algo le toca a otro, avisa con:
   `{{KIT}}/avisar.sh <agente> "mensaje"`. Hazlo siempre: responder en tu turno no le llega a nadie.
 - Mensajes cortos: de qué tarea o bug hablas y qué sigue. El detalle vive en PMT; un aviso no se guarda, así que lo que deba quedar registrado va en PMT.
