@@ -10,7 +10,7 @@ L="${*:-$TODOS}"
 for A in $L; do
   case " $TODOS " in *" $A "*) ;; *) echo "agente desconocido: $A" >&2; exit 1;; esac
   case "$(herramienta "$A")" in
-    claude|codex|mcode) ;;
+    claude|codex|mcode|qwen) ;;
     *) echo "herramienta inválida para $A: $(herramienta "$A")" >&2; exit 1;;
   esac
   [ -n "$(modelo "$A")" ] || { echo "falta el modelo de $A" >&2; exit 1; }
@@ -82,6 +82,17 @@ cat > "$AGENTES_DIR/mcp.json" <<JSON
 JSON
 # mcode lo toma de .mcp.json en la raíz del proyecto.
 [ -e "$PROYECTO_RUTA/.mcp.json" ] || cp "$AGENTES_DIR/mcp.json" "$PROYECTO_RUTA/.mcp.json"
+# Qwen lo toma de .qwen/settings.json del proyecto; se agrega pmt sin tocar lo demás. El token sale del entorno.
+python3 - "$PROYECTO_RUTA/.qwen/settings.json" "$PMT_URL" <<'PY'
+import json,os,sys
+p,url=sys.argv[1],sys.argv[2]
+os.makedirs(os.path.dirname(p),exist_ok=True)
+d=json.load(open(p)) if os.path.exists(p) else {}
+d.setdefault('mcpServers',{})['pmt']={'httpUrl':url,'headers':{'Authorization':'Bearer $PMT_TOKEN'}}
+# Herdr sabe si Qwen trabaja por el estado en el título de la terminal.
+d.setdefault('ui',{})['showStatusInTitle']=True
+json.dump(d,open(p,'w'),indent=2)
+PY
 
 # Perfil final: rol + comun.md con los datos del proyecto, para los nueve.
 export KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCRIPCION DB_URL DB_CONSULTA PUERTO_BACKEND PUERTO_FRONTEND

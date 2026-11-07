@@ -52,7 +52,7 @@ lanzar() { "$HERDR" pane run "$1" "AGENTES_ENV=$AGENTES_ENV $KIT/lanzar.sh $2" >
 relanzar() {
   local A=$1 P S
   P=$(pane "$A")
-  case "$(herramienta "$A")" in codex) S=/quit;; *) S=/exit;; esac
+  case "$(herramienta "$A")" in codex|qwen) S=/quit;; *) S=/exit;; esac
   "$HERDR" pane send-keys "$P" ctrl+u >/dev/null
   "$HERDR" pane run "$P" "$S" >/dev/null
   espera_shell "$P" || { echo "$A no cerró" >&2; return 1; }

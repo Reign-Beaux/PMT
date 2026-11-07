@@ -26,5 +26,16 @@ case "$H" in
       -c "mcp_servers.pmt.url=\"$PMT_URL\"" -c "projects.\"$PROYECTO_RUTA\".trust_level=\"trusted\"" ;;
   mcode)
     exec mcode --model "$M" --append-system-prompt-file "$F" ;;
+  qwen)
+    # El MCP sale de .qwen/settings.json del proyecto, que genera iniciar.sh. Qwen pide aprobar
+    # el servidor y la aprobación queda ligada a su configuración: se aprueba en cada arranque.
+    # El effort no se pasa por línea de comandos: lo fija la configuración del modelo en ~/.qwen.
+    # Herdr reconoce a Qwen por el nombre del proceso, y el lanzador de Qwen termina en node:
+    # se arranca node desde un enlace llamado qwen. QWEN_RAIZ es la instalación de Qwen Code.
+    R="${QWEN_RAIZ:-$HOME/.local/lib/qwen-code}"
+    mkdir -p "$AGENTES_DIR/bin" && ln -sf "$R/node/bin/node" "$AGENTES_DIR/bin/qwen"
+    "$R/bin/qwen" mcp approve pmt >/dev/null 2>&1
+    export QWEN_CODE_LAUNCHER_PATH="$R/bin/qwen"
+    exec "$AGENTES_DIR/bin/qwen" "$R/lib/cli-entry.js" --yolo --model "$M" --append-system-prompt "$(cat "$F")" ;;
   *) echo "herramienta desconocida para $A: $H" >&2; exit 1 ;;
 esac

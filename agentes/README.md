@@ -1,6 +1,6 @@
 # Kit de agentes
 
-Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herdr`, `pmt-server` corriendo, y `claude`, `codex` o `mcode` según lo que elijas. Corre desde un pane de herdr.
+Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herdr`, `pmt-server` corriendo, y `claude`, `codex`, `mcode` o `qwen` según lo que elijas. Corre desde un pane de herdr.
 
 ## Arrancar un proyecto
 
@@ -14,7 +14,7 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
    Repite con `PC`, `TL`, `DP`, `DevBackend`, `DevFrontend`, `CR`, `QAP` y `QA`.
 
-2. **Configuración.** Copia `agentes.env.example` a `.agentes.env` en la raíz del proyecto y ajústalo. Añade `.agentes.env` y `.agentes/` al `.gitignore` del proyecto: la cadena de base de datos queda ahí.
+2. **Configuración.** Copia `agentes.env.example` a `.agentes.env` en la raíz del proyecto y ajústalo. Añade `.agentes.env`, `.agentes/` y `.qwen/` al `.gitignore` del proyecto: la cadena de base de datos queda ahí.
 
 3. **Effort de mcode.** Es global: se fija en `defaultModelThinking.effort` de `~/.minimax/config.yaml`. `iniciar.sh` avisa si difiere del `.env`.
 
@@ -37,13 +37,15 @@ Toman la configuración de `AGENTES_ENV`, que los agentes heredan, o del `.agent
 | Script | Qué hace |
 | --- | --- |
 | `avisar.sh <agente> "mensaje"` | Envía un aviso y confirma que llegó. Reintenta una vez sin duplicarlo; si no se confirma, deja una línea en `para-usuario.md` y sale con error. Tarda segundos, unos 10 como máximo |
-| `reiniciar.sh <agente>` | Sesión vacía: `/new` en Claude y mcode, relanzar en Codex |
+| `reiniciar.sh <agente>` | Sesión vacía: `/new` en Claude y mcode, relanzar en Codex y Qwen |
 | `levantar.sh <agente> "encargo"` | Reinicia y da el encargo |
 | `relanzar-dp.sh <medium\|high>` | Relanza a DP; el effort se conserva al reiniciar |
 | `relanzar-mcode.sh <agente\|todos>` | Relanza mcode para que lea su configuración |
 | `vigia.sh` | Avisa al TL si todos llevan un rato quietos |
 
 Los avisos van a los agentes de este proyecto por su pane. `HERDR_PREFIJO` solo evita choques de nombre si hay otro equipo vivo.
+
+Qwen toma el MCP de `.qwen/settings.json` del proyecto, que `iniciar.sh` genera con el token desde `$PMT_TOKEN`; `lanzar.sh` aprueba el servidor en cada arranque. Herdr reconoce a Qwen por el nombre del proceso: `lanzar.sh` arranca su `node` desde un enlace llamado `qwen`, con la instalación en `QWEN_RAIZ` (por omisión `~/.local/lib/qwen-code`). Su effort no se pasa por línea de comandos: lo fija la configuración del modelo en `~/.qwen/settings.json`.
 
 Codex usa `~/.codex-flow`, porque `~/.codex` tiene un `pmt` de la v3. Debe tener `[mcp_servers.pmt]` con `bearer_token_env_var = "PMT_TOKEN"`. `lanzar.sh` usa `allow_login_shell=false`, porque el shell de login no carga `nvm` y Codex no vería `node` ni `pnpm`.
 

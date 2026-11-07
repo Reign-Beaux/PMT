@@ -53,7 +53,8 @@ if "Failed" in ti: ocupado=False
 norm=lambda s:" ".join(s.split())
 m=norm(sys.argv[2]); frag,cola=m[:24],m[-24:]
 L=[norm(l) for l in sys.stdin.read().splitlines()]
-c=[i for i,l in enumerate(L) if re.match(r"[›❯]( |$)",l)]
+# Qwen muestra * o > como prompt del compositor.
+c=[i for i,l in enumerate(L) if re.match(r"[›❯*>]( |$)",l)]
 c=c[-1] if c else None
 if c is None: print("nada",int(ocupado),-1); sys.exit()
 abajo=" ".join(L[c:])
