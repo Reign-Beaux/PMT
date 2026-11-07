@@ -28,7 +28,7 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
 5. **PP.** Abre su pestaña en herdr y descríbele el proyecto. Con tu visto bueno libera y levanta al TL con la etapa 1. Se trabaja una etapa por vez: cada etapa siguiente la levantas tú, o PP si se lo pides.
 
-6. **Vigía (opcional).** Desde la raíz del proyecto, en una pestaña aparte: `/ruta/a/agentes/vigia.sh`.
+6. **Vigía.** Arranca solo cada vez que se levanta al TL y termina cuando alguien anota en `para-usuario.md`, como el TL al cerrar su etapa. Su bitácora queda en `.agentes/vigia.log`. Si hace falta, lánzalo a mano desde la raíz del proyecto: `/ruta/a/agentes/vigia.sh`.
 
 ## Scripts
 

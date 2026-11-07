@@ -94,12 +94,19 @@ Completa la tabla del flujo con quién actúa y cuándo.
 - **Avance:** se revisa siempre con `get_project_progress`, nunca solo proyecto y etapas. Sus `signals` son hechos que apuntan a un atasco: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
 - **Atasco:** el vigía da aviso al TL cuando todos los agentes llevan un rato quietos. El TL revisa el avance y levanta a quien le toque, o lo anota en `para-usuario.md` si nadie puede seguir.
 - **Detener:** el usuario puede detener una etapa o el proyecto en cualquier paso; el TL, solo su etapa.
-- **Limpieza:** quien levanta un proceso lo baja.
+- **Limpieza:** quien levanta un proceso lo baja antes de avisar. El aviso es lo último del turno.
 - **Herramientas de prueba:** nadie crea las suyas; se usan las que se instalaron al configurar el proyecto.
+
+## Fallos durante el desarrollo
+
+Un fallo hallado mientras se desarrolla no es un bug. Quien lo detecta avisa al TL:
+
+- **Dentro de su etapa:** el TL lo resuelve ahí, por ejemplo devolviendo la tarea con un hallazgo.
+- **Fuera de su etapa:** el TL se lo pasa a PP, que lo agrega con `add_task` en la etapa a la que pertenece ese trabajo, o con `revise_task` si esa tarea aún no está en `done`. Siempre con motivo: nada se edita, queda en el historial.
 
 ## Flujo de bugs
 
-Un bug solo se registra con el proyecto en `working`. Nadie espera otra orden: PP y cada perfil avisan al TL, y él levanta al siguiente con sesión nueva.
+Un bug solo se registra con el proyecto en `working`, por un fallo hallado en pruebas de rutina o en el uso del sistema. Nadie espera otra orden: PP y cada perfil avisan al TL, y él levanta al siguiente con sesión nueva.
 
 | Paso | Quién | Qué hace | El TL levanta a |
 | --- | --- | --- | --- |

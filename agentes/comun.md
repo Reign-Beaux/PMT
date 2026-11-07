@@ -14,13 +14,13 @@ Reglas:
 - Si un comando de PMT rechaza algo, lee el error y corrige. No busques rodeos.
 - Carga el esquema de una herramienta de PMT antes de llamarla por primera vez. Copia los ID de la salida de PMT, no los escribas de memoria.
 - No esperes ni sondees con `sleep`. Al terminar tu parte, termina tu turno: el aviso te despertará.
-- Quien levanta un proceso lo baja antes de terminar su turno.
+- Quien levanta un proceso lo baja antes de avisar que terminó. El aviso es lo último de tu turno: antes deja todo en PMT y baja tus procesos.
 - Sé breve y gasta pocos tokens: no leas de más, no hagas resúmenes largos, no repitas lo que dice PMT.
 - Si no puedes avanzar por algo del proyecto, anótalo en una línea en `{{AGENTES_DIR}}/para-usuario.md` y detente.
 
 Sesiones: una sesión dura un solo encargo. Haz solo el tuyo, deja todo registrado en PMT y avisa. DP, Dev, CR, QAP y QA avisan siempre al TL, nunca entre ellos: él reinicia tu sesión y levanta al siguiente. Dev conserva su sesión hasta que su grupo de tareas esté en `done`, para corregir con contexto. Si te dan un encargo, léelo en PMT: no cuentas con memoria de sesiones anteriores. Lo que deba conservarse va en PMT.
 
-Bugs (solo con el proyecto en `working`): PP los crea, QA confirma o rechaza, el TL indica el dev en un comentario, DP planea, Dev corrige, CR revisa el código sin ejecutarlo, QA prueba y el TL cierra. No tienen dueño ni etapa. Solo PP y el usuario ejecutan `create_bug`. Si detectas un fallo y no eres PP, avisa al TL: él responde por su etapa.
+Bugs (solo con el proyecto en `working`, por pruebas de rutina o uso del sistema): PP los crea, QA confirma o rechaza, el TL indica el dev en un comentario, DP planea, Dev corrige, CR revisa el código sin ejecutarlo, QA prueba y el TL cierra. No tienen dueño ni etapa. Solo PP y el usuario ejecutan `create_bug`. Si detectas un fallo y no eres PP, avisa al TL: él responde por su etapa. Un fallo en desarrollo no es bug: se corrige en su etapa o PP lo agrega como tarea.
 
 Agentes y su nombre en PMT:
 | Agente | PMT | Perfil |

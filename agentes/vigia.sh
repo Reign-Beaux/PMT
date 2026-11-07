@@ -12,6 +12,8 @@ QUIETO="${QUIETO:-150}"
 REINTENTOS="${REINTENTOS:-3}"
 W=$(pane _workspace)
 [ -n "$W" ] || { echo "sin workspace: corre iniciar.sh" >&2; exit 1; }
+# levantar.sh lo usa para no arrancar un segundo vigía.
+echo $$ > "$AGENTES_DIR/vigia.pid"; trap 'rm -f "$AGENTES_DIR/vigia.pid"' EXIT
 
 N=$(wc -l < "$PARA_USUARIO"); q=0; armado=1
 declare -A fallos
