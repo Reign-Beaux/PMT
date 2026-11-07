@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"pmt/internal/features/projects/domain"
+	"pmt/internal/kernel"
 )
 
 type fakeRepo struct {
@@ -23,7 +24,7 @@ func (r *fakeRepo) Create(_ context.Context, p domain.Project) (domain.Project, 
 func TestHandleCreatesProject(t *testing.T) {
 	repo := &fakeRepo{}
 
-	result, err := New(repo).Handle(context.Background(), Command{Name: " PMT ", Description: "Gestor"})
+	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Name: " PMT ", Description: "Gestor"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +35,7 @@ func TestHandleCreatesProject(t *testing.T) {
 }
 
 func TestHandleStartsInPlanningWithoutProductVersion(t *testing.T) {
-	result, err := New(&fakeRepo{}).Handle(context.Background(), Command{Name: "PMT"})
+	result, err := New(&fakeRepo{}).Handle(context.Background(), Command{Actor: kernel.Owner, Name: "PMT"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +48,7 @@ func TestHandleStartsInPlanningWithoutProductVersion(t *testing.T) {
 func TestHandleRejectsInvalidProject(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo).Handle(context.Background(), Command{Name: " "})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Name: " "})
 
 	if !errors.Is(err, domain.ErrProjectNameRequired) {
 		t.Fatalf("err = %v", err)

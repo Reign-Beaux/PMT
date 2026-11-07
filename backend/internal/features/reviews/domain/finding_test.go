@@ -94,3 +94,26 @@ func TestNeedsStageLead(t *testing.T) {
 		t.Error("solo descartar en una tarea exige ser el TL de la etapa")
 	}
 }
+
+func TestEnsureCanCloseWithoutReadingFinding(t *testing.T) {
+	pc := kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}
+	tests := []struct {
+		name       string
+		resolution Status
+		actor      kernel.Actor
+		want       error
+	}{
+		{"CR corrige", StatusFixed, kernel.Actor{Name: "cr", Profile: kernel.ProfileCR}, nil},
+		{"TL descarta", StatusDismissed, kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}, nil},
+		{"PC corrige", StatusFixed, pc, ErrFixForbidden},
+		{"PC descarta", StatusDismissed, pc, ErrDismissForbidden},
+		{"resolución desconocida", "open", pc, ErrResolutionInvalid},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := EnsureCanClose(tt.resolution, tt.actor); !errors.Is(err, tt.want) {
+				t.Errorf("err = %v, quiero %v", err, tt.want)
+			}
+		})
+	}
+}

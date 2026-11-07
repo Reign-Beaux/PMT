@@ -35,13 +35,14 @@ func (h *Handler) RegisterTool(server *sdk.Server) {
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
 	id, err := uuid.Parse(input.TaskID)
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("task_id inválido"))
 	}
 
 	result, err := h.Handle(ctx, Command{
+		Actor:       platformmcp.ActorFrom(req),
 		ID:          id,
 		Title:       input.Title,
 		Description: input.Description,

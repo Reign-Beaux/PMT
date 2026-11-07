@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -34,7 +35,10 @@ func New(repo Repository, stages StageChecker) *Handler {
 }
 
 // Handle elimina la tarea.
-func (h *Handler) Handle(ctx context.Context, id uuid.UUID) error {
+func (h *Handler) Handle(ctx context.Context, id uuid.UUID, actor kernel.Actor) error {
+	if err := domain.EnsureCanPlan(actor); err != nil {
+		return err
+	}
 	t, err := h.repo.Get(ctx, id)
 	if err != nil {
 		return err

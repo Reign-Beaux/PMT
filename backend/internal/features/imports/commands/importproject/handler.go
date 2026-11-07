@@ -11,6 +11,7 @@ import (
 	"pmt/internal/features/imports/file"
 	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -21,6 +22,8 @@ type Repository interface {
 // Command contiene los datos de entrada.
 type Command struct {
 	Path string
+
+	Actor kernel.Actor
 }
 
 // Result resume lo creado.
@@ -43,6 +46,9 @@ func New(repo Repository) *Handler {
 
 // Handle valida el fichero completo y después guarda todo como una unidad.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanImport(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	entry, err := file.ReadProject(cmd.Path)
 	if err != nil {
 		return Result{}, err

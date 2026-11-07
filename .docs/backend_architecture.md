@@ -266,10 +266,27 @@ Ninguna otra feature importa `imports`, así que no hay ciclos. El formato del f
 - Cada agente tiene su propio token, que determina su `Actor`: agente y perfil.
 - El usuario humano también es un `Actor`, con su propio token y el perfil `User`.
 - El `Actor` se pasa explícitamente a cada handler, en el `Command`. Nunca es argumento de una herramienta ni del cuerpo REST.
-- Cada agente recibe por MCP solo las herramientas de su perfil, lo que además reduce su contexto.
+- Cada agente recibe por MCP solo las herramientas de su perfil, lo que además reduce su contexto. Ese filtrado sigue pendiente: hoy todos reciben la lista completa.
 - Ese filtrado no sustituye la autorización: la validación real ocurre siempre en `domain` o en el handler.
 
 Las responsabilidades de cada perfil están definidas en `perfiles.md`.
+
+### Permisos de escritura
+
+Todo comando de escritura exige perfil, por MCP y por REST, porque ambos llaman al mismo handler. Un perfil sin permiso recibe `kernel.Forbidden` antes de leer o escribir en la base. Las transiciones, la asignación, los bugs, los hallazgos, los planes y los comentarios tienen su tabla en su sección. La planeación es de PP y `User`:
+
+| Comando MCP | Quién |
+| --- | --- |
+| `create_project`, `update_project`, `delete_project` | PP, `User` |
+| `create_stage`, `update_stage`, `delete_stage`, `add_stage`, `retire_stage` | PP, `User` |
+| `revise_stage` | PP, `User` y el TL de la etapa, que la revisa para fijar el contrato |
+| `create_task`, `update_task`, `delete_task`, `add_task`, `revise_task`, `retire_task` | PP, `User` |
+| `import_project`, `import_stage` | PP, `User` |
+
+- **Dónde:** `EnsureCanPlan` en `projects`, `stages` y `tasks/domain`, y `EnsureCanImport` en `imports/domain`, al inicio del handler. `kernel.Profile.IsPlanner` dice si el perfil es PP o `User`.
+- **`revise_stage`:** `EnsureCanRevise` rechaza, antes de leer, a quien no es PP, `User` ni TL. Con la etapa leída, `Stage.EnsureReviser` exige que el TL sea el de la etapa; otro TL recibe `no eres el TL de la etapa`.
+- **Antes de leer:** un comando que depende del elemento, como un cambio de status o una decisión del TL, primero descarta al perfil que nunca podría hacerlo: `EnsureCanChangeStatus` en `projects`, `stages`, `tasks` y `bugs/domain`, con `kernel.HasAnyTransition`, rechaza al perfil sin ninguna transición en la tabla, como PC. `EnsureLeadProfile`, `EnsureQAP`, `EnsureTL` y `reviews.EnsureCanClose` hacen lo mismo en su feature. Los demás perfiles siguen el orden de validación de su sección.
+- **Prueba:** `TestWriteToolsRejectPC`, en `internal/app`, recorre toda herramienta registrada que no empiece con `list_` ni `get_` y exige que rechace a PC con `forbidden:` sin tocar la base: corre con el pool nulo, así que una herramienta que llegue a ella falla la prueba. Una herramienta nueva que solo lea debe seguir esa convención de nombre.
 
 ### Tokens
 
@@ -307,7 +324,7 @@ Todo proyecto nace en `planning`. `in_dev` significa que se desarrolla la primer
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `projects/commands/changestatus`, no con `PUT /api/projects/{id}`.
 
-**Perfiles:** PP y `User` hacen todas las transiciones. PC solo detiene y reanuda. Detener, cancelar y reabrir exigen motivo.
+**Perfiles:** PP y `User` hacen todas las transiciones. PC no mueve proyectos: solo lee. Detener, cancelar y reabrir exigen motivo.
 
 Cambiar el status depende de las etapas; ver [Reglas entre status](#reglas-entre-status).
 
@@ -335,7 +352,7 @@ Toda etapa nace en `planning`. Una tabla de transiciones en `stages/domain` defi
 
 Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida la del status a sí mismo, es `kernel.Conflict`. El status solo cambia con la slice `stages/commands/changestatus`, no con `PUT /api/stages/{id}`.
 
-**Perfiles:** `stand_by → in_dev` e `in_dev → done` son del TL de la etapa; `done → in_dev`, de PP, `User` o ese TL, con motivo. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User`, PC y el TL detienen y reanudan. Detener, cancelar y reabrir exigen motivo.
+**Perfiles:** `stand_by → in_dev` e `in_dev → done` son del TL de la etapa; `done → in_dev`, de PP, `User` o ese TL, con motivo. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User` y el TL detienen y reanudan; PC no mueve etapas. Detener, cancelar y reabrir exigen motivo.
 
 **Regla de cierre:** una etapa solo pasa a `done` si todas sus tareas activas están en `done` o `cancelled`, con al menos una en `done`; si no, la operación responde `kernel.Conflict`. Una etapa vacía o toda cancelada no cierra: se cancela. Reabrirla (`done` → `in_dev`) no consulta las tareas, pero cumple la regla 5. Como `stages` no importa `tasks`, la slice define la interfaz `changestatus.TaskChecker`, que implementa `tasks.Checker.EnsureClosable` sobre el recuento de `tasks/queries/checkdone`, conectada en `registerFeatures`. Todo paso a `done` o `cancelled` pasa por `CloseStage`, salvo la salida del planning propio; ver [movimientos automáticos](#estados-de-un-proyecto).
 
@@ -373,7 +390,7 @@ Un valor desconocido es `kernel.Invalid`. Una transición no permitida, incluida
 
 Cambiar el status depende del proyecto y de la etapa; ver [Reglas entre status](#reglas-entre-status). No es un cambio de contenido: no escribe en `task_changes`. Actualiza `status` y `updated_at`, deja su registro en el [historial de status](#historial-de-status) y devuelve la última versión. Una tarea retirada responde `NotFound`.
 
-**Perfiles:** cada transición exige un perfil, en `domain/permissions.go`. Una prueba exige que toda transición tenga perfiles. `User` tiene lo de PP y PC; Dev es DevFrontend o DevBackend.
+**Perfiles:** cada transición exige un perfil, en `domain/permissions.go`. Una prueba exige que toda transición tenga perfiles. `User` tiene lo de PP; PC no hace ninguna transición. Dev es DevFrontend o DevBackend.
 
 | Desde | Acción | Perfil | Hacia |
 | --- | --- | --- | --- |
@@ -391,7 +408,7 @@ Cambiar el status depende del proyecto y de la etapa; ver [Reglas entre status](
 | cualquiera menos `done` | Cancelar, con motivo | TL, PP, `User` | `cancelled` |
 | `cancelled` | Reabrir, con motivo | TL, PP, `User` | `backlog` |
 
-La validación sigue este orden: status conocido, transición, perfil, ámbito, motivo y reglas entre status. El perfil responde `kernel.Forbidden` antes de consultar otra feature. Solo espacios cuenta como motivo vacío.
+La validación sigue este orden, después de descartar a un perfil sin ninguna transición, como PC: status conocido, transición, perfil, ámbito, motivo y reglas entre status. El perfil responde `kernel.Forbidden` antes de consultar otra feature. Solo espacios cuenta como motivo vacío.
 
 **Criterio de QA:** un cambio pasa por QA si altera algo observable desde fuera. Si es interno, CR lo lleva a `pending_close` con motivo. El TL decide si lo devuelve a CR o a QA, sin importar por dónde llegó; CR o QA deciden después si va a `changes_requested`.
 
@@ -410,7 +427,7 @@ Cada etapa tiene un TL responsable y un equipo de devs. `stages.lead`, `stage_me
 
 - **Tomar no es un comando:** `ready → in_dev` deja `assignee` con el nombre del dev, que debe ser del equipo. Después solo ese dev la mueve. `cancelled → backlog` lo limpia.
 - Un dev puede tener varias tareas sin límite fijo. CR, QA, QAP y DP actúan por perfil.
-- Un TL solo actúa sobre su etapa y sus tareas. PP, PC y `User` no tienen ámbito.
+- Un TL solo actúa sobre su etapa y sus tareas. PP y `User` no tienen ámbito. PC no escribe, así que no lo necesita.
 - Solo se asignan agentes activos. Lo ya asignado a un agente revocado no cambia: PP o el TL lo reasignan.
 - Las cuatro operaciones aplican en cualquier status y en el planning propio, porque no son cambios de contenido. Lo retirado responde `NotFound`. `stage_members` se borra en cascada con la etapa, para no impedir `delete_stage`.
 - `import_*` crea sin TL, sin equipo y sin dueño.
@@ -614,7 +631,7 @@ Un comentario deja constancia de una decisión que no es una transición, o de u
 
 | Comando MCP | REST | Quién | Efecto |
 | --- | --- | --- | --- |
-| `add_comment` | `POST /api/comments` | Todos, incluido `User` | Registra el comentario sobre un `project`, `stage`, `task` o `bug`. El elemento debe existir, sin retirar |
+| `add_comment` | `POST /api/comments` | Todos menos PC, incluido `User` | Registra el comentario sobre un `project`, `stage`, `task` o `bug`. El elemento debe existir, sin retirar. PC recibe `kernel.Forbidden` antes de consultar el elemento |
 | `list_comments` | `GET /api/comments?item_kind=&item_id=` | Todos | Por fecha, de un elemento |
 
 - **Actor:** sale del token, con una copia de nombre y perfil, como en el [historial de status](#historial-de-status).
@@ -711,8 +728,8 @@ La operación es la slice `tasks/commands/changestatusbatch/`, `change_tasks_sta
 Este documento describe el destino de la arquitectura. Hoy existe lo siguiente:
 
 - **Implementado:** el historial de status, `Actor`, la feature `agents` con sus tokens, la autenticación de `/api/` y `/mcp`, los perfiles de todas las transiciones, la asignación de etapas y tareas, las reglas entre status, los lotes y la feature `workflow`; configuración, conexión a PostgreSQL, servidor REST, servidor MCP en `/mcp`, errores de negocio, la feature `projects` con su CRUD por REST, su `status` con tabla de transiciones, su `product_version` y las herramientas MCP `create_project`, `list_projects`, `update_project`, `delete_project` y `change_project_status`, la feature `stages` con su CRUD por REST, su `status` con tabla de transiciones y regla de cierre, y las herramientas MCP `create_stage`, `list_stages`, `update_stage`, `delete_stage` y `change_stage_status`, y la feature `tasks` con su CRUD por REST, su `status` con tabla de transiciones y las herramientas MCP `create_task`, `list_tasks`, `update_task`, `delete_task` y `change_task_status`, la feature `imports` con las herramientas MCP `import_project` e `import_stage`, y la feature `bugs` con su REST y las herramientas MCP `create_bug`, `update_bug`, `change_bug_status` y `list_bugs`, con `status` y tabla de transiciones, la feature `reviews` con sus hallazgos, su REST y las herramientas MCP `create_finding`, `close_finding` y `list_findings`, y la feature `qa` con sus planes, su REST y las herramientas MCP `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans` y `list_test_plan_versions`, la feature `devplans` con sus planes de desarrollo, su REST y las herramientas MCP `create_dev_plan`, `revise_dev_plan`, `list_dev_plans` y `list_dev_plan_versions`, `get_project_progress`, y la feature `activity` con sus comentarios, su REST y las herramientas MCP `add_comment` y `list_comments`. Crear, editar y eliminar etapas y tareas, y eliminar proyectos, exige que el proyecto esté en `planning`; fuera de esa fase, etapas y tareas cambian con `add_*`, `revise_*` y `retire_*`, con historial en `list_stage_changes` y `list_task_changes`, salvo las etapas en su planning propio.
-- **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features.
-- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción, y solo los de status y asignación, `create_bug` y `update_bug` tienen autorización. Deben incorporarlas cuando exista la auditoría de `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
+- **Pendiente:** `Transactor`, auditoría, filtrado de herramientas por perfil y las demás features. El filtrado solo reduciría la lista: la autorización ya cubre todo comando de escritura; ver [Permisos de escritura](#permisos-de-escritura).
+- **Excepción temporal:** los commands de `projects`, `stages`, `tasks` y `bugs` no tienen auditoría ni, salvo los de cambios y de status, transacción. Deben incorporarlas cuando exista la auditoría de `activity`. Hasta entonces, el servidor escucha por defecto solo en `127.0.0.1` y no debe exponerse fuera de la máquina local.
 
 ## Orden de construcción
 

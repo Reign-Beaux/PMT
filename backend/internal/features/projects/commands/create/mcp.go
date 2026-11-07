@@ -31,8 +31,8 @@ func (h *Handler) RegisterTool(server *sdk.Server) {
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
-	result, err := h.Handle(ctx, Command(input))
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+	result, err := h.Handle(ctx, Command{Name: input.Name, Description: input.Description, Actor: platformmcp.ActorFrom(req)})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}

@@ -63,3 +63,22 @@ var ErrUnauthenticated = errors.New("token inválido")
 type Authenticator interface {
 	Authenticate(ctx context.Context, token string) (Actor, error)
 }
+
+// IsPlanner indica si el perfil planea: PP o el usuario, que tiene lo de PP.
+func (p Profile) IsPlanner() bool {
+	return p == ProfilePP || p == ProfileUser
+}
+
+// HasAnyTransition indica si el perfil hace alguna transición de la tabla. Sirve
+// para rechazar, antes de leer el elemento, a un perfil que nunca mueve status; el
+// resto sigue el orden normal: status, transición, perfil y ámbito.
+func HasAnyTransition[S comparable](table map[S]map[S][]Profile, profile Profile) bool {
+	for _, targets := range table {
+		for _, profiles := range targets {
+			if slices.Contains(profiles, profile) {
+				return true
+			}
+		}
+	}
+	return false
+}

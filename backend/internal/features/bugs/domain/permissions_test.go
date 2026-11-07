@@ -70,3 +70,18 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureCanChangeStatusRejectsPC(t *testing.T) {
+	if err := EnsureCanChangeStatus(kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}); !errors.Is(err, kernel.ErrTransitionForbidden) {
+		t.Errorf("PC: err = %v", err)
+	}
+	for _, targets := range statusProfiles {
+		for _, profiles := range targets {
+			for _, p := range profiles {
+				if err := EnsureCanChangeStatus(kernel.Actor{Name: "agente", Profile: p}); err != nil {
+					t.Errorf("%s: err = %v", p, err)
+				}
+			}
+		}
+	}
+}

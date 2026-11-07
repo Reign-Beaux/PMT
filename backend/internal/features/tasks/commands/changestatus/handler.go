@@ -59,6 +59,9 @@ func New(repo Repository, stages StageChecker) *Handler {
 // Handle cambia el status de la tarea si su etapa y su proyecto lo permiten. Una
 // tarea retirada no se encuentra.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	task, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

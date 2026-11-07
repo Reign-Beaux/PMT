@@ -67,6 +67,9 @@ func New(repo Repository, stages StageChecker) *Handler {
 // que change_task_status y puede tener otro origen. El error conserva su tipo y
 // nombra la tarea.
 func (h *Handler) Handle(ctx context.Context, cmd Command) ([]Item, error) {
+	if err := domain.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return nil, err
+	}
 	if err := ensureIDs(cmd.TaskIDs); err != nil {
 		return nil, err
 	}

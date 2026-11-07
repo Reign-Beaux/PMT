@@ -61,3 +61,12 @@ func ensureReason(from, to Status, reason string) error {
 	}
 	return nil
 }
+
+// EnsureCanChangeStatus rechaza, antes de leer, a un perfil que no mueve ningún bug,
+// como PC, que solo lee.
+func EnsureCanChangeStatus(actor kernel.Actor) error {
+	if !kernel.HasAnyTransition(statusProfiles, actor.Profile) {
+		return kernel.ErrTransitionForbidden
+	}
+	return nil
+}

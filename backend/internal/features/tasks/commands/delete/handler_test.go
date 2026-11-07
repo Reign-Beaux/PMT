@@ -49,7 +49,7 @@ func TestHandleDeletesInPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	if err := New(repo, fakeStages{}).Handle(context.Background(), id); err != nil {
+	if err := New(repo, fakeStages{}).Handle(context.Background(), id, kernel.Owner); err != nil {
 		t.Fatal(err)
 	}
 	if !repo.deleted {
@@ -61,7 +61,7 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), id)
+	err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), id, kernel.Owner)
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)
@@ -75,7 +75,7 @@ func TestHandleRejectsElementWithChanges(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, hasChanges: true}
 
-	err := New(repo, fakeStages{}).Handle(context.Background(), id)
+	err := New(repo, fakeStages{}).Handle(context.Background(), id, kernel.Owner)
 
 	if !errors.Is(err, domain.ErrTaskHasChanges) {
 		t.Fatalf("err = %v", err)

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/projects/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -26,7 +27,10 @@ func New(repo Repository) *Handler {
 }
 
 // Handle elimina el proyecto.
-func (h *Handler) Handle(ctx context.Context, id uuid.UUID) error {
+func (h *Handler) Handle(ctx context.Context, id uuid.UUID, actor kernel.Actor) error {
+	if err := domain.EnsureCanPlan(actor); err != nil {
+		return err
+	}
 	p, err := h.repo.Get(ctx, id)
 	if err != nil {
 		return err

@@ -69,6 +69,9 @@ func New(repo Repository, tasks TaskChecker, stages StageChecker) *Handler {
 // Handle cierra el hallazgo. Valida resolución, que siga abierto, perfil, ámbito y
 // motivo, en ese orden. El ámbito solo se consulta si el perfil ya pasó.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanClose(cmd.Resolution, cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	f, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

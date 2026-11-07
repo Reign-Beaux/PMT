@@ -18,6 +18,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cmd.Actor = rest.ActorFrom(r.Context())
 	result, err := h.Handle(r.Context(), cmd)
 	if err != nil {
 		rest.WriteError(w, err)

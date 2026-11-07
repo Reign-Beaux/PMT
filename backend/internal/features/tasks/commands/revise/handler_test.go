@@ -56,7 +56,8 @@ func TestHandleSavesNewVersion(t *testing.T) {
 	repo := newRepo()
 
 	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{
-		ID: repo.current.ID, Title: "Crear login con Google", Reason: "Incongruencia", RequestedBy: "PM",
+		Actor: kernel.Owner,
+		ID:    repo.current.ID, Title: "Crear login con Google", Reason: "Incongruencia", RequestedBy: "PM",
 	})
 
 	if err != nil {
@@ -76,9 +77,9 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin title", Command{Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
-		{"sin motivo", Command{Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"sin title", Command{Actor: kernel.Owner, Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
+		{"sin motivo", Command{Actor: kernel.Owner, Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Owner, Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
 	}
 
 	for _, tt := range tests {
@@ -101,7 +102,7 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 func TestHandleMissingOrRetired(t *testing.T) {
 	repo := newRepo()
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: uuid.New(), Title: "A", Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: uuid.New(), Title: "A", Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrTaskNotFound) {
 		t.Fatalf("err = %v", err)
@@ -144,7 +145,8 @@ func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
 	repo := newRepo()
 
 	_, err := New(repo, fakeStages{err: errOwnPlanning}).Handle(context.Background(), Command{
-		ID: repo.current.ID, Title: "A", Reason: "M", RequestedBy: "PM",
+		Actor: kernel.Owner,
+		ID:    repo.current.ID, Title: "A", Reason: "M", RequestedBy: "PM",
 	})
 
 	if !errors.Is(err, errOwnPlanning) || len(repo.changes) != 0 {

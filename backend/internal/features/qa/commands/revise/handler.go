@@ -53,6 +53,9 @@ func New(repo Repository, tasks TaskChecker) *Handler {
 // Handle valida con una copia, antes de consultar otra feature, y decide de nuevo
 // con lo leído tras bloquear.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureQAP(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	plan, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

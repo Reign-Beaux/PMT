@@ -62,7 +62,6 @@ func TestHandleAdds(t *testing.T) {
 	actors := []kernel.Actor{
 		tl,
 		kernel.Owner,
-		{Name: "pc", Profile: kernel.ProfilePC},
 		{Name: "dev", Profile: kernel.ProfileDevBackend},
 	}
 	for _, kind := range []domain.ItemKind{domain.ItemProject, domain.ItemStage, domain.ItemTask, domain.ItemBug} {
@@ -164,5 +163,24 @@ func TestRESTTakesActorFromToken(t *testing.T) {
 
 	if len(repo.created) != 1 || repo.created[0].ActorName != "tl" || repo.created[0].ActorProfile != kernel.ProfileTL {
 		t.Fatalf("creados = %+v, cuerpo = %s", repo.created, rec.Body)
+	}
+}
+
+func TestHandleRejectsPC(t *testing.T) {
+	id := uuid.New()
+	pc := kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}
+	for _, kind := range []domain.ItemKind{domain.ItemProject, domain.ItemStage, domain.ItemTask, domain.ItemBug} {
+		t.Run(string(kind), func(t *testing.T) {
+			repo := &fakeRepo{}
+
+			_, err := newHandler(repo, id).Handle(context.Background(), Command{ItemKind: kind, ItemID: id, Body: "Texto", Actor: pc})
+
+			if !errors.Is(err, domain.ErrCommentForbidden) {
+				t.Errorf("error = %v", err)
+			}
+			if len(repo.created) != 0 {
+				t.Errorf("creados = %d", len(repo.created))
+			}
+		})
 	}
 }

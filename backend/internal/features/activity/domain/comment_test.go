@@ -43,3 +43,10 @@ func TestNewCommentRejects(t *testing.T) {
 		})
 	}
 }
+
+func TestNewCommentRejectsPC(t *testing.T) {
+	_, err := NewComment(ItemStage, uuid.New(), "Texto", kernel.Actor{Name: "pc", Profile: kernel.ProfilePC})
+	if !errors.Is(err, ErrCommentForbidden) {
+		t.Fatalf("error = %v", err)
+	}
+}

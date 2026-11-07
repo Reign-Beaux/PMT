@@ -40,6 +40,9 @@ func New(repo Repository) *Handler {
 
 // Handle envía el plan. Decide con lo leído tras bloquear.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureQAP(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	plan, err := h.repo.Decide(ctx, cmd.ID, func(p *domain.Plan) error {
 		return p.Submit(cmd.Actor)
 	})

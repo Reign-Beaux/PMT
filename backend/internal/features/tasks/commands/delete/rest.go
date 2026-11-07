@@ -18,7 +18,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Handle(r.Context(), id); err != nil {
+	if err := h.Handle(r.Context(), id, rest.ActorFrom(r.Context())); err != nil {
 		rest.WriteError(w, err)
 		return
 	}

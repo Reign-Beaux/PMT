@@ -41,7 +41,7 @@ func TestHandleCreatesStage(t *testing.T) {
 	repo := &fakeRepo{}
 	projectID := uuid.New()
 
-	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ProjectID: projectID, Name: " Diseño "})
+	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Owner, ProjectID: projectID, Name: " Diseño "})
 
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestHandleCreatesStage(t *testing.T) {
 func TestHandleRejectsInvalidStage(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{ProjectID: uuid.New(), Name: " "})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Owner, ProjectID: uuid.New(), Name: " "})
 
 	if !errors.Is(err, domain.ErrStageNameRequired) {
 		t.Fatalf("err = %v", err)
@@ -70,7 +70,7 @@ func TestHandleRejectsInvalidStage(t *testing.T) {
 func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{ProjectID: uuid.New(), Name: "Diseño"})
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, ProjectID: uuid.New(), Name: "Diseño"})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)

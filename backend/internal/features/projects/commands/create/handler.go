@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/projects/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -19,6 +20,8 @@ type Repository interface {
 type Command struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result es el proyecto creado.
@@ -44,6 +47,9 @@ func New(repo Repository) *Handler {
 
 // Handle crea el proyecto.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	p, err := domain.NewProject(cmd.Name, cmd.Description)
 	if err != nil {
 		return Result{}, err

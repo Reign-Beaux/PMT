@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -30,6 +31,8 @@ type Command struct {
 	Description string    `json:"description"`
 	Reason      string    `json:"reason"`
 	RequestedBy string    `json:"requested_by"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result es la etapa agregada y su versión, 0 mientras no tenga registro.
@@ -62,6 +65,9 @@ func New(repo Repository, projects ProjectChecker) *Handler {
 // Handle agrega la etapa. Con el proyecto en working pospone el registro hasta
 // que la etapa salga de su planning propio; si no, lo escribe de inmediato.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	working, err := h.projects.IsWorking(ctx, cmd.ProjectID)
 	if err != nil {
 		return Result{}, err

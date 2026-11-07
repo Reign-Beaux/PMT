@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -23,6 +24,8 @@ type Command struct {
 	Description string    `json:"description"`
 	Reason      string    `json:"reason"`
 	RequestedBy string    `json:"requested_by"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result es la última versión de la etapa.
@@ -50,8 +53,14 @@ func New(repo Repository) *Handler {
 
 // Handle registra el cambio con la nueva versión. La fila conserva el original.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanRevise(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	stage, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := stage.EnsureReviser(cmd.Actor); err != nil {
 		return Result{}, err
 	}
 	if err := stage.EnsureHistoryRule(); err != nil {

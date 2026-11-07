@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/projects/domain"
+	"pmt/internal/kernel"
 )
 
 type fakeRepo struct {
@@ -38,7 +39,7 @@ func TestHandleDeletesInPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, status: domain.StatusPlanning}
 
-	if err := New(repo).Handle(context.Background(), id); err != nil {
+	if err := New(repo).Handle(context.Background(), id, kernel.Owner); err != nil {
 		t.Fatal(err)
 	}
 	if !repo.deleted {
@@ -56,7 +57,7 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 			id := uuid.New()
 			repo := &fakeRepo{existing: id, status: status}
 
-			err := New(repo).Handle(context.Background(), id)
+			err := New(repo).Handle(context.Background(), id, kernel.Owner)
 
 			if !errors.Is(err, domain.ErrProjectNotPlanning) {
 				t.Fatalf("err = %v", err)

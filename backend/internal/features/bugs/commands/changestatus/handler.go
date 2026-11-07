@@ -58,6 +58,9 @@ func New(repo Repository, projects ProjectChecker) *Handler {
 
 // Handle cambia el status del bug. Exige el proyecto en working (regla 15).
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	bug, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

@@ -83,3 +83,24 @@ func ensureReason(from, to Status, reason string) error {
 	}
 	return nil
 }
+
+// ErrPlanForbidden indica que el perfil no planea tareas.
+var ErrPlanForbidden = kernel.Forbidden("solo PP o el usuario crean, editan, agregan, revisan, retiran o eliminan tareas")
+
+// EnsureCanPlan exige que el actor pueda crear, editar, agregar, revisar, retirar o
+// eliminar tareas. Se comprueba antes de leer o escribir en la base.
+func EnsureCanPlan(actor kernel.Actor) error {
+	if !actor.Profile.IsPlanner() {
+		return ErrPlanForbidden
+	}
+	return nil
+}
+
+// EnsureCanChangeStatus rechaza, antes de leer, a un perfil que no mueve ninguna tarea,
+// como PC, que solo lee.
+func EnsureCanChangeStatus(actor kernel.Actor) error {
+	if !kernel.HasAnyTransition(statusProfiles, actor.Profile) {
+		return kernel.ErrTransitionForbidden
+	}
+	return nil
+}

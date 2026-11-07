@@ -77,6 +77,9 @@ func New(repo Repository, tasks TaskChecker, projects ProjectChecker) *Handler {
 // Al salir de su planning propio escribe el registro add pendiente; ese camino
 // cumple las mismas reglas. Todo paso a done o cancelled pasa por CloseStage.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

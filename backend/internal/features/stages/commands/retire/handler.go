@@ -52,6 +52,9 @@ func New(repo Repository, tasks TaskChecker) *Handler {
 
 // Handle registra el retiro. Una etapa con tareas sin retirar no se retira.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	stage, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

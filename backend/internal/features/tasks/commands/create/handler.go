@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -26,6 +27,8 @@ type Command struct {
 	StageID     uuid.UUID `json:"-"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result es la tarea creada.
@@ -53,6 +56,9 @@ func New(repo Repository, stages StageChecker) *Handler {
 
 // Handle crea la tarea.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	if err := h.stages.EnsureTasksEditable(ctx, cmd.StageID); err != nil {
 		return Result{}, err
 	}

@@ -136,3 +136,33 @@ func TestAssign(t *testing.T) {
 		}
 	}
 }
+
+func TestEnsureCanPlanOnlyPlanners(t *testing.T) {
+	for _, p := range []kernel.Profile{kernel.ProfilePP, kernel.ProfilePC, kernel.ProfileTL, kernel.ProfileDevFrontend, kernel.ProfileDevBackend, kernel.ProfileCR, kernel.ProfileQAP, kernel.ProfileQA, kernel.ProfileDP, kernel.ProfileUser} {
+		err := EnsureCanPlan(kernel.Actor{Name: "agente", Profile: p})
+		if p == kernel.ProfilePP || p == kernel.ProfileUser {
+			if err != nil {
+				t.Errorf("%s: err = %v", p, err)
+			}
+			continue
+		}
+		if !errors.Is(err, ErrPlanForbidden) {
+			t.Errorf("%s: err = %v", p, err)
+		}
+	}
+}
+
+func TestEnsureCanChangeStatusRejectsPC(t *testing.T) {
+	if err := EnsureCanChangeStatus(kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}); !errors.Is(err, kernel.ErrTransitionForbidden) {
+		t.Errorf("PC: err = %v", err)
+	}
+	for _, targets := range statusProfiles {
+		for _, profiles := range targets {
+			for _, p := range profiles {
+				if err := EnsureCanChangeStatus(kernel.Actor{Name: "agente", Profile: p}); err != nil {
+					t.Errorf("%s: err = %v", p, err)
+				}
+			}
+		}
+	}
+}

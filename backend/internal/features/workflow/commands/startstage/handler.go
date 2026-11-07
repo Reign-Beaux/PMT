@@ -56,6 +56,9 @@ func New(repo Repository) *Handler {
 // Handle pasa la etapa a in_dev, sus tareas en backlog a ready y el proyecto a
 // in_dev si sigue en stand_by, todo o nada. Las demás tareas no se tocan.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := stages.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	s, err := h.repo.Stage(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

@@ -52,7 +52,7 @@ func writeFile(t *testing.T, content string) string {
 func TestHandleBuildsPlanInFileOrder(t *testing.T) {
 	repo := &fakeRepo{}
 
-	result, err := New(repo).Handle(context.Background(), Command{Path: writeFile(t, validFile)})
+	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Path: writeFile(t, validFile)})
 
 	if err != nil {
 		t.Fatal(err)
@@ -152,7 +152,7 @@ project:
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			_, err := New(repo).Handle(context.Background(), Command{Path: writeFile(t, tt.content)})
+			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Path: writeFile(t, tt.content)})
 
 			assertInvalid(t, err, tt.want)
 			if len(repo.saved) != 0 {
@@ -201,7 +201,7 @@ func TestHandleTranslatesSyntaxErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			_, err := New(repo).Handle(context.Background(), Command{Path: writeFile(t, tt.content)})
+			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Path: writeFile(t, tt.content)})
 
 			assertInvalid(t, err, tt.want)
 			if err.Error() != tt.want {
@@ -267,7 +267,7 @@ project:
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			_, err := New(repo).Handle(context.Background(), Command{Path: writeFile(t, tt.content)})
+			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Path: writeFile(t, tt.content)})
 
 			assertInvalid(t, err, tt.want+": "+commentMessage)
 			if len(repo.saved) != 0 {
@@ -297,7 +297,7 @@ project: # proyecto de prueba
 `
 	repo := &fakeRepo{}
 
-	_, err := New(repo).Handle(context.Background(), Command{Path: writeFile(t, content)})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, Path: writeFile(t, content)})
 
 	if err != nil {
 		t.Fatal(err)
@@ -319,7 +319,7 @@ project: # proyecto de prueba
 func TestHandleRejectsMissingPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "no-existe.yaml")
 
-	_, err := New(&fakeRepo{}).Handle(context.Background(), Command{Path: path})
+	_, err := New(&fakeRepo{}).Handle(context.Background(), Command{Actor: kernel.Owner, Path: path})
 
 	assertInvalid(t, err, path)
 }
@@ -327,7 +327,7 @@ func TestHandleRejectsMissingPath(t *testing.T) {
 func TestHandlePropagatesRepositoryError(t *testing.T) {
 	failure := errors.New("sin conexión")
 
-	_, err := New(&fakeRepo{err: failure}).Handle(context.Background(), Command{Path: writeFile(t, validFile)})
+	_, err := New(&fakeRepo{err: failure}).Handle(context.Background(), Command{Actor: kernel.Owner, Path: writeFile(t, validFile)})
 
 	if !errors.Is(err, failure) {
 		t.Errorf("err = %v", err)

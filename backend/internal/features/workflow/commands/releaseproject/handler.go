@@ -58,6 +58,9 @@ func New(repo Repository, tasks TaskChecker) *Handler {
 // Handle pasa el proyecto y sus etapas en planning a stand_by, todos o ninguno. Las
 // etapas en otro status no se tocan, y las tareas siguen en backlog.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := projects.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	p, err := h.repo.Project(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

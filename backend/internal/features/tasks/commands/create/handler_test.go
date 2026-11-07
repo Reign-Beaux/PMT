@@ -41,7 +41,7 @@ func TestHandleCreatesTask(t *testing.T) {
 	repo := &fakeRepo{}
 	stageID := uuid.New()
 
-	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{StageID: stageID, Title: " Revisar "})
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, StageID: stageID, Title: " Revisar "})
 
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestHandleCreatesTask(t *testing.T) {
 func TestHandleRejectsInvalidTask(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{StageID: uuid.New(), Title: " "})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, StageID: uuid.New(), Title: " "})
 
 	if !errors.Is(err, domain.ErrTaskTitleRequired) {
 		t.Fatalf("err = %v", err)
@@ -70,7 +70,7 @@ func TestHandleRejectsInvalidTask(t *testing.T) {
 func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{StageID: uuid.New(), Title: "Revisar"})
+	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, StageID: uuid.New(), Title: "Revisar"})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Repository es la persistencia que necesita la operación.
@@ -26,6 +27,8 @@ type Command struct {
 	ProjectID   uuid.UUID `json:"-"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
+
+	Actor kernel.Actor `json:"-"`
 }
 
 // Result es la etapa creada.
@@ -59,6 +62,9 @@ func New(repo Repository, projects ProjectChecker) *Handler {
 
 // Handle crea la etapa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	if err := h.projects.EnsurePlanning(ctx, cmd.ProjectID); err != nil {
 		return Result{}, err
 	}

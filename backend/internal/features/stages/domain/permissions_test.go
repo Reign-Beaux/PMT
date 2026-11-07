@@ -52,9 +52,13 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		{"TL cierra", StatusInDev, StatusDone, tl, "", nil},
 		{"usuario no cierra", StatusInDev, StatusDone, kernel.Owner, "", kernel.ErrTransitionForbidden},
 		{"reabrir sin motivo", StatusDone, StatusInDev, pp, "", kernel.ErrReasonRequired},
-		{"PC detiene", StatusInDev, StatusStopped, pc, "pausa", nil},
-		{"detener sin motivo", StatusInDev, StatusStopped, pc, " ", kernel.ErrReasonRequired},
-		{"PC reanuda", StatusStopped, StatusInDev, pc, "", nil},
+		{"TL detiene", StatusInDev, StatusStopped, tl, "pausa", nil},
+		{"usuario detiene", StatusInDev, StatusStopped, kernel.Owner, "pausa", nil},
+		{"PC no detiene", StatusInDev, StatusStopped, pc, "pausa", kernel.ErrTransitionForbidden},
+		{"detener sin motivo", StatusInDev, StatusStopped, pp, " ", kernel.ErrReasonRequired},
+		{"PP reanuda", StatusStopped, StatusInDev, pp, "", nil},
+		{"usuario reanuda", StatusStopped, StatusInDev, kernel.Owner, "", nil},
+		{"PC no reanuda", StatusStopped, StatusInDev, pc, "", kernel.ErrTransitionForbidden},
 		{"PC no cancela", StatusInDev, StatusCancelled, pc, "x", kernel.ErrTransitionForbidden},
 		{"usuario cancela", StatusInDev, StatusCancelled, kernel.Owner, "x", nil},
 		{"TL ajeno no detiene", StatusInDev, StatusStopped, otherTL, "x", kernel.ErrNotStageLead},
@@ -87,5 +91,67 @@ func TestEnsureCanAssignLead(t *testing.T) {
 		if err := EnsureCanAssignLead(kernel.Actor{Profile: profile}); !errors.Is(err, ErrAssignLeadForbidden) {
 			t.Fatalf("%s: %v", profile, err)
 		}
+	}
+}
+
+func TestEnsureCanPlanOnlyPlanners(t *testing.T) {
+	for _, p := range []kernel.Profile{kernel.ProfilePP, kernel.ProfilePC, kernel.ProfileTL, kernel.ProfileDevFrontend, kernel.ProfileDevBackend, kernel.ProfileCR, kernel.ProfileQAP, kernel.ProfileQA, kernel.ProfileDP, kernel.ProfileUser} {
+		err := EnsureCanPlan(kernel.Actor{Name: "agente", Profile: p})
+		if p == kernel.ProfilePP || p == kernel.ProfileUser {
+			if err != nil {
+				t.Errorf("%s: err = %v", p, err)
+			}
+			continue
+		}
+		if !errors.Is(err, ErrPlanForbidden) {
+			t.Errorf("%s: err = %v", p, err)
+		}
+	}
+}
+
+func TestEnsureCanChangeStatusRejectsPC(t *testing.T) {
+	if err := EnsureCanChangeStatus(kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}); !errors.Is(err, kernel.ErrTransitionForbidden) {
+		t.Errorf("PC: err = %v", err)
+	}
+	for _, targets := range statusProfiles {
+		for _, profiles := range targets {
+			for _, p := range profiles {
+				if err := EnsureCanChangeStatus(kernel.Actor{Name: "agente", Profile: p}); err != nil {
+					t.Errorf("%s: err = %v", p, err)
+				}
+			}
+		}
+	}
+}
+
+func TestEnsureReviser(t *testing.T) {
+	s := Stage{Lead: "tl"}
+	tests := []struct {
+		name  string
+		actor kernel.Actor
+		want  error
+	}{
+		{"PP", kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}, nil},
+		{"usuario", kernel.Owner, nil},
+		{"TL de la etapa", kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}, nil},
+		{"TL de otra etapa", kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ErrNotStageLead},
+		{"PC", kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}, ErrReviseForbidden},
+		{"Dev", kernel.Actor{Name: "dev", Profile: kernel.ProfileDevBackend}, ErrReviseForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := s.EnsureReviser(tt.actor); !errors.Is(err, tt.want) {
+				t.Errorf("err = %v, quiero %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnsureLeadProfile(t *testing.T) {
+	if err := EnsureLeadProfile(kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}); err != nil {
+		t.Errorf("TL: err = %v", err)
+	}
+	if err := EnsureLeadProfile(kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}); !errors.Is(err, kernel.ErrNotStageLead) {
+		t.Errorf("PC: err = %v", err)
 	}
 }

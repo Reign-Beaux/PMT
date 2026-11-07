@@ -29,6 +29,8 @@ var (
 	ErrItemKindInvalid = kernel.Invalid("item_kind desconocido: usa project, stage, task o bug")
 	// ErrBodyRequired indica que el comentario está vacío.
 	ErrBodyRequired = kernel.Invalid("el texto del comentario es obligatorio")
+	// ErrCommentForbidden indica que el perfil no puede comentar.
+	ErrCommentForbidden = kernel.Forbidden("PC solo lee: no comenta")
 )
 
 // Comment es un comentario inmutable sobre un elemento, al que referencia por ID, sin
@@ -52,8 +54,12 @@ func EnsureKind(kind ItemKind) error {
 	return ErrItemKindInvalid
 }
 
-// NewComment crea un comentario. Solo espacios cuenta como vacío.
+// NewComment crea un comentario. Comenta cualquier perfil menos PC, que solo lee.
+// Solo espacios cuenta como vacío.
 func NewComment(kind ItemKind, itemID uuid.UUID, body string, actor kernel.Actor) (Comment, error) {
+	if actor.Profile == kernel.ProfilePC {
+		return Comment{}, ErrCommentForbidden
+	}
 	if err := EnsureKind(kind); err != nil {
 		return Comment{}, err
 	}

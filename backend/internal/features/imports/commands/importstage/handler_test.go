@@ -50,7 +50,7 @@ func writeFile(t *testing.T, content string) string {
 
 func command(t *testing.T, content string) Command {
 	t.Helper()
-	return Command{ProjectID: uuid.New(), Path: writeFile(t, content), Reason: "Petición", RequestedBy: "PM"}
+	return Command{Actor: kernel.Owner, ProjectID: uuid.New(), Path: writeFile(t, content), Reason: "Petición", RequestedBy: "PM"}
 }
 
 func TestHandleCreatesStageInOwnPlanning(t *testing.T) {

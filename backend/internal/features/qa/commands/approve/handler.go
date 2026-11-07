@@ -49,6 +49,9 @@ func New(repo Repository, stages StageChecker) *Handler {
 // Handle valida status, perfil y ámbito, en ese orden. El ámbito solo se consulta
 // si el perfil ya pasó.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureTL(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	plan, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

@@ -115,11 +115,20 @@ var reviewers = []kernel.Profile{kernel.ProfileCR, kernel.ProfileQA}
 // EnsureClosable comprueba la resolución, que siga abierto y el perfil, antes de
 // consultar el ámbito en otra feature.
 func (f Finding) EnsureClosable(resolution Status, actor kernel.Actor) error {
-	if resolution != StatusFixed && resolution != StatusDismissed {
-		return ErrResolutionInvalid
+	if err := EnsureCanClose(resolution, actor); err != nil {
+		return err
 	}
 	if f.Status != StatusOpen {
 		return ErrFindingClosed
+	}
+	return nil
+}
+
+// EnsureCanClose comprueba resolución y perfil sin leer el hallazgo, para rechazar
+// antes de consultar la base.
+func EnsureCanClose(resolution Status, actor kernel.Actor) error {
+	if resolution != StatusFixed && resolution != StatusDismissed {
+		return ErrResolutionInvalid
 	}
 	if resolution == StatusFixed && !slices.Contains(reviewers, actor.Profile) {
 		return ErrFixForbidden

@@ -58,6 +58,9 @@ func New(repo Repository, stages StageProgress) *Handler {
 
 // Handle cambia el status del proyecto si sus etapas lo permiten.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanChangeStatus(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	p, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

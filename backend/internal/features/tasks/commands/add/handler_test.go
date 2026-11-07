@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
 
 type fakeStages struct {
@@ -46,6 +47,7 @@ func TestHandleAdds(t *testing.T) {
 	parent := uuid.New()
 
 	result, err := newHandler(repo).Handle(context.Background(), Command{
+		Actor:   kernel.Owner,
 		StageID: parent, Title: "Nueva", Reason: "Faltaba", RequestedBy: "PM",
 	})
 
@@ -66,9 +68,9 @@ func TestHandleRejectsInvalidInput(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin title", Command{Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
-		{"sin motivo", Command{Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"sin title", Command{Actor: kernel.Owner, Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
+		{"sin motivo", Command{Actor: kernel.Owner, Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Owner, Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
 	}
 
 	for _, tt := range tests {
@@ -91,6 +93,7 @@ func TestHandleRejectsRetiredStage(t *testing.T) {
 	repo := &fakeRepo{}
 
 	_, err := New(repo, fakeStages{err: domain.ErrStageNotFound}).Handle(context.Background(), Command{
+		Actor: kernel.Owner,
 		Title: "Nueva", Reason: "Faltaba", RequestedBy: "PM",
 	})
 

@@ -49,6 +49,9 @@ func New(repo Repository, agents AgentChecker) *Handler {
 
 // Handle añade al dev. Solo lo hace el TL de la etapa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureLeadProfile(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	s, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err

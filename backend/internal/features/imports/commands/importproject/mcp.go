@@ -29,12 +29,12 @@ func (h *Handler) RegisterTool(server *sdk.Server) {
 	}, h.callTool)
 }
 
-func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
+func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
 	if !filepath.IsAbs(input.Path) {
 		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("path debe ser una ruta absoluta"))
 	}
 
-	result, err := h.Handle(ctx, Command{Path: input.Path})
+	result, err := h.Handle(ctx, Command{Path: input.Path, Actor: platformmcp.ActorFrom(req)})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}

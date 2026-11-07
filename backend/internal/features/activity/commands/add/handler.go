@@ -70,7 +70,7 @@ func New(repo Repository, projects ProjectChecker, stages StageChecker, tasks Ta
 	return &Handler{repo: repo, projects: projects, stages: stages, tasks: tasks, bugs: bugs}
 }
 
-// Handle registra el comentario. Lo puede hacer cualquier perfil y no toca el elemento.
+// Handle registra el comentario. Lo puede hacer cualquier perfil menos PC y no toca el elemento.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	c, err := domain.NewComment(cmd.ItemKind, cmd.ItemID, cmd.Body, cmd.Actor)
 	if err != nil {

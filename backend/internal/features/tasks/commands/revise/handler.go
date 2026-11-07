@@ -61,6 +61,9 @@ func New(repo Repository, stages StageChecker) *Handler {
 // tarea ya entregada vuelve a changes_requested, aunque esté congelada, y una en
 // done se rechaza: lo decide el repositorio con el status que lee al bloquearla.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
+	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
 	task, err := h.repo.Get(ctx, cmd.ID)
 	if err != nil {
 		return Result{}, err
