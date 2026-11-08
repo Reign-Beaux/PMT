@@ -94,29 +94,19 @@ El binario lee `config.yaml` desde su directorio de trabajo; las variables
 `DATABASE_URL` y `SERVER_ADDR` tienen prioridad si se quieren fijar por
 entorno. Si no arranca, revisar su log y aplicar la reversión (sección 9).
 
-## 7. Proxy: upgrade WebSocket en `/api/events`
+## 7. Frontend en el mismo puerto
 
-El frontend se sirve detrás de un proxy same-origin. El ejemplo de nginx está
-en `frontend/README.md`, sección **Despliegue**; para `/api/events` importan
-estas directivas:
+`pmt-server` sirve el frontend compilado junto con `/api`, `/api/events` y
+`/mcp`, en el mismo puerto: no hace falta un proxy. Antes de reiniciar el
+servidor, compilar el frontend con `pnpm build` en `frontend/`. La ruta del
+compilado y el resto de los detalles están en `frontend/README.md`, sección
+**Despliegue**.
 
-```nginx
-location /api/events {
-  proxy_pass http://127.0.0.1:8080;
-  proxy_http_version 1.1;
-  proxy_set_header Upgrade $http_upgrade;
-  proxy_set_header Connection "upgrade";
-  proxy_set_header Host $host;
-  proxy_read_timeout 120s;
-}
-```
-
-- Sin `proxy_http_version 1.1` + `Upgrade` + `Connection` el handshake falla:
-  el cliente recibe un error (400/426) o la conexión se cierra de inmediato.
-- El servidor hace ping cada 30 s (`pingInterval` en
-  `internal/platform/events/websocket.go`): `proxy_read_timeout` debe ser
-  mayor que ese intervalo, o el proxy cortará las conexiones
-  periódicamente.
+Si algún día se pone un proxy delante, debe hacer el upgrade de WebSocket en
+`/api/events` (`proxy_http_version 1.1` y las cabeceras `Upgrade` y
+`Connection`), y su tiempo de lectura debe superar los 30 s del ping del
+servidor (`pingInterval` en `internal/platform/events/websocket.go`); si no,
+el handshake falla o el proxy corta las conexiones.
 
 ## 8. Comprobación
 
@@ -153,8 +143,7 @@ interactiva o here-document.
 Si no llega nada, verificar que la migración está aplicada (`status` de la
 sección 5) y que el cambio se confirmó (una transacción revertida no publica).
 
-**WebSocket.** Con `node` (≥ 22), contra el proxy (o directamente contra el
-backend si no hay proxy):
+**WebSocket.** Con `node` (≥ 22), contra el servidor:
 
 ```sh
 node -e '
@@ -183,8 +172,8 @@ asyncio.run(main())
 '
 ```
 
-Un error de handshake (400/426 o cierre inmediato) apunta al proxy: revisar
-las directivas de la sección 7.
+Un error de handshake (400/426 o cierre inmediato) indica que el servidor no
+es el binario nuevo, o que hay un proxy delante sin el upgrade de la sección 7.
 
 ## 9. Reversión
 
