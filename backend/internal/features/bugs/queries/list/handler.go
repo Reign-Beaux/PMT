@@ -15,6 +15,12 @@ type Reader interface {
 	List(ctx context.Context, projectID uuid.UUID) ([]domain.Bug, error)
 }
 
+// ProjectChecker confirma que un proyecto existe. Lo implementa la feature
+// projects, que responde con un error de negocio si no lo encuentra.
+type ProjectChecker interface {
+	Check(ctx context.Context, id uuid.UUID) error
+}
+
 // Item es un bug de la lista.
 type Item struct {
 	ID               uuid.UUID     `json:"id"`
@@ -31,16 +37,21 @@ type Item struct {
 
 // Handler ejecuta la operación.
 type Handler struct {
-	reader Reader
+	reader   Reader
+	projects ProjectChecker
 }
 
 // New crea el handler.
-func New(reader Reader) *Handler {
-	return &Handler{reader: reader}
+func New(reader Reader, projects ProjectChecker) *Handler {
+	return &Handler{reader: reader, projects: projects}
 }
 
 // Handle devuelve los bugs del proyecto por fecha de creación.
 func (h *Handler) Handle(ctx context.Context, projectID uuid.UUID) ([]Item, error) {
+	if err := h.projects.Check(ctx, projectID); err != nil {
+		return nil, err
+	}
+
 	bugs, err := h.reader.List(ctx, projectID)
 	if err != nil {
 		return nil, err

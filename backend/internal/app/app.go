@@ -24,9 +24,11 @@ import (
 	"pmt/internal/features/tasks"
 	"pmt/internal/features/workflow"
 	"pmt/internal/kernel"
+	"pmt/internal/platform/events"
 	"pmt/internal/platform/mcp"
 	"pmt/internal/platform/postgres"
 	"pmt/internal/platform/rest"
+	"pmt/internal/platform/web"
 )
 
 const connectTimeout = 5 * time.Second
@@ -51,17 +53,33 @@ func Run() error {
 	defer pool.Close()
 
 	mux := http.NewServeMux()
+	listener := events.NewListener(events.PgxDialer{DatabaseURL: cfg.DatabaseURL})
+	mux.Handle("GET /api/events", events.Handler(listener))
+	listenerDone := make(chan struct{})
+	go func() {
+		listener.Run(ctx)
+		close(listenerDone)
+	}()
+
 	tools := mcp.NewServer()
 	registerFeatures(mux, tools, pool)
 
-	return rest.Serve(ctx, cfg.ServerAddr, routes(mux, tools, agents.NewAuthenticator(pool)))
+	frontend := web.Handler(cfg.FrontendDist)
+	serveErr := rest.Serve(ctx, cfg.ServerAddr, routes(mux, tools, agents.NewAuthenticator(pool), frontend))
+	stop() // si Serve falló antes de la señal, el listener termina con ctx
+	<-listenerDone
+	return serveErr
 }
 
-// routes protege la API y el MCP con la autenticación por token.
-func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator) http.Handler {
+// routes protege la API y el MCP con la autenticación por token y sirve el
+// frontend compilado en el resto de las rutas.
+func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator, frontend http.Handler) http.Handler {
 	root := http.NewServeMux()
-	root.Handle("/api/", rest.Authenticate(authenticator)(api))
+	apiHandler := rest.Authenticate(authenticator)(api)
+	root.Handle("/api", apiHandler)
+	root.Handle("/api/", apiHandler)
 	root.Handle("/mcp", mcp.Authenticate(authenticator)(mcp.Handler(tools)))
+	root.Handle("/", frontend)
 	return root
 }
 

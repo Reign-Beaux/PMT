@@ -43,6 +43,7 @@ type ProjectChecker interface {
 	add.ProjectChecker
 	update.ProjectChecker
 	checktasks.ProjectChecker
+	list.ProjectChecker
 }
 
 // AgentChecker reúne lo que las slices piden a la feature agents.
@@ -100,7 +101,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 
 	get.New(repo).Register(mux)
 
-	listStages := list.New(repo)
+	listStages := list.New(repo, projects)
 	listStages.Register(mux)
 	listStages.RegisterTool(tools)
 

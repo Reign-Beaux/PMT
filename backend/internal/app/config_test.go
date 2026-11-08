@@ -60,3 +60,58 @@ func TestLoadConfigRequiresDatabaseURL(t *testing.T) {
 		t.Fatal("se esperaba un error")
 	}
 }
+
+func TestLoadConfigFrontendDistDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://entorno/pmt")
+	t.Setenv("FRONTEND_DIST", "")
+
+	cfg, err := LoadConfig(filepath.Join(t.TempDir(), "config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FrontendDist != "../frontend/dist" {
+		t.Errorf("FrontendDist = %q", cfg.FrontendDist)
+	}
+}
+
+func TestLoadConfigFrontendDistFromFile(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("FRONTEND_DIST", "")
+	path := writeConfigFile(t, "database:\n  url: postgres://archivo/pmt\nfrontend:\n  dist: /ruta/del/archivo\n")
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FrontendDist != "/ruta/del/archivo" {
+		t.Errorf("FrontendDist = %q", cfg.FrontendDist)
+	}
+}
+
+func TestLoadConfigFrontendDistEnvOverridesFile(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("FRONTEND_DIST", "/ruta/del/entorno")
+	path := writeConfigFile(t, "database:\n  url: postgres://archivo/pmt\nfrontend:\n  dist: /ruta/del/archivo\n")
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FrontendDist != "/ruta/del/entorno" {
+		t.Errorf("FrontendDist = %q", cfg.FrontendDist)
+	}
+}
+
+func TestLoadConfigFrontendDistVacioUsaDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("FRONTEND_DIST", "")
+	path := writeConfigFile(t, "database:\n  url: postgres://archivo/pmt\nfrontend:\n  dist: \"\"\n")
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FrontendDist != "../frontend/dist" {
+		t.Errorf("FrontendDist = %q", cfg.FrontendDist)
+	}
+}

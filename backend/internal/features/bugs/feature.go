@@ -18,9 +18,15 @@ import (
 	"pmt/internal/features/bugs/store/sqlcgen"
 )
 
+// ProjectChecker reúne lo que las slices piden a la feature projects.
+type ProjectChecker interface {
+	create.ProjectChecker
+	list.ProjectChecker
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature.
 // projects lo aporta la feature projects, conectada en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects create.ProjectChecker) {
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects ProjectChecker) {
 	repo := store.NewBugs(db)
 	statusChanges := store.NewStatusChanges(db)
 
@@ -39,7 +45,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects creat
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
-	listBugs := list.New(repo)
+	listBugs := list.New(repo, projects)
 	listBugs.Register(mux)
 	listBugs.RegisterTool(tools)
 

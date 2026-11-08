@@ -9,15 +9,16 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	projectsdomain "pmt/internal/features/projects/domain"
 	"pmt/internal/features/stages/domain"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
-func callTool(t *testing.T, reader Reader, projectID string) *sdk.CallToolResult {
+func callTool(t *testing.T, handler *Handler, projectID string) *sdk.CallToolResult {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
-	New(reader).RegisterTool(server)
+	handler.RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()
 	if _, err := server.Connect(ctx, serverTransport, nil); err != nil {
@@ -46,7 +47,7 @@ func TestToolListsStagesInOrder(t *testing.T) {
 		{ID: uuid.New(), Name: "B", Position: 2, Status: domain.StatusInDev},
 	}}
 
-	result := callTool(t, reader, uuid.NewString())
+	result := callTool(t, New(reader, fakeProjects{}), uuid.NewString())
 
 	if result.IsError {
 		t.Fatalf("resultado = %+v", result)
@@ -65,7 +66,7 @@ func TestToolListsStagesInOrder(t *testing.T) {
 }
 
 func TestToolReturnsEmptyArray(t *testing.T) {
-	result := callTool(t, &fakeReader{}, uuid.NewString())
+	result := callTool(t, New(&fakeReader{}, fakeProjects{}), uuid.NewString())
 
 	raw, err := json.Marshal(result.StructuredContent)
 	if err != nil {
@@ -77,10 +78,19 @@ func TestToolReturnsEmptyArray(t *testing.T) {
 }
 
 func TestToolRejectsInvalidProjectID(t *testing.T) {
-	result := callTool(t, &fakeReader{}, "abc")
+	result := callTool(t, New(&fakeReader{}, fakeProjects{}), "abc")
 
 	text := result.Content[0].(*sdk.TextContent).Text
 	if !result.IsError || !strings.Contains(text, "project_id inválido") {
+		t.Errorf("resultado = %q", text)
+	}
+}
+
+func TestToolReturnsErrorForMissingProject(t *testing.T) {
+	result := callTool(t, New(&fakeReader{}, fakeProjects{err: projectsdomain.ErrProjectNotFound}), uuid.NewString())
+
+	text := result.Content[0].(*sdk.TextContent).Text
+	if !result.IsError || !strings.Contains(text, "proyecto no encontrado") {
 		t.Errorf("resultado = %q", text)
 	}
 }
