@@ -1,26 +1,28 @@
-// Package importstage crea una etapa completa desde un fichero YAML, en su
-// planning propio, dentro de un proyecto en working.
+// Package importstage crea una o varias etapas con sus tareas desde un fichero
+// YAML con raíz stages, en un proyecto en planning o en working.
 package importstage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 
 	"pmt/internal/features/imports/domain"
 	"pmt/internal/features/imports/file"
+	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
 	"pmt/internal/kernel"
 )
 
-const location = "etapa"
-
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
-	SaveStage(ctx context.Context, projectID uuid.UUID, plan domain.StagePlan) error
+	ProjectStatus(ctx context.Context, projectID uuid.UUID) (projects.Status, error)
+	SaveStages(ctx context.Context, projectID uuid.UUID, plans []domain.StagePlan) error
 }
 
-// Command contiene los datos de entrada.
+// Command contiene los datos de entrada. Reason y RequestedBy solo se usan en
+// un proyecto en working.
 type Command struct {
 	ProjectID   uuid.UUID
 	Path        string
@@ -30,12 +32,17 @@ type Command struct {
 	Actor kernel.Actor
 }
 
-// Result resume lo creado.
-type Result struct {
-	ProjectID uuid.UUID
+// StageResult resume una etapa creada.
+type StageResult struct {
 	StageID   uuid.UUID
 	StageName string
 	TaskCount int
+}
+
+// Result resume lo creado, en el orden del fichero.
+type Result struct {
+	ProjectID uuid.UUID
+	Stages    []StageResult
 }
 
 // Handler ejecuta la operación.
@@ -53,30 +60,73 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureCanImport(cmd.Actor); err != nil {
 		return Result{}, err
 	}
-	entry, err := file.ReadStage(cmd.Path)
+	entries, err := file.ReadStages(cmd.Path)
+	if err != nil {
+		return Result{}, err
+	}
+	status, err := h.repo.ProjectStatus(ctx, cmd.ProjectID)
 	if err != nil {
 		return Result{}, err
 	}
 
-	stage, err := stages.NewOwnPlanningStage(cmd.ProjectID, entry.Name, entry.Description, cmd.Reason, cmd.RequestedBy)
-	if err != nil {
-		return Result{}, file.Located(location, err.Error())
+	var plans []domain.StagePlan
+	switch status {
+	case projects.StatusPlanning:
+		plans, err = buildPlans(cmd.ProjectID, entries, false, "", "")
+	case projects.StatusWorking:
+		if file.Blank(cmd.Reason) {
+			return Result{}, stages.ErrChangeReasonRequired
+		}
+		if file.Blank(cmd.RequestedBy) {
+			return Result{}, stages.ErrChangeRequesterRequired
+		}
+		plans, err = buildPlans(cmd.ProjectID, entries, true, cmd.Reason, cmd.RequestedBy)
+	default:
+		return Result{}, domain.ErrProjectNotImportable
 	}
-	if file.Blank(entry.Description) {
-		return Result{}, file.Located(location, file.DescriptionRequired)
-	}
-	tasks, err := entry.BuildTasks(stage.ID, "")
 	if err != nil {
 		return Result{}, err
 	}
 
-	if err := h.repo.SaveStage(ctx, cmd.ProjectID, domain.StagePlan{Stage: stage, Tasks: tasks}); err != nil {
+	if err := h.repo.SaveStages(ctx, cmd.ProjectID, plans); err != nil {
 		return Result{}, err
 	}
-	return Result{
-		ProjectID: cmd.ProjectID,
-		StageID:   stage.ID,
-		StageName: stage.Name,
-		TaskCount: len(tasks),
-	}, nil
+
+	result := Result{ProjectID: cmd.ProjectID}
+	for _, plan := range plans {
+		result.Stages = append(result.Stages, StageResult{
+			StageID:   plan.Stage.ID,
+			StageName: plan.Stage.Name,
+			TaskCount: len(plan.Tasks),
+		})
+	}
+	return result, nil
+}
+
+func buildPlans(projectID uuid.UUID, entries []file.Stage, ownPlanning bool, reason, requestedBy string) ([]domain.StagePlan, error) {
+	plans := make([]domain.StagePlan, 0, len(entries))
+	for i, entry := range entries {
+		where := fmt.Sprintf("etapa %d", i+1)
+
+		var stage stages.Stage
+		var err error
+		if ownPlanning {
+			stage, err = stages.NewOwnPlanningStage(projectID, entry.Name, entry.Description, reason, requestedBy)
+		} else {
+			stage, err = stages.NewStage(projectID, entry.Name, entry.Description)
+		}
+		if err != nil {
+			return nil, file.Located(where, err.Error())
+		}
+		if file.Blank(entry.Description) {
+			return nil, file.Located(where, file.DescriptionRequired)
+		}
+
+		tasks, err := entry.BuildTasks(stage.ID, where+", ")
+		if err != nil {
+			return nil, err
+		}
+		plans = append(plans, domain.StagePlan{Stage: stage, Tasks: tasks})
+	}
+	return plans, nil
 }

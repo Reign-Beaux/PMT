@@ -53,26 +53,66 @@ func (s *Imports) Save(ctx context.Context, plan domain.Plan) error {
 	})
 }
 
-// SaveStage guarda una etapa y sus tareas en un proyecto en working. Si algo falla, no guarda nada.
-func (s *Imports) SaveStage(ctx context.Context, projectID uuid.UUID, plan domain.StagePlan) error {
+// SaveStages guarda varias etapas con sus tareas en un proyecto, en una sola
+// transacción y en el orden de la lista. Si algo falla, no guarda nada.
+func (s *Imports) SaveStages(ctx context.Context, projectID uuid.UUID, plans []domain.StagePlan) error {
 	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		project, err := projects.NewProjects(tx).Get(ctx, projectID)
 		if err != nil {
 			return err
 		}
-		if !project.IsWorking() {
-			return projectdomain.ErrProjectNotWorking
-		}
-
-		if _, err := stages.NewStages(tx).Create(ctx, plan.Stage); err != nil {
+		if err := ensureStageKinds(project, plans); err != nil {
 			return err
 		}
+
+		stageRepo := stages.NewStages(tx)
 		taskRepo := tasks.NewTasks(tx)
-		for _, task := range plan.Tasks {
-			if _, err := taskRepo.Create(ctx, task); err != nil {
+		for _, plan := range plans {
+			if _, err := stageRepo.Create(ctx, plan.Stage); err != nil {
 				return err
+			}
+			for _, task := range plan.Tasks {
+				if _, err := taskRepo.Create(ctx, task); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
 	})
+}
+
+// ProjectStatus devuelve el status del proyecto.
+func (s *Imports) ProjectStatus(ctx context.Context, projectID uuid.UUID) (projectdomain.Status, error) {
+	var status projectdomain.Status
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		project, err := projects.NewProjects(tx).Get(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		status = project.Status
+		return nil
+	})
+	return status, err
+}
+
+// ensureStageKinds valida que el tipo de cada etapa corresponda al status del
+// proyecto, antes del primer insert.
+func ensureStageKinds(project projectdomain.Project, plans []domain.StagePlan) error {
+	switch {
+	case project.Status == projectdomain.StatusPlanning:
+		for _, plan := range plans {
+			if plan.Stage.InOwnPlanning() {
+				return domain.ErrStageKindMismatch
+			}
+		}
+	case project.IsWorking():
+		for _, plan := range plans {
+			if !plan.Stage.InOwnPlanning() {
+				return domain.ErrStageKindMismatch
+			}
+		}
+	default:
+		return domain.ErrProjectNotImportable
+	}
+	return nil
 }

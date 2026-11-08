@@ -200,7 +200,7 @@ Cada feature corresponde a un agregado principal:
 | `devplans` | Planes de desarrollo de DP, con sus versiones y tareas vinculadas. |
 | `activity` | Comentarios sobre proyectos, etapas, tareas y bugs. La auditoría sigue pendiente. |
 | `bugs` | Bugs de un proyecto. No pertenecen a ninguna etapa. |
-| `imports` | Carga de un proyecto o una etapa completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
+| `imports` | Carga de un proyecto o una o varias etapas completos desde un fichero. No tiene agregado propio; ver [Feature de composición](#features-de-composición-imports-y-workflow). |
 | `workflow` | Operaciones que mueven varios agregados en una transacción: `release_project`, `start_stage` y el cierre y el retiro de una etapa. También compone la lectura `get_project_progress`. No tiene agregado propio. |
 
 Las dependencias entre features van, en general, en este sentido:
@@ -245,7 +245,7 @@ Ninguna feature lee las tablas ni importa los detalles internos de otra.
 
 ### Features de composición: `imports` y `workflow`
 
-`imports` es una excepción a las reglas anteriores. Crea un proyecto con sus etapas y tareas, o una etapa con sus tareas, como una unidad, sin agregado propio, y por eso:
+`imports` es una excepción a las reglas anteriores. Crea un proyecto con sus etapas y tareas, o una o varias etapas con sus tareas, como una unidad, sin agregado propio, y por eso:
 
 - `imports/domain` y los handlers de `importproject` e `importstage` usan el `domain` de `projects`, `stages` y `tasks`, y aplican sus constructores para validar.
 - `imports/store` usa el `store` de esas tres features sobre una sola `pgx.Tx`, porque aceptan `sqlcgen.DBTX`. No usa `kernel.Transactor`, aún pendiente.
@@ -564,7 +564,7 @@ En `planning`, `product_version` es texto libre y cambia con `update_project`. E
 
 Una etapa pedida con el proyecto en `working` se planea por sí sola, sin que el proyecto cambie de status. Está en **planning propio** si su fila tiene `add_reason` y `add_requested_by`: el status `planning` no basta, porque también lo tienen las etapas definidas en el `planning` del proyecto, que siguen sin poder editarse. `Stage.InOwnPlanning` hace la distinción.
 
-`add_stage` e `import_stage` guardan motivo y solicitante en la fila y no escriben en `stage_changes`, porque el registro es inmutable y `ON DELETE RESTRICT` impediría editar o eliminar la etapa. Al salir, `Changes.LeavePlanning` escribe en una transacción el `add` versión 1 con el contenido definitivo y el registro de status, cambia el status y vuelve a `NULL` ambas columnas. El motivo del registro es el de `change_stage_status`, no `add_reason`. Por eso `changed_at` del `add` es la fecha de salida, y una etapa eliminada en su planning propio no deja rastro. Con el proyecto en otro status, `add_stage` escribe el `add` de inmediato.
+`add_stage`, e `import_stage` con el proyecto en `working`, guardan motivo y solicitante en la fila y no escriben en `stage_changes`, porque el registro es inmutable y `ON DELETE RESTRICT` impediría editar o eliminar la etapa; con el proyecto en `planning`, `import_stage` crea etapas normales, como `create_stage`, sin motivo ni solicitante. Al salir, `Changes.LeavePlanning` escribe en una transacción el `add` versión 1 con el contenido definitivo y el registro de status, cambia el status y vuelve a `NULL` ambas columnas. El motivo del registro es el de `change_stage_status`, no `add_reason`. Por eso `changed_at` del `add` es la fecha de salida, y una etapa eliminada en su planning propio no deja rastro. Con el proyecto en otro status, `add_stage` escribe el `add` de inmediato.
 
 Cualquier transición desde `planning` es la salida, y es definitiva: si la etapa vuelve al status `planning`, sigue bajo historial.
 

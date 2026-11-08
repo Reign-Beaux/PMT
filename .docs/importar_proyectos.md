@@ -1,6 +1,6 @@
-# Importar proyectos desde un fichero
+# Importar proyectos y etapas desde un fichero
 
-La herramienta MCP `import_project` crea un proyecto nuevo con todas sus etapas y tareas a partir de un fichero YAML. Sustituye las llamadas una por una a `create_project`, `create_stage` y `create_task`.
+La herramienta MCP `import_project` crea un proyecto nuevo con todas sus etapas y tareas a partir de un fichero YAML. Sustituye las llamadas una por una a `create_project`, `create_stage` y `create_task`. La herramienta MCP `import_stage` agrega una o varias etapas a un proyecto existente; ver [Importar etapas](#importar-etapas).
 
 ## Flujo de uso
 
@@ -62,29 +62,36 @@ Un comentario junto a `name`, `title` o `description` se rechaza, porque YAML lo
 | Salida | `project_id`, `project_name`, `stage_count` y `task_count`. |
 | Interfaz | Solo MCP, sin ruta REST. |
 
-## Importar una etapa
+## Importar etapas
 
-La herramienta MCP `import_stage` crea una etapa con sus tareas en un proyecto en `working`. La etapa nace en su planning propio, como con `add_stage`: sus tareas no generan registros y su registro `add` se escribe al salir de `planning`.
+La herramienta MCP `import_stage` crea una o varias etapas con sus tareas, desde un fichero con raíz `stages`, en un proyecto en `planning` o en `working`. En `planning` crea etapas normales, como `create_stage`; en `working` las crea en su planning propio, como `add_stage`: sus tareas no generan registros y su registro `add` se escribe al salir de `planning`. A diferencia de `import_project`, que crea un proyecto nuevo, `import_stage` agrega etapas a uno existente.
 
 ```yaml
-stage:
-  name: "Pagos"
-  description: "Cobro con tarjeta."
-  tasks:
-    - title: "Crear tabla de pagos"
-      description: "Debe relacionarse con pedidos."
+stages:
+  - name: "Pagos"
+    description: "Cobro con tarjeta."
+    tasks:
+      - title: "Crear tabla de pagos"
+        description: "Debe relacionarse con pedidos."
+  - name: "Reportes"
+    description: "Reportes de ventas."
+    tasks: []
 ```
+
+- `stages` es obligatoria y con al menos una etapa; si falta o está vacía, responde `el fichero no tiene etapas`.
+- La raíz anterior `stage` se rechaza con `la raíz ahora es stages, con una lista de etapas`.
+- Las reglas de escritura y de claves son las mismas del proyecto: `name` y `description` son obligatorios en cada etapa y `tasks` puede faltar o ser una lista vacía.
 
 | Aspecto | Regla |
 | --- | --- |
-| Entrada | `project_id`, `path`, `reason` y `requested_by`. |
-| Proyecto | Debe estar en `working`; si no, responde `el proyecto no está en working`. |
-| Formato | Las mismas reglas de escritura y de claves. `name` y `description` son obligatorios; `tasks` puede faltar. |
-| Atomicidad | Valida el fichero completo y guarda en una sola transacción. Si algo falla, no se crea nada. Importar dos veces crea dos etapas. |
-| Salida | `project_id`, `stage_id`, `stage_name` y `task_count`. |
+| Entrada | `project_id` y `path`. `reason` y `requested_by` son obligatorios solo en `working`; en `planning` se ignoran. |
+| Proyecto | Debe estar en `planning` o en `working`; si no, responde `el proyecto debe estar en planning o en working`. |
+| Atomicidad | Valida el fichero completo y guarda en una sola transacción. Si algo falla, no se crea nada. Importar dos veces crea las etapas dos veces. |
+| Salida | `project_id` y `stages`: una lista con `stage_id`, `stage_name` y `task_count` por etapa, en el orden del fichero. |
 | Interfaz | Solo MCP, sin ruta REST. |
+| Permisos | Solo PP y el usuario. |
 
-Los errores indican su ubicación como `etapa: ...` y `tarea 2: ...`.
+En `working`, un `reason` ausente o de solo espacios responde `el motivo del cambio es obligatorio`, y lo mismo `requested_by` con `quién pidió el cambio es obligatorio`. Los errores del fichero indican su ubicación como `etapa 2: ...` y `etapa 2, tarea 3: ...`, con números desde 1.
 
 ## Errores
 

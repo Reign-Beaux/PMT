@@ -12,24 +12,28 @@ import (
 )
 
 type toolInput struct {
-	ProjectID   string `json:"project_id" jsonschema:"UUID del proyecto, que debe estar en working"`
+	ProjectID   string `json:"project_id" jsonschema:"UUID del proyecto, en planning o en working"`
 	Path        string `json:"path" jsonschema:"Ruta absoluta del fichero YAML, en la máquina donde corre pmt-server"`
-	Reason      string `json:"reason" jsonschema:"Motivo de la etapa"`
-	RequestedBy string `json:"requested_by" jsonschema:"Quién pidió la etapa"`
+	Reason      string `json:"reason,omitempty" jsonschema:"Motivo de las etapas, obligatorio en working"`
+	RequestedBy string `json:"requested_by,omitempty" jsonschema:"Quién pidió las etapas, obligatorio en working"`
 }
 
-type toolOutput struct {
-	ProjectID string `json:"project_id"`
+type stageOutput struct {
 	StageID   string `json:"stage_id"`
 	StageName string `json:"stage_name"`
 	TaskCount int    `json:"task_count"`
+}
+
+type toolOutput struct {
+	ProjectID string        `json:"project_id"`
+	Stages    []stageOutput `json:"stages"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "import_stage",
-		Description: "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. Solo PP y el usuario. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
+		Description: "Crea una o varias etapas con sus tareas desde un fichero YAML con raíz stages, en un proyecto en planning o en working. Solo PP y el usuario. En planning las crea como con create_stage y en working en su planning propio, como con add_stage, con reason y requested_by obligatorios. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea las etapas dos veces.",
 	}, h.callTool)
 }
 
@@ -53,10 +57,13 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}
 
-	return nil, toolOutput{
-		ProjectID: result.ProjectID.String(),
-		StageID:   result.StageID.String(),
-		StageName: result.StageName,
-		TaskCount: result.TaskCount,
-	}, nil
+	output := toolOutput{ProjectID: result.ProjectID.String(), Stages: make([]stageOutput, 0, len(result.Stages))}
+	for _, stage := range result.Stages {
+		output.Stages = append(output.Stages, stageOutput{
+			StageID:   stage.StageID.String(),
+			StageName: stage.StageName,
+			TaskCount: stage.TaskCount,
+		})
+	}
+	return nil, output, nil
 }

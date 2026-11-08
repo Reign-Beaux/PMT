@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 
+	stages "pmt/internal/features/stages/domain"
 	tasks "pmt/internal/features/tasks/domain"
 	"pmt/internal/kernel"
 )
@@ -65,8 +66,8 @@ type projectFile struct {
 	Project Project `yaml:"project"`
 }
 
-type stageFile struct {
-	Stage Stage `yaml:"stage"`
+type stagesFile struct {
+	Stages []Stage `yaml:"stages"`
 }
 
 // ReadProject lee y revisa un fichero con raíz project.
@@ -85,20 +86,58 @@ func ReadProject(path string) (Project, error) {
 	return parsed.Project, nil
 }
 
-// ReadStage lee y revisa un fichero con raíz stage.
-func ReadStage(path string) (Stage, error) {
+// ReadStages lee y revisa un fichero con raíz stages, una lista de etapas.
+func ReadStages(path string) ([]Stage, error) {
 	raw, err := read(path)
 	if err != nil {
-		return Stage{}, err
+		return nil, err
 	}
-	var parsed stageFile
+	// La raíz anterior se rechaza antes de decodificar: KnownFields(true) no
+	// admite un campo *yaml.Node de captura y "stage" daría clave desconocida.
+	if err := rejectLegacyRoot(raw); err != nil {
+		return nil, err
+	}
+	var parsed stagesFile
 	if err := decode(raw, &parsed); err != nil {
-		return Stage{}, err
+		return nil, err
 	}
-	if err := checkComments(raw, stageComments); err != nil {
-		return Stage{}, err
+	if len(parsed.Stages) == 0 {
+		return nil, kernel.Invalid("el fichero no tiene etapas")
 	}
-	return parsed.Stage, nil
+	if err := checkComments(raw, stagesComments); err != nil {
+		return nil, err
+	}
+	for i, entry := range parsed.Stages {
+		if err := entry.validate(i + 1); err != nil {
+			return nil, err
+		}
+	}
+	return parsed.Stages, nil
+}
+
+// rejectLegacyRoot rechaza un fichero que aún usa la raíz stage.
+func rejectLegacyRoot(raw []byte) error {
+	var document yaml.Node
+	if err := yaml.Unmarshal(raw, &document); err != nil {
+		return nil // el decode siguiente reporta el error de sintaxis
+	}
+	if len(document.Content) > 0 && fieldValue(document.Content[0], "stage") != nil {
+		return kernel.Invalid("la raíz ahora es stages, con una lista de etapas")
+	}
+	return nil
+}
+
+// validate revisa una etapa del fichero. El id descartable solo sirve para validar.
+func (s Stage) validate(n int) error {
+	where := fmt.Sprintf("etapa %d", n)
+	if _, err := stages.NewStage(uuid.Nil, s.Name, s.Description); err != nil {
+		return Located(where, err.Error())
+	}
+	if Blank(s.Description) {
+		return Located(where, DescriptionRequired)
+	}
+	_, err := s.BuildTasks(uuid.Nil, where+", ")
+	return err
 }
 
 // BuildTasks valida las tareas de la etapa. prefix antecede a su ubicación en los errores.
@@ -206,16 +245,20 @@ func projectComments(root *yaml.Node) error {
 	if commented(project, "name", "description") {
 		return Located("proyecto", commentInText)
 	}
-	for i, stage := range items(fieldValue(project, "stages")) {
+	return stagesListComments(fieldValue(project, "stages"))
+}
+
+func stagesComments(root *yaml.Node) error {
+	return stagesListComments(fieldValue(root, "stages"))
+}
+
+func stagesListComments(list *yaml.Node) error {
+	for i, stage := range items(list) {
 		if err := stageNodeComments(stage, fmt.Sprintf("etapa %d", i+1), fmt.Sprintf("etapa %d, ", i+1)); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func stageComments(root *yaml.Node) error {
-	return stageNodeComments(fieldValue(root, "stage"), "etapa", "")
 }
 
 func stageNodeComments(stage *yaml.Node, where, taskPrefix string) error {

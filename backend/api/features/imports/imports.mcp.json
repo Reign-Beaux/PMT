@@ -41,7 +41,7 @@
     }
   },
   {
-    "description": "Crea una etapa con sus tareas desde un fichero YAML con raíz stage, en un proyecto en working. Solo PP y el usuario. La etapa nace en su planning propio, como con add_stage. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea dos etapas.",
+    "description": "Crea una o varias etapas con sus tareas desde un fichero YAML con raíz stages, en un proyecto en planning o en working. Solo PP y el usuario. En planning las crea como con create_stage y en working en su planning propio, como con add_stage, con reason y requested_by obligatorios. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea las etapas dos veces.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -50,23 +50,21 @@
           "type": "string"
         },
         "project_id": {
-          "description": "UUID del proyecto, que debe estar en working",
+          "description": "UUID del proyecto, en planning o en working",
           "type": "string"
         },
         "reason": {
-          "description": "Motivo de la etapa",
+          "description": "Motivo de las etapas, obligatorio en working",
           "type": "string"
         },
         "requested_by": {
-          "description": "Quién pidió la etapa",
+          "description": "Quién pidió las etapas, obligatorio en working",
           "type": "string"
         }
       },
       "required": [
         "project_id",
-        "path",
-        "reason",
-        "requested_by"
+        "path"
       ],
       "type": "object"
     },
@@ -77,21 +75,36 @@
         "project_id": {
           "type": "string"
         },
-        "stage_id": {
-          "type": "string"
-        },
-        "stage_name": {
-          "type": "string"
-        },
-        "task_count": {
-          "type": "integer"
+        "stages": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "stage_id": {
+                "type": "string"
+              },
+              "stage_name": {
+                "type": "string"
+              },
+              "task_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "stage_id",
+              "stage_name",
+              "task_count"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         }
       },
       "required": [
         "project_id",
-        "stage_id",
-        "stage_name",
-        "task_count"
+        "stages"
       ],
       "type": "object"
     }

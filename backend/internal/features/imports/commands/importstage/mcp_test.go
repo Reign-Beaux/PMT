@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	projects "pmt/internal/features/projects/domain"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
@@ -35,8 +36,8 @@ func call(t *testing.T, repo Repository, args map[string]any) *sdk.CallToolResul
 	return result
 }
 
-func TestToolImportsStage(t *testing.T) {
-	repo := &fakeRepo{}
+func TestToolImportsStagesInWorking(t *testing.T) {
+	repo := &fakeRepo{status: projects.StatusWorking}
 
 	result := call(t, repo, map[string]any{
 		"project_id": uuid.New().String(), "path": writeFile(t, validFile), "reason": "Petición", "requested_by": "PM",
@@ -46,8 +47,39 @@ func TestToolImportsStage(t *testing.T) {
 		t.Fatalf("resultado = %+v", result)
 	}
 	output := result.StructuredContent.(map[string]any)
-	if output["stage_name"] != "Pagos" || output["task_count"] != float64(2) || output["stage_id"] != repo.saved[0].Stage.ID.String() {
-		t.Errorf("salida = %+v", output)
+	list, ok := output["stages"].([]any)
+	if !ok || len(list) != 2 {
+		t.Fatalf("salida = %+v", output)
+	}
+	first := list[0].(map[string]any)
+	if first["stage_name"] != "Pagos" || first["task_count"] != float64(2) || first["stage_id"] != repo.saved[0].Stage.ID.String() {
+		t.Errorf("primera etapa = %+v", first)
+	}
+	second := list[1].(map[string]any)
+	if second["stage_name"] != "Reportes" || second["task_count"] != float64(0) {
+		t.Errorf("segunda etapa = %+v", second)
+	}
+}
+
+func TestToolImportsStagesInPlanningWithoutReason(t *testing.T) {
+	repo := &fakeRepo{status: projects.StatusPlanning}
+
+	result := call(t, repo, map[string]any{
+		"project_id": uuid.New().String(), "path": writeFile(t, validFile),
+	})
+
+	if result.IsError {
+		t.Fatalf("resultado = %+v", result)
+	}
+	output := result.StructuredContent.(map[string]any)
+	list := output["stages"].([]any)
+	if len(list) != 2 || len(repo.saved) != 2 {
+		t.Fatalf("salida = %+v, guardadas = %d", output, len(repo.saved))
+	}
+	for _, plan := range repo.saved {
+		if plan.Stage.InOwnPlanning() {
+			t.Errorf("etapa = %+v", plan.Stage)
+		}
 	}
 }
 
@@ -63,7 +95,7 @@ func TestToolRejectsInvalidInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := call(t, &fakeRepo{}, map[string]any{
+			result := call(t, &fakeRepo{status: projects.StatusWorking}, map[string]any{
 				"project_id": tt.projectID, "path": tt.path, "reason": "M", "requested_by": "PM",
 			})
 
