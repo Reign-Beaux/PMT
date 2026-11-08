@@ -54,7 +54,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     put:
-      summary: Reemplaza los datos editables de un proyecto. Fuera de planning, product_version debe ser la actual. Un campo omitido queda vacío; status tiene su propia ruta
+      summary: Reemplaza los datos editables de un proyecto. Fuera de planning, product_version debe ser la actual; en working se sube con POST /api/projects/{id}/product-version. Un campo omitido queda vacío; status tiene su propia ruta
       description: Solo PP y el usuario.
       requestBody:
         $ref: "#/components/requestBodies/ProjectUpdateInput"
@@ -153,6 +153,71 @@ paths:
                   $ref: "#/components/schemas/StatusChange"
         "400":
           $ref: "#/components/responses/Error"
+  /api/projects/{id}/product-version:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Sube la versión de producto de un proyecto en working
+      description: Solo PP y el usuario. Solo con el proyecto en working; en otro status responde 409, y en planning la versión se cambia con PUT /api/projects/{id}. La versión debe tener la forma X.Y.Z, tres enteros sin signo y sin ceros a la izquierda, y ser mayor que la actual si esta también tiene esa forma; si no, responde 400. Guarda la versión y su registro inmutable en la misma transacción.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [product_version, reason]
+              properties:
+                product_version:
+                  type: string
+                  pattern: "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+                  description: Nueva versión, mayor que la actual.
+                reason:
+                  type: string
+                  minLength: 1
+                  description: Motivo del cambio; obligatorio, queda en el historial de versiones.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/projects/{id}/product-version-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista el historial inmutable de cambios de versión de producto de un proyecto
+      description: Funciona aunque el proyecto ya no exista. Un ID sin registros responde lista vacía. Los cambios hechos en planning con PUT /api/projects/{id} no quedan aquí.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Cambios en orden cronológico
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductVersionChange"
+        "400":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     bearerAuth:
@@ -212,6 +277,30 @@ components:
               error:
                 type: string
   schemas:
+    ProductVersionChange:
+      type: object
+      required: [id, project_id, from_version, to_version, actor_name, actor_profile, reason, changed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        from_version:
+          type: string
+          description: Versión anterior; puede estar vacía o no tener la forma X.Y.Z.
+        to_version:
+          type: string
+        actor_name:
+          type: string
+        actor_profile:
+          type: string
+        reason:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
     StatusChange:
       type: object
       required: [id, project_id, from_status, to_status, actor_name, actor_profile, reason, changed_at]

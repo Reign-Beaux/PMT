@@ -175,7 +175,7 @@
     }
   },
   {
-    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Solo PP y el usuario. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
+    "description": "Reemplaza el nombre, la descripción y la versión de producto de un proyecto de PMT y devuelve el proyecto completo. Solo PP y el usuario. Fuera de planning solo cambian el nombre y la descripción: la versión de producto debe enviarse igual a la actual. En working, la versión se sube con change_product_version. Usa list_projects para obtener su ID y sus valores actuales, y envía esos valores en los campos que no cambien.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -205,6 +205,69 @@
       "type": "object"
     },
     "name": "update_project",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "product_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "status",
+        "product_version",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Sube la versión de producto de un proyecto de PMT en working y devuelve el proyecto completo. Solo PP y el usuario. Solo con el proyecto en working; en planning la versión se cambia con update_project. La versión debe tener la forma X.Y.Z, tres enteros sin signo y sin ceros a la izquierda, y ser mayor que la actual si esta también tiene esa forma. El motivo es obligatorio. Deja un registro inmutable, consultable con list_product_version_changes. Usa list_projects para obtener el ID del proyecto y su versión actual.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "product_version": {
+          "description": "Nueva versión del producto con la forma X.Y.Z, mayor que la actual",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo del cambio de versión; obligatorio, queda en el historial",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "product_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "change_product_version",
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -324,6 +387,78 @@
               "project_id",
               "from_status",
               "to_status",
+              "actor_name",
+              "actor_profile",
+              "reason",
+              "changed_at"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "changes"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista el historial inmutable de cambios de versión de producto de un proyecto en orden cronológico: versión anterior, versión nueva, motivo, actor, perfil y fecha. Lo escribe change_product_version; los cambios hechos en planning con update_project no quedan aquí. Funciona aunque el proyecto ya no exista. Sin cambios devuelve una lista vacía.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto; sirve aunque ya no exista",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_product_version_changes",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "actor_name": {
+                "type": "string"
+              },
+              "actor_profile": {
+                "type": "string"
+              },
+              "changed_at": {
+                "type": "string"
+              },
+              "from_version": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "to_version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "project_id",
+              "from_version",
+              "to_version",
               "actor_name",
               "actor_profile",
               "reason",

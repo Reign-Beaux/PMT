@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/projects/commands/changeproductversion"
 	"pmt/internal/features/projects/commands/changestatus"
 	"pmt/internal/features/projects/commands/create"
 	"pmt/internal/features/projects/commands/delete"
@@ -18,6 +19,7 @@ import (
 	"pmt/internal/features/projects/queries/checkworking"
 	"pmt/internal/features/projects/queries/get"
 	"pmt/internal/features/projects/queries/list"
+	"pmt/internal/features/projects/queries/listproductversionchanges"
 	"pmt/internal/features/projects/queries/liststatuschanges"
 	"pmt/internal/features/projects/store"
 	"pmt/internal/features/projects/store/sqlcgen"
@@ -28,6 +30,7 @@ import (
 func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changestatus.StageProgress) {
 	repo := store.NewProjects(db)
 	statusChanges := store.NewStatusChanges(db)
+	versionChanges := store.NewProductVersionChanges(db)
 
 	createProject := create.New(repo)
 	createProject.Register(mux)
@@ -44,6 +47,13 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changes
 	updateProject.Register(mux)
 	updateProject.RegisterTool(tools)
 
+	changeProductVersion := changeproductversion.New(struct {
+		*store.Projects
+		*store.ProductVersionChanges
+	}{repo, versionChanges})
+	changeProductVersion.Register(mux)
+	changeProductVersion.RegisterTool(tools)
+
 	deleteProject := delete.New(repo)
 	deleteProject.Register(mux)
 	deleteProject.RegisterTool(tools)
@@ -57,6 +67,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changes
 	listStatusChanges := liststatuschanges.New(statusChanges)
 	listStatusChanges.Register(mux)
 	listStatusChanges.RegisterTool(tools)
+
+	listVersionChanges := listproductversionchanges.New(versionChanges)
+	listVersionChanges.Register(mux)
+	listVersionChanges.RegisterTool(tools)
 }
 
 // Checker permite a otras features saber qué admite un proyecto según su status.

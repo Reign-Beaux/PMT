@@ -31,3 +31,9 @@ WHERE id = $1;
 SELECT * FROM projects
 WHERE id = $1
 FOR UPDATE;
+
+-- name: UpdateProjectProductVersion :one
+UPDATE projects
+SET product_version = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;

@@ -167,6 +167,33 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 	return i, err
 }
 
+const updateProjectProductVersion = `-- name: UpdateProjectProductVersion :one
+UPDATE projects
+SET product_version = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, name, description, created_at, updated_at, status, product_version
+`
+
+type UpdateProjectProductVersionParams struct {
+	ID             uuid.UUID
+	ProductVersion string
+}
+
+func (q *Queries) UpdateProjectProductVersion(ctx context.Context, arg UpdateProjectProductVersionParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProjectProductVersion, arg.ID, arg.ProductVersion)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.ProductVersion,
+	)
+	return i, err
+}
+
 const updateProjectStatus = `-- name: UpdateProjectStatus :one
 UPDATE projects
 SET status = $2, updated_at = now()

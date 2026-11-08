@@ -97,6 +97,17 @@ type Finding struct {
 	ClosedAt     pgtype.Timestamptz
 }
 
+type ProductVersionChange struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	FromVersion  string
+	ToVersion    string
+	ActorName    string
+	ActorProfile string
+	Reason       string
+	ChangedAt    time.Time
+}
+
 type Project struct {
 	ID             uuid.UUID
 	Name           string

@@ -86,7 +86,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 6. **Decidir el camino tras CR:** con la tarea en `in_qa`, si la tarea crea una funcionalidad nueva o cambia una existente, y afecta frontend y backend, el TL levanta a QAP; si no, a QA.
 7. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
 8. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
-9. **Cerrar la etapa:** QA limpia sus datos de prueba al terminar cada ronda, y el TL lo comprueba antes de cerrar. Al cerrarla lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
+9. **Cerrar la etapa:** QA limpia sus datos de prueba al terminar cada ronda, y el TL lo comprueba antes de cerrar. Al cerrarla, si el proyecto ya estaba en `working` al iniciarla, avisa a PP para que suba la versión; luego lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
 
 **En todo momento:**
 
@@ -104,6 +104,18 @@ Un fallo hallado mientras se desarrolla no es un bug. Quien lo detecta avisa al 
 - **Dentro de su etapa:** el TL lo resuelve ahí, por ejemplo devolviendo la tarea con un hallazgo.
 - **Fuera de su etapa:** el TL se lo pasa a PP, que lo agrega con `add_task` en la etapa a la que pertenece ese trabajo, o con `revise_task` si esa tarea aún no está en `done`. Siempre con motivo: nada se edita, queda en el historial.
 
+## Versiones
+
+`product_version` tiene la forma `X.Y.Z`. PP la fija al planear con `update_project`; con el proyecto en `working` la sube con `change_product_version`, siempre con motivo, y queda en el historial.
+
+- **Mayor (X):** cambia la app entera o algo deja de ser compatible, como la API o el MCP. Solo con el visto bueno del usuario.
+- **Menor (Y):** funcionalidad nueva o ajuste que no rompe nada; normalmente, una etapa nueva al cerrarse.
+- **Parche (Z):** un bug cerrado.
+
+Al subir un dígito, los de su derecha vuelven a 0: de `1.1.3`, una funcionalidad nueva lleva a `1.2.0`.
+
+El TL avisa a PP al cerrar un bug, o una etapa iniciada con el proyecto ya en `working`, y PP sube el dígito que toca. Las etapas de la versión 1 no suben la versión: ya se fijó al planear.
+
 ## Flujo de bugs
 
 Un bug solo se registra con el proyecto en `working`, por un fallo hallado en pruebas de rutina o en el uso del sistema. Nadie espera otra orden: PP y cada perfil avisan al TL, y él levanta al siguiente con sesión nueva.
@@ -117,7 +129,7 @@ Un bug solo se registra con el proyecto en `working`, por un fallo hallado en pr
 | 5 | Dev | Sigue el plan: `in_dev`, corrige, `in_review`, con evidencia de los criterios que le tocan | CR |
 | 6 | CR | Revisa el código sin ejecutarlo, también contra el plan. Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 8 |
 | 7 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | Dev; si está bien, hace el paso 8 |
-| 8 | TL | Cierra en `done`, o regresa a CR o QA | CR o QA si lo regresa |
+| 8 | TL | Cierra en `done` y avisa a PP para que suba la versión, o regresa a CR o QA | CR o QA si lo regresa |
 
 - **Crear y corregir:** solo PP y `User` ejecutan `create_bug` y `update_bug`. Otro perfil que detecte un fallo avisa al TL, que es enteramente responsable de su etapa: lo resuelve dentro de ella y solo si por fuerza mayor va más allá de la etapa se lo pasa a PP. Un bug en `done` o `rejected` ya no se corrige.
 - **Sin dueño:** un bug no tiene dev ni TL asignado. El TL indica al dev en el comentario, y PMT no restringe qué dev o TL mueve el bug.
