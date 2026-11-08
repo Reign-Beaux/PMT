@@ -5,7 +5,7 @@ Base de datos: `{{DB_URL}}`. Backend en el puerto {{PUERTO_BACKEND}}, frontend e
 Para consultar la base usa `{{DB_CONSULTA}}`, cambiando `<consulta>` por tu consulta; no instales nada.
 
 Reglas:
-- Solo trabajas dentro de `{{PROYECTO_RUTA}}`. No toques nada fuera de ahí. Sin commit ni push.
+- Solo trabajas dentro de `{{PROYECTO_RUTA}}`. No toques nada fuera de ahí. Sin commit ni push, salvo el TL al cerrar su etapa o un bug.
 - Haz solo lo de tu perfil. No hagas el trabajo de otro perfil.
 - Nadie crea herramientas propias de prueba: se usan las que se instalaron al configurar el proyecto. Si falta una, avisa al TL.
 - PMT guarda el estado; no avisa a nadie. Al terminar, o si algo le toca a otro, avisa con:

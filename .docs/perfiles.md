@@ -86,7 +86,7 @@ Completa la tabla del flujo con quién actúa y cuándo.
 6. **Decidir el camino tras CR:** con la tarea en `in_qa`, si la tarea crea una funcionalidad nueva o cambia una existente, y afecta frontend y backend, el TL levanta a QAP; si no, a QA.
 7. **Aprobar en QA:** QA escribe en el motivo un resumen de lo verificado y la ruta del script o resultado. No hay adjuntos. PMT exige ese motivo, en tareas y bugs: sin él rechaza la aprobación. Si la evidencia difiere entre tareas, QA las aprueba una por una.
 8. **Cerrar la tarea:** el TL revisa si quedan tareas en `ready`. Si cerró el grupo, reinicia al dev y lo levanta con el siguiente.
-9. **Cerrar la etapa:** QA limpia sus datos de prueba al terminar cada ronda, y el TL lo comprueba antes de cerrar. Al cerrarla, si el proyecto ya estaba en `working` al iniciarla, avisa a PP para que suba la versión; luego lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
+9. **Cerrar la etapa:** QA limpia sus datos de prueba al terminar cada ronda, y el TL lo comprueba antes de cerrar. Antes de cerrar, el TL hace commit y push solo de los archivos que tocó su etapa, agregados por ruta, con el nombre de la etapa en el mensaje; lo ajeno lo deja fuera y lo anota en `para-usuario.md`, y si el push falla cierra igual y lo anota. Al cerrar un bug hace lo mismo, con el bug en el mensaje. Nadie más hace commit ni push. Al cerrarla, si el proyecto ya estaba en `working` al iniciarla, avisa a PP para que suba la versión; luego lo anota en `para-usuario.md` y termina su sesión; el usuario o PP levantan una nueva para la siguiente etapa.
 
 **En todo momento:**
 
@@ -129,7 +129,7 @@ Un bug solo se registra con el proyecto en `working`, por un fallo hallado en pr
 | 5 | Dev | Sigue el plan: `in_dev`, corrige, `in_review`, con evidencia de los criterios que le tocan | CR |
 | 6 | CR | Revisa el código sin ejecutarlo, también contra el plan. Falla: `changes_requested`. Interno: `pending_close`. Si no: `in_qa` | Dev o QA; si es interno, hace el paso 8 |
 | 7 | QA | Prueba y verifica los datos. Bien: `pending_close`. Si no: `changes_requested` | Dev; si está bien, hace el paso 8 |
-| 8 | TL | Cierra en `done` y avisa a PP para que suba la versión, o regresa a CR o QA | CR o QA si lo regresa |
+| 8 | TL | Hace commit y push de los archivos del bug, cierra en `done` y avisa a PP para que suba la versión, o regresa a CR o QA | CR o QA si lo regresa |
 
 - **Crear y corregir:** solo PP y `User` ejecutan `create_bug` y `update_bug`. Otro perfil que detecte un fallo avisa al TL, que es enteramente responsable de su etapa: lo resuelve dentro de ella y solo si por fuerza mayor va más allá de la etapa se lo pasa a PP. Un bug en `done` o `rejected` ya no se corrige.
 - **Sin dueño:** un bug no tiene dev ni TL asignado. El TL indica al dev en el comentario, y PMT no restringe qué dev o TL mueve el bug.
