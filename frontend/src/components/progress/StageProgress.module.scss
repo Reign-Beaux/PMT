@@ -12,22 +12,46 @@
 }
 
 .track {
+  display: flex;
   width: 100%;
   height: 0.5rem;
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: var(--color-surface-hover);
+  border-radius: var(--space-1);
 }
 
 .fill {
   height: 100%;
   max-width: 100%;
-  background-color: var(--color-success);
-  border-radius: var(--radius);
+  background-color: var(--lozenge-success-text);
+}
+
+.segment {
+  height: 100%;
+}
+
+.neutral {
+  background-color: var(--lozenge-neutral-text);
+}
+
+.info {
+  background-color: var(--lozenge-progress-text);
+}
+
+.success {
+  background-color: var(--lozenge-success-text);
+}
+
+.warning {
+  background-color: var(--lozenge-warning-text);
+}
+
+.danger {
+  background-color: var(--lozenge-danger-text);
 }
 
 .label {
   color: var(--color-text-muted);
-  font-size: 0.85em;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
 }

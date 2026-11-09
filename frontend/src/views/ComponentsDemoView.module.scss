@@ -1,3 +1,5 @@
+@use '../styles/buttons' as *;
+
 .page {
   min-width: 0;
   max-width: 48rem;
@@ -21,4 +23,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.demoButton {
+  @include button-secondary;
+
+  align-self: flex-start;
 }

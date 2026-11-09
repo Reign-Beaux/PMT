@@ -1,128 +1,47 @@
-import { useEffect } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { HttpError } from '../api/http'
-import { getProjectStages } from '../api/projects'
 import { getStageTasks } from '../api/tasks'
-import { Badge } from '../components/card/Badge'
-import { Card } from '../components/card/Card'
-import { ErrorState, Loading } from '../components/feedback'
-import { KanbanBoard, KanbanColumn } from '../components/kanban'
-import { StageProgress } from '../components/progress/StageProgress'
-import { groupTasksByStatus } from '../domain/groupTasksByStatus'
+import { useAsync } from '../hooks/useAsync'
+import { TASK_RESOURCES } from '../realtime/refreshResources'
+import { useDetailSelection } from '../routes/useDetailSelection'
+import { useProjectContext } from '../shell/useProjectContext'
+import { stageProgressDenominator, stageProgressPercent } from '../components/progress/stageProgress'
 import { STAGE_STATUS_LABELS } from '../domain/status'
 import { STAGE_STATUS_TONES } from '../domain/statusTone'
-import { useAsync } from '../hooks/useAsync'
-import { STAGE_RESOURCES } from '../realtime/refreshResources'
-import { useDetailSelection } from '../routes/useDetailSelection'
-import { useStageName } from '../shell/stageNameContext'
-import styles from './StageView.module.scss'
+import { QueryState } from '../components/QueryState'
+import { Empty } from '../components/feedback'
+import { Badge } from '../components/card/Badge'
+import { Filters } from '../components/Filters'
+import { Icon } from '../components/Icon'
+import { TaskTable } from './TaskTable'
 import { TaskDetailDialog } from './TaskDetail'
+import s from '../styles/App.module.scss'
 
 export function StageView() {
-  const { projectId, stageId } = useParams()
-  if (projectId === undefined || stageId === undefined) return null
-  return <StageBoard projectId={projectId} stageId={stageId} />
-}
-
-function StageBoard({
-  projectId,
-  stageId,
-}: {
-  projectId: string
-  stageId: string
-}) {
+  const { stageId } = useParams()
+  const { project, stages } = useProjectContext()
+  const tasks = useAsync(signal => getStageTasks(stageId!, { signal }), [stageId], { refreshOn: TASK_RESOURCES })
   const { selection, select, clear } = useDetailSelection()
-  const setStageName = useStageName()
-  const { status, data, error, retry } = useAsync(
-    async (signal) => {
-      const [tasks, stages] = await Promise.all([
-        // 404 = la etapa no existe: lo maneja la rama "Etapa no encontrada".
-        getStageTasks(stageId, { signal }).catch((err: unknown) => {
-          if (err instanceof HttpError && err.kind === 'http' && err.status === 404)
-            return null
-          throw err
-        }),
-        getProjectStages(projectId, { signal }),
-      ])
-      return { tasks: tasks ?? [], stages, missing: tasks === null }
-    },
-    [projectId, stageId],
-    { refreshOn: STAGE_RESOURCES },
-  )
+  const [filter, setFilter] = useState<'all' | 'active' | 'done'>('all')
+  const stage = stages.data?.stages.find(candidate => candidate.id === stageId)
+  const numbers = { total: tasks.data?.length ?? 0, done: tasks.data?.filter(task => task.status === 'done').length ?? 0, cancelled: tasks.data?.filter(task => task.status === 'cancelled').length ?? 0 }
+  const percent = stageProgressPercent(numbers)
+  const items = tasks.data?.filter(task => filter === 'all' || (filter === 'done' ? task.status === 'done' : !['done', 'cancelled'].includes(task.status)))
+  const missing = tasks.error?.status === 404 || (stages.data !== undefined && !stage)
 
-  const stage =
-    data !== undefined && !data.missing
-      ? data.stages.find((candidate) => candidate.id === stageId)
-      : undefined
-  const stageName = stage?.name
-
-  useEffect(() => {
-    setStageName(stageName)
-    return () => setStageName(undefined)
-  }, [stageName, setStageName])
-
-  return (
-    <section className={styles.view}>
-      {status === 'loading' && <Loading label="Cargando etapa…" />}
-      {status === 'error' && error !== undefined && (
-        <ErrorState message={error.message} onRetry={retry} />
-      )}
-      {data !== undefined && stage === undefined && (
-        <div className={styles.notFound}>
-          <p>Etapa no encontrada</p>
-          <Link to={`/projects/${projectId}`}>Volver al proyecto</Link>
-        </div>
-      )}
-      {data !== undefined && stage !== undefined && (
-        <>
-          <header className={styles.header}>
-            <h2 className={styles.name}>{stage.name}</h2>
-            <Badge
-              label={STAGE_STATUS_LABELS[stage.status]}
-              tone={STAGE_STATUS_TONES[stage.status]}
-            />
-            <StageProgress
-              done={data.tasks.filter((task) => task.status === 'done').length}
-              cancelled={
-                data.tasks.filter((task) => task.status === 'cancelled').length
-              }
-              total={data.tasks.length}
-            />
-          </header>
-          <KanbanBoard label="Tablero de la etapa">
-            {groupTasksByStatus(data.tasks).map((column) => (
-              <KanbanColumn
-                key={column.status}
-                id={column.status}
-                label={column.label}
-                count={column.tasks.length}
-              >
-                <ul className={styles.cards}>
-                  {column.tasks.map((task) => (
-                    <li key={task.id}>
-                      <Card
-                        title={task.title}
-                        id={task.id}
-                        subtitle={
-                          task.assignee !== undefined && task.assignee !== ''
-                            ? task.assignee
-                            : 'Sin asignar'
-                        }
-                        onOpen={() => select({ kind: 'task', id: task.id })}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </KanbanColumn>
-            ))}
-          </KanbanBoard>
-        </>
-      )}
-      {/* Hermano del tablero y fuera de sus estados: recargar con ?task= abre
-          el detalle aunque la etapa aún cargue o falle. */}
-      {selection?.kind === 'task' && (
-        <TaskDetailDialog taskId={selection.id} onClose={clear} />
-      )}
-    </section>
-  )
+  return <>
+    <QueryState result={stages} label="Cargando etapa…" />
+    {missing ? <section><h1>Etapa no encontrada</h1><Link to={`/projects/${project.id}`}>Volver al proyecto</Link></section> : <>
+      {stage && <>
+        <header className={s['page-heading']}><div><p className={s.eyebrow}>Etapa {String(stage.position).padStart(2, '0')} / {project.name}</p><div className={s['heading-line']}><h1>{stage.name}</h1><Badge label={STAGE_STATUS_LABELS[stage.status]} tone={STAGE_STATUS_TONES[stage.status]} /></div>
+          {stage.description && <p className={`${s['heading-subtitle']} ${s['project-heading-description']}`}>{stage.description}</p>}
+          <p className={s['heading-subtitle']}>Responsable: {stage.lead || 'Sin asignar'}</p>
+        </div></header>
+        <div className={`${s.panel} ${s['stage-summary']}`}><div className={s['stage-summary-left']}><Icon name="layers" /><span><strong>{numbers.done} de {stageProgressDenominator(numbers)} tareas</strong> terminadas</span></div><div className={s['stage-summary-right']}><div className={`${s.track} ${s.purple}`} role="progressbar" aria-label="Avance de la etapa" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></div><strong>{percent}%</strong><span>de avance</span></div></div>
+      </>}
+      <QueryState result={tasks} label="Cargando tareas…" />
+      {stage && tasks.data && <section aria-label="Tareas de la etapa"><div className={s['section-toolbar']}><h2>Tareas <span className={s.count}>{tasks.data.length}</span></h2><Filters label="Filtrar tareas" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Todas' }, { value: 'active', label: 'En curso' }, { value: 'done', label: 'Terminadas' }]} /></div>{items?.length ? <TaskTable tasks={items} onOpen={id => select({ kind: 'task', id })} /> : <Empty message={tasks.data.length === 0 ? 'Esta etapa no tiene tareas' : 'No hay tareas para este filtro'} />}</section>}
+    </>}
+    {selection?.kind === 'task' && <TaskDetailDialog key={selection.id} taskId={selection.id} onClose={clear} />}
+  </>
 }

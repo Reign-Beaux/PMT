@@ -2,6 +2,7 @@ import { getComments } from '../../api/comments'
 import { formatDate } from '../../domain/formatDate'
 import { useAsync } from '../../hooks/useAsync'
 import { COMMENT_RESOURCES } from '../../realtime/refreshResources'
+import { Avatar } from '../avatar/Avatar'
 import { Empty, ErrorState, Loading } from '../feedback'
 import styles from './Detail.module.scss'
 
@@ -37,8 +38,9 @@ export function CommentList({ itemKind, itemId }: CommentListProps) {
       {comments.length > 0 && (
         <ol className={styles.list}>
           {comments.map((comment) => (
-            <li key={comment.id} className={styles.item}>
+            <li key={comment.id} className={`${styles.box} ${styles.item}`}>
               <p className={styles.meta}>
+                <Avatar name={comment.actor_name} decorative />
                 <span>
                   {comment.actor_profile !== ''
                     ? `${comment.actor_name} (${comment.actor_profile})`

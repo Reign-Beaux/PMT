@@ -34,7 +34,7 @@ describe('stageProgressFor', () => {
 
     const numbers = stageProgressFor('s1', progress)
 
-    expect(numbers).toEqual({ done: 0, total: 0, cancelled: 0 })
+    expect(numbers).toEqual({ done: 0, total: 0, cancelled: 0, counts: {} })
     expect(stageProgressPercent(numbers)).toBe(0)
   })
 
@@ -43,7 +43,7 @@ describe('stageProgressFor', () => {
 
     const numbers = stageProgressFor('s1', progress)
 
-    expect(numbers).toEqual({ done: 0, total: 0, cancelled: 0 })
+    expect(numbers).toEqual({ done: 0, total: 0, cancelled: 0, counts: {} })
     expect(stageProgressPercent(numbers)).toBe(0)
   })
 
@@ -52,16 +52,26 @@ describe('stageProgressFor', () => {
 
     const numbers = stageProgressFor('s1', progress)
 
-    expect(numbers).toEqual({ done: 0, total: 3, cancelled: 3 })
+    expect(numbers).toEqual({
+      done: 0,
+      total: 3,
+      cancelled: 3,
+      counts: { cancelled: 3 },
+    })
     expect(stageProgressPercent(numbers)).toBe(0)
   })
 
-  it('done 2 de 3 → 67 %', () => {
+  it('done 2 de 3 → 67 % y devuelve los counts de la etapa', () => {
     const progress = makeProgress([makeStage('s1', { done: 2, in_dev: 1 })])
 
     const numbers = stageProgressFor('s1', progress)
 
-    expect(numbers).toEqual({ done: 2, total: 3, cancelled: 0 })
+    expect(numbers).toEqual({
+      done: 2,
+      total: 3,
+      cancelled: 0,
+      counts: { done: 2, in_dev: 1 },
+    })
     expect(stageProgressPercent(numbers)).toBe(67)
   })
 
@@ -70,7 +80,12 @@ describe('stageProgressFor', () => {
 
     const numbers = stageProgressFor('s1', progress)
 
-    expect(numbers).toEqual({ done: 0, total: 5, cancelled: 0 })
+    expect(numbers).toEqual({
+      done: 0,
+      total: 5,
+      cancelled: 0,
+      counts: { ready: 4, backlog: 1 },
+    })
   })
 
   it('las canceladas no cuentan para el porcentaje: 2 done, 1 cancelada → 100 %', () => {
@@ -80,7 +95,12 @@ describe('stageProgressFor', () => {
 
     const numbers = stageProgressFor('s1', progress)
 
-    expect(numbers).toEqual({ done: 2, total: 3, cancelled: 1 })
+    expect(numbers).toEqual({
+      done: 2,
+      total: 3,
+      cancelled: 1,
+      counts: { done: 2, cancelled: 1 },
+    })
     expect(stageProgressPercent(numbers)).toBe(100)
   })
 })

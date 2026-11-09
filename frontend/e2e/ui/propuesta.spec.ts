@@ -1,0 +1,161 @@
+import { test, expect } from '@playwright/test'
+import { ids, mockApi, project, stage } from './fixtures'
+
+const base = `/projects/${ids.project}`
+const stagePath = `${base}/stages/${ids.stage}`
+
+test('navegación y contexto idéntico entre Etapas y Bugs', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/projects$/)
+  const nav = page.getByRole('navigation', { name: 'Navegación principal' })
+  await expect(nav.getByRole('link')).toHaveText(['Dashboard', 'Projects'])
+  await page.getByRole('link', { name: /PMT En operación/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(project.name)
+  await expect(page.locator('main')).toContainText(project.description)
+  const header = await page.locator('main > header').innerText()
+  const metrics = await page.getByRole('region', { name: 'Resumen del proyecto' }).innerText()
+  const sidebar = await page.getByRole('complementary', { name: 'Información del proyecto' }).innerText()
+  const tabs = page.getByRole('navigation', { name: 'Secciones del proyecto' })
+  await tabs.getByRole('link', { name: /Bugs/ }).click()
+  await expect(page.getByRole('button', { name: 'Desbordamiento en móvil' })).toBeVisible()
+  expect(await page.locator('main > header').innerText()).toBe(header)
+  expect(await page.getByRole('region', { name: 'Resumen del proyecto' }).innerText()).toBe(metrics)
+  expect(await page.getByRole('complementary', { name: 'Información del proyecto' }).innerText()).toBe(sidebar)
+  await tabs.getByRole('link', { name: /Etapas/ }).click()
+  await expect(page.getByRole('region', { name: 'Etapas del proyecto' })).toBeVisible()
+})
+
+test('título como único acceso a la tarea, pestañas y transiciones completas', async ({ page }) => {
+  await mockApi(page)
+  await page.goto(stagePath)
+  await expect(page.locator('main')).toContainText(stage.description)
+  const row = page.getByRole('row').filter({ hasText: 'Tarea 12' })
+  await expect(row.getByRole('button')).toHaveCount(1)
+  await expect(page.getByRole('columnheader')).toHaveCount(5)
+  await row.getByRole('button').click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('tab', { name: 'Comentarios' })).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('listitem').first()).toContainText('<script>literal</script>')
+  await expect(dialog.locator('script')).toHaveCount(0)
+  await dialog.getByRole('tab', { name: 'Historial' }).click()
+  const changes = dialog.getByRole('region', { name: 'Historial de estados' }).getByRole('listitem')
+  await expect(changes).toHaveCount(2)
+  await expect(changes.first()).toContainText('Lista → En desarrollo')
+  await expect(changes.last()).toContainText('En desarrollo → En revisión')
+  await expect(changes.last()).toContainText('pmt-frontend-devfront (DevFrontend)')
+  await expect(changes.last().locator('time')).toHaveAttribute('datetime', '2026-11-07T16:00:00-06:00')
+  await expect(changes.last()).toContainText('Revisión solicitada.')
+  await expect(dialog.getByRole('region', { name: 'Comentarios' })).toBeHidden()
+  await page.keyboard.press('ArrowLeft')
+  await expect(dialog.getByRole('tab', { name: 'Comentarios' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(row.getByRole('button')).toBeFocused()
+  expect(new URL(page.url()).searchParams.has('task')).toBe(false)
+})
+
+for (const width of [1280, 390]) {
+  test(`scroll independiente y cierre sin salto a ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 650 })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await mockApi(page)
+    await page.goto(stagePath)
+    const trigger = page.getByRole('button', { name: 'Tarea 12 — Validación de interfaz', exact: true })
+    await trigger.scrollIntoViewIfNeeded()
+    const y = await page.evaluate(() => scrollY)
+    await trigger.click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('tab', { name: 'Historial' })).toBeVisible()
+    const scroller = page.getByTestId('detail-scroll')
+    await scroller.hover()
+    await page.mouse.wheel(0, 900)
+    await expect.poll(() => scroller.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+    expect(await page.evaluate(() => scrollY)).toBe(y)
+    await scroller.evaluate(el => { el.scrollTop = el.scrollHeight })
+    await page.mouse.wheel(0, 900)
+    expect(await page.evaluate(() => scrollY)).toBe(y)
+    await dialog.getByRole('button', { name: 'Cerrar detalle', exact: true }).last().click()
+    await expect(dialog).toHaveCount(0)
+    expect(await page.evaluate(() => scrollY)).toBe(y)
+    await expect(trigger).toBeFocused()
+  })
+}
+
+test('URL compartible, recarga, datos vacíos y 404', async ({ page }) => {
+  await mockApi(page)
+  await page.goto(`${stagePath}?extra=conservar&task=tarea-1`)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('Sin comentarios')).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Historial' }).click()
+  await expect(dialog.getByText('Sin cambios de estado')).toBeVisible()
+  await page.reload()
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  expect(new URL(page.url()).searchParams.get('extra')).toBe('conservar')
+  await page.goto(`${stagePath}?task=inexistente`)
+  await expect(page.getByRole('dialog', { name: 'Tarea no encontrada' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.goto('/projects/inexistente')
+  await expect(page.getByRole('heading', { name: 'Proyecto no encontrado' })).toBeVisible()
+})
+
+test('refresco de tarea e historial sin conexiones nuevas al navegar', async ({ page }) => {
+  const api = await mockApi(page)
+  await page.goto(stagePath)
+  await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'En vivo' })).toBeVisible()
+  const connections = api.connections()
+  await page.getByRole('button', { name: 'Tarea 12 — Validación de interfaz', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('En revisión', { exact: true })).toBeVisible()
+  api.state.tasks[11].status = 'done'
+  api.state.tasks[11].done_at = '2026-11-09T10:00:00-06:00'
+  api.send('task')
+  await expect(dialog.getByText('Terminada', { exact: true })).toBeVisible()
+  await dialog.getByRole('tab', { name: 'Historial' }).click()
+  api.state.history.push({ id: 'h3', task_id: 'tarea-12', from_status: 'pending_close', to_status: 'done', actor_name: 'pmt-frontend-tl', actor_profile: 'TL', reason: 'Cierre registrado', changed_at: '2026-11-09T10:00:00-06:00' })
+  api.send('status_change')
+  await expect(dialog.getByText('Cierre registrado')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.goto(base)
+  await page.getByRole('navigation', { name: 'Secciones del proyecto' }).getByRole('link', { name: /Bugs/ }).click()
+  // Una recarga crea otra conexión; cambiar pestañas dentro de la app no.
+  const afterReload = api.connections()
+  await page.getByRole('navigation', { name: 'Secciones del proyecto' }).getByRole('link', { name: /Etapas/ }).click()
+  expect(api.connections()).toBe(afterReload)
+  expect(connections).toBeGreaterThan(0)
+})
+
+test('errores con reintento y listado vacío', async ({ page }) => {
+  const api = await mockApi(page)
+  api.state.failProjects = 100
+  await page.goto('/projects')
+  await expect(page.getByRole('alert')).toContainText('Servicio temporalmente no disponible')
+  api.state.failProjects = 0
+  await page.getByRole('button', { name: 'Reintentar' }).click()
+  await expect(page.getByRole('heading', { name: 'PMT', exact: true })).toBeVisible()
+  api.state.projects = []
+  api.send('project')
+  await expect(page.getByText('No hay proyectos', { exact: true })).toBeVisible()
+})
+
+test('vistas y detalles sin desbordamiento entre 360 y 1512 px', async ({ page }, testInfo) => {
+  await mockApi(page)
+  for (const width of [1512, 1024, 768, 390, 360]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const path of ['/dashboard', '/projects', base, `${base}/bugs`, stagePath]) {
+      await page.goto(path)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    }
+  }
+  await page.setViewportSize({ width: 1512, height: 1100 })
+  await page.goto(base)
+  await expect(page.getByRole('region', { name: 'Resumen del proyecto' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('proyecto-desktop.png'), fullPage: true })
+  await page.goto(`${stagePath}?task=tarea-12`)
+  await page.getByRole('dialog').getByRole('tab', { name: 'Historial' }).click()
+  await page.getByRole('region', { name: 'Historial de estados' }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('historial-desktop.png') })
+})

@@ -5,5 +5,5 @@ export interface EmptyProps {
 }
 
 export function Empty({ message }: EmptyProps) {
-  return <p className={styles.inline}>{message}</p>
+  return <p className={styles.empty}>{message}</p>
 }

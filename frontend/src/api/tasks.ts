@@ -19,6 +19,7 @@ export interface Task {
   created_at: string
   updated_at: string
   assignee?: string
+  done_at?: string
 }
 
 function validateTask(value: unknown): Task {
@@ -34,6 +35,8 @@ function validateTask(value: unknown): Task {
   }
   const assignee = optionalString(record, 'assignee')
   if (assignee !== undefined) task.assignee = assignee
+  const doneAt = optionalString(record, 'done_at')
+  if (doneAt !== undefined) task.done_at = doneAt
   return task
 }
 

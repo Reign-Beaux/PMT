@@ -76,12 +76,30 @@ describe('rutas y datos', () => {
     expect(task).toEqual(TASK_WITHOUT_ASSIGNEE)
     expect(task).not.toHaveProperty('assignee')
   })
+
+  it('done_at string se conserva', async () => {
+    const doneAt = '2026-11-05T18:20:30-06:00'
+    stubFetch({ ...TASK_WITH_ASSIGNEE, done_at: doneAt })
+
+    const task = await getTask(TASK_WITH_ASSIGNEE.id)
+
+    expect(task.done_at).toBe(doneAt)
+  })
+
+  it('done_at ausente se omite', async () => {
+    stubFetch(TASK_WITH_ASSIGNEE)
+
+    const task = await getTask(TASK_WITH_ASSIGNEE.id)
+
+    expect(task).not.toHaveProperty('done_at')
+  })
 })
 
 describe('datos inválidos', () => {
   it.each([
     ['estado desconocido', { ...TASK_WITH_ASSIGNEE, status: 'archived' }],
     ['title que no es string', { ...TASK_WITH_ASSIGNEE, title: 42 }],
+    ['done_at que no es string', { ...TASK_WITH_ASSIGNEE, done_at: 17 }],
   ])('tarea con %s rechaza con invalid_response', async (_caso, body) => {
     stubFetch(body)
 

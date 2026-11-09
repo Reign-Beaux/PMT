@@ -1,15 +1,20 @@
 import { getBugHistory, getTaskHistory } from '../../api/history'
 import { formatDate } from '../../domain/formatDate'
 import { BUG_STATUS_LABELS, TASK_STATUS_LABELS } from '../../domain/status'
+import { BUG_STATUS_TONES, TASK_STATUS_TONES } from '../../domain/statusTone'
 import { useAsync } from '../../hooks/useAsync'
 import { STATUS_CHANGE_RESOURCES } from '../../realtime/refreshResources'
+import type { BadgeTone } from '../card/Badge'
+import { Badge } from '../card/Badge'
 import { Empty, ErrorState, Loading } from '../feedback'
 import styles from './Detail.module.scss'
 
 interface HistoryRow {
   id: string
   from: string
+  fromTone: BadgeTone
   to: string
+  toTone: BadgeTone
   actor_name: string
   actor_profile: string
   reason: string
@@ -29,7 +34,9 @@ export function StatusHistory({ itemKind, itemId }: StatusHistoryProps) {
         return changes.map((change) => ({
           id: change.id,
           from: TASK_STATUS_LABELS[change.from_status],
+          fromTone: TASK_STATUS_TONES[change.from_status],
           to: TASK_STATUS_LABELS[change.to_status],
+          toTone: TASK_STATUS_TONES[change.to_status],
           actor_name: change.actor_name,
           actor_profile: change.actor_profile,
           reason: change.reason,
@@ -40,7 +47,9 @@ export function StatusHistory({ itemKind, itemId }: StatusHistoryProps) {
       return changes.map((change) => ({
         id: change.id,
         from: BUG_STATUS_LABELS[change.from_status],
+        fromTone: BUG_STATUS_TONES[change.from_status],
         to: BUG_STATUS_LABELS[change.to_status],
+        toTone: BUG_STATUS_TONES[change.to_status],
         actor_name: change.actor_name,
         actor_profile: change.actor_profile,
         reason: change.reason,
@@ -69,12 +78,14 @@ export function StatusHistory({ itemKind, itemId }: StatusHistoryProps) {
         <Empty message="Sin cambios de estado" />
       )}
       {rows.length > 0 && (
-        <ol className={styles.list}>
+        <ol className={`${styles.list} ${styles.historyList}`}>
           {rows.map((row) => (
-            <li key={row.id} className={styles.item}>
+            <li key={row.id} className={`${styles.item} ${styles.historyItem}`}>
               <p className={styles.meta}>
                 <span>
-                  {row.from} → {row.to}
+                  <Badge label={row.from} tone={row.fromTone} />
+                  {' → '}
+                  <Badge label={row.to} tone={row.toTone} />
                 </span>
                 <span>
                   {row.actor_profile !== ''
@@ -84,7 +95,7 @@ export function StatusHistory({ itemKind, itemId }: StatusHistoryProps) {
                 <time dateTime={row.changed_at}>{formatDate(row.changed_at)}</time>
               </p>
               {row.reason.trim() !== '' && (
-                <p className={styles.preformatted}>{row.reason}</p>
+                <p className={styles.reason}>{row.reason}</p>
               )}
             </li>
           ))}

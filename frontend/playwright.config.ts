@@ -18,12 +18,13 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
+    launchOptions: process.env.PMT_BROWSER_PATH ? { executablePath: process.env.PMT_BROWSER_PATH } : {},
   },
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: /etapa5-tiempo-real\.spec\.ts/,
+      testIgnore: [/etapa5-tiempo-real\.spec\.ts/, /\/ui\//],
     },
     {
       // La reconexión detiene y relanza el 8090: corre al final, cuando ningún

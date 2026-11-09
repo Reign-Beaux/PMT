@@ -11,7 +11,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "e2e:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
-    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test"
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
+    "test:ui": "playwright test --config=playwright.ui.config.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -20,22 +21,22 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
-    "@playwright/test": "^1.65.0",
-    "@rolldown/plugin-babel": "^0.2.4",
-    "@testing-library/dom": "^10.4.2",
-    "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.8",
+    "@rolldown/plugin-babel": "^0.3.0",
     "@types/babel__core": "^7.20.5",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "babel-plugin-react-compiler": "^1.0.0",
-    "jsdom": "^31.0.0",
-    "oxlint": "^1.89.0",
-    "sass": "^1.108.0",
+    "oxlint": "^1.90.0",
     "typescript": "~7.0.2",
-    "vite": "^8.3.5",
+    "vite": "^8.3.6",
+    "@playwright/test": "^1.65.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "jsdom": "^31.0.0",
+    "sass": "^1.108.0",
     "vitest": "^5.1.0"
   }
 }

@@ -68,12 +68,12 @@ describe('statusTone', () => {
   it('mapeos esperados de tarea', () => {
     expect(TASK_STATUS_TONES).toEqual({
       backlog: 'neutral',
-      ready: 'neutral',
+      ready: 'info',
       in_dev: 'info',
       in_review: 'info',
       changes_requested: 'warning',
       in_qa: 'info',
-      pending_close: 'success',
+      pending_close: 'info',
       done: 'success',
       cancelled: 'danger',
     })
@@ -96,7 +96,7 @@ describe('statusTone', () => {
       in_review: 'info',
       changes_requested: 'warning',
       in_qa: 'info',
-      pending_close: 'success',
+      pending_close: 'info',
       done: 'success',
       rejected: 'danger',
     })

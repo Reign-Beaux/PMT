@@ -1,7 +1,21 @@
 # Frontend de PMT
 
-Interfaz web de PMT: React 19 + TypeScript + Vite, estilos con Sass (SCSS Modules)
-y tema oscuro propio. UI en español, de solo lectura en esta etapa.
+Interfaz web de PMT: React 19 + TypeScript + Vite, React Compiler y estilos con Sass (SCSS Modules). UI de consulta en español. Implementa la propuesta aprobada de `codex/propuesta` con datos reales de la API.
+
+## Interfaz
+
+- Navegación principal: Dashboard y Projects. `/` conserva el acceso al listado redirigiendo a `/projects`.
+- `/dashboard`: indicadores calculados a partir de proyectos, etapas, tareas y bugs existentes.
+- `/projects`: catálogo de proyectos.
+- `/projects/:projectId`: descripción visible, indicadores, etapas y responsable de la etapa activa.
+- `/projects/:projectId/bugs`: comparte exactamente la cabecera, descripción, indicadores y panel lateral del proyecto; cambia la lista.
+- `/projects/:projectId/stages/:stageId`: descripción visible y tabla de tareas; el título es el único acceso al detalle.
+- `?task=<id>` y `?bug=<id>` abren el detalle y se conservan al recargar. Los demás parámetros de consulta no se borran al cerrar.
+- Detalles con pestañas de Comentarios e Historial, transiciones completas, autor y perfil, fecha/hora y motivo. Todo el texto se muestra como texto plano, conservando saltos de línea.
+- Diálogo nativo con foco contenido, Escape, cierre desde el fondo, scroll independiente y devolución del foco sin mover la lista.
+- No se añaden entidades ni campos al backend. El porcentaje de avance excluye las tareas canceladas.
+
+Los clientes de API, validadores, selección por URL, conexión WebSocket y reglas de aislamiento proceden de `frontend_og`, que se conserva sin modificaciones. Se mantienen los plugins de React, React Compiler mediante Babel/Rolldown, Oxlint, Vitest y Playwright. Las versiones ya presentes en el scaffold nuevo se conservan; se agregan las dependencias faltantes del OG.
 
 ## Requisitos
 
@@ -21,6 +35,7 @@ pnpm build          # tsc -b + vite build → dist/
 pnpm lint           # oxlint
 pnpm test:run       # Vitest, una ejecución (unitarias: src/ y config/)
 pnpm test           # Vitest en modo watch
+pnpm test:ui        # Playwright: recorridos UI con HTTP/WebSocket controlados, sin base
 pnpm test:e2e       # Playwright contra 5173 + backend de pruebas en 8090
 ```
 
@@ -74,6 +89,12 @@ al recibir cambios; no hay sondeo HTTP periódico:
   recurso afectado y un `resync` (al reconectar) refresca todo lo visible, así
   que los cambios hechos con la conexión caída aparecen al volver sin recargar.
 
+## Pruebas de la interfaz
+
+`pnpm test:ui` inicia su propio Vite y valida navegación, cabecera compartida, descripciones, apertura por título, pestañas, historial, foco, scroll, errores, recarga por URL, eventos y cinco anchos de pantalla (360–1512 px). Las respuestas controladas solo existen en `e2e/ui`; la aplicación no contiene fixtures ni un modo de demostración.
+
+Los navegadores se instalan con `pnpm e2e:install`. Si ya existe un Chromium de sistema, puede indicarse mediante `PMT_BROWSER_PATH=/ruta/al/chromium`. Las pruebas unitarias y estas pruebas de UI no requieren `PMT_TEST_DATABASE_URL`.
+
 ## Harness de pruebas e2e
 
 `pnpm test:e2e` usa el harness de `e2e/harness/` (ver `playwright.config.ts`):
@@ -97,16 +118,7 @@ al recibir cambios; no hay sondeo HTTP periódico:
    (`restantes 0` en consola y en las anotaciones del test, sin credenciales).
 6. Playwright baja solo los procesos que él levantó.
 
-Las pruebas se reparten en dos proyectos de Playwright: `chromium` (todos los
-specs) y `reconexion` (`e2e/etapa5-tiempo-real.spec.ts`, que detiene y relanza
-el backend del 8090 y por eso depende de `chromium` y corre al final, cuando
-ningún otro spec usa el backend). Si el 8090 lo levantó un proceso ajeno, ese
-spec se salta con el mensaje "8090 no lo levantó este run: no se detiene" y
-nunca lo mata. Para correrlo aislado:
-
-```sh
-pnpm test:e2e --project=reconexion --no-deps
-```
+El recorrido real de `e2e/recorrido.real.spec.ts` crea sus datos mediante el harness y verifica proyectos, etapas, tareas, comentarios, transiciones y foco. El harness exige `PMT_TEST_DATABASE_URL`; sin esta variable no se ejecutan pruebas contra una base real. La configuración mantiene la separación del proyecto de reconexión del OG para incorporar sus pruebas sin interferir con el resto.
 
 Comprobación de limpieza tras una ejecución:
 

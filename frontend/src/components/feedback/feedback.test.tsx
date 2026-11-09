@@ -16,6 +16,40 @@ describe('Loading', () => {
   })
 })
 
+describe('Loading — variantes con esqueleto (tarea 11)', () => {
+  it.each(['list', 'detail'] as const)(
+    'variante %s: el role status tiene exactamente el label y el esqueleto es aria-hidden sin texto',
+    (variant) => {
+      const { container } = render(
+        <Loading label="Cargando contenido…" variant={variant} />,
+      )
+      expect(screen.getByRole('status').textContent).toBe(
+        'Cargando contenido…',
+      )
+      const skeleton = container.querySelector('[aria-hidden="true"]')
+      expect(skeleton).not.toBeNull()
+      expect(skeleton?.textContent).toBe('')
+      expect(skeleton?.querySelectorAll('div').length).toBeGreaterThan(0)
+    },
+  )
+
+  it('la variante por defecto no renderiza esqueleto', () => {
+    const { container } = render(<Loading label="Cargando contenido…" />)
+    expect(screen.getByRole('status').textContent).toBe(
+      'Cargando contenido…',
+    )
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull()
+  })
+
+  it.each(['list', 'detail'] as const)(
+    'variante %s sin label muestra "Cargando…"',
+    (variant) => {
+      render(<Loading variant={variant} />)
+      expect(screen.getByRole('status').textContent).toBe('Cargando…')
+    },
+  )
+})
+
 describe('Empty', () => {
   it('muestra el mensaje', () => {
     render(<Empty message="No hay tareas en esta columna" />)

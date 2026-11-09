@@ -5,6 +5,7 @@ export interface StageProgressNumbers {
   done: number
   total: number
   cancelled: number
+  counts: Record<string, number>
 }
 
 /** Une una etapa con su entrada de progress; sin entrada devuelve ceros. */
@@ -13,11 +14,13 @@ export function stageProgressFor(
   progress: Progress,
 ): StageProgressNumbers {
   const stage = progress.stages.find((candidate) => candidate.id === stageId)
-  if (stage === undefined) return { done: 0, total: 0, cancelled: 0 }
+  if (stage === undefined)
+    return { done: 0, total: 0, cancelled: 0, counts: {} }
   return {
     done: countOf(stage.counts, 'done'),
     cancelled: countOf(stage.counts, 'cancelled'),
     total: Object.values(stage.counts).reduce((sum, count) => sum + count, 0),
+    counts: stage.counts,
   }
 }
 

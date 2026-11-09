@@ -1,7 +1,25 @@
+@use '../../styles/buttons' as *;
+
 .inline {
   min-width: 0;
   margin: 0;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.empty {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--color-text-muted);
+  text-align: center;
   overflow-wrap: anywhere;
 }
 
@@ -13,22 +31,87 @@
   min-width: 0;
   padding: var(--space-3) var(--space-4);
   color: var(--color-text);
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  background-color: var(--lozenge-danger-bg);
+  border: 1px solid var(--lozenge-danger-text);
+  border-radius: var(--radius-md);
   overflow-wrap: anywhere;
 }
 
 .retry {
-  min-height: 44px;
-  padding: var(--space-2) var(--space-4);
-  color: var(--color-text);
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  cursor: pointer;
+  @include button-primary;
 
-  &:hover {
-    border-color: var(--color-accent);
+  // Área táctil existente.
+  min-height: 44px;
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 0%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shine 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shine {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.row {
+  width: 100%;
+  height: 16px;
+}
+
+.skeletonDetail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.skeletonDetailMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  width: 60%;
+  height: 24px;
+}
+
+.side {
+  height: 160px;
+}
+
+@media (min-width: 768px) {
+  .skeletonDetail {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
   }
 }

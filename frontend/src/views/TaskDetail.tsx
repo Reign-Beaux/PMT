@@ -1,101 +1,33 @@
-import type { Task } from '../api/tasks'
-import { getTask } from '../api/tasks'
-import { Badge } from '../components/card/Badge'
-import { CommentList } from '../components/detail/CommentList'
-import { StatusHistory } from '../components/detail/StatusHistory'
-import { DetailDialog } from '../components/dialog/DetailDialog'
-import { ErrorState, Loading } from '../components/feedback'
+import { getTask, type Task } from '../api/tasks'
+import { useAsync } from '../hooks/useAsync'
+import { TASK_RESOURCES } from '../realtime/refreshResources'
 import { formatDate } from '../domain/formatDate'
 import { TASK_STATUS_LABELS } from '../domain/status'
 import { TASK_STATUS_TONES } from '../domain/statusTone'
-import { useAsync } from '../hooks/useAsync'
-import { TASK_RESOURCES } from '../realtime/refreshResources'
-import styles from './BugsView.module.scss'
+import { Badge } from '../components/card/Badge'
+import { Avatar } from '../components/avatar/Avatar'
+import { ActivityTabs } from '../components/detail/ActivityTabs'
+import { DetailDialog } from '../components/dialog/DetailDialog'
+import { QueryState } from '../components/QueryState'
+import s from '../styles/App.module.scss'
 
-export function TaskDetailDialog({
-  taskId,
-  onClose,
-}: {
-  taskId: string
-  onClose: () => void
-}) {
-  const { status, data, error, retry } = useAsync(
-    (signal) => getTask(taskId, { signal }),
-    [taskId],
-    { refreshOn: TASK_RESOURCES },
-  )
-
-  const notFound =
-    status === 'error' &&
-    error !== undefined &&
-    error.kind === 'http' &&
-    error.status === 404
-
-  if (notFound) {
-    // 404 con datos previos: la tarea desapareció tras un refresco.
-    if (data !== undefined) {
-      return (
-        <DetailDialog open title={data.title} onClose={onClose}>
-          <p>Ya no existe</p>
-        </DetailDialog>
-      )
-    }
-    return (
-      <DetailDialog open title="Tarea no encontrada" onClose={onClose}>
-        <p>Tarea no encontrada</p>
-      </DetailDialog>
-    )
-  }
-  if (status === 'error' && error !== undefined) {
-    return (
-      <DetailDialog open title="Tarea" onClose={onClose}>
-        <ErrorState message={error.message} onRetry={retry} />
-        {data !== undefined && <TaskDetail task={data} />}
-      </DetailDialog>
-    )
-  }
-  if (data !== undefined) {
-    return (
-      <DetailDialog open title={data.title} onClose={onClose}>
-        <TaskDetail task={data} />
-      </DetailDialog>
-    )
-  }
-  return (
-    <DetailDialog open title="Tarea" onClose={onClose}>
-      <Loading label="Cargando tarea…" />
-    </DetailDialog>
-  )
+function TaskDetail({ task }: { task: Task }) {
+  return <>
+    <dl className={s.propertyGrid}>
+      <div><dt>Estado</dt><dd><Badge label={TASK_STATUS_LABELS[task.status]} tone={TASK_STATUS_TONES[task.status]} /></dd></div>
+      <div><dt>Responsable</dt><dd className={s['person-cell']}><Avatar name={task.assignee} decorative />{task.assignee || 'Sin asignar'}</dd></div>
+      <div><dt>Creada</dt><dd><time dateTime={task.created_at}>{formatDate(task.created_at)}</time></dd></div>
+      <div><dt>Terminada</dt><dd>{task.done_at ? <time dateTime={task.done_at}>{formatDate(task.done_at)}</time> : '—'}</dd></div>
+    </dl>
+    <section className={s['drawer-section']} aria-label="Descripción"><h3>Descripción</h3><p className={s.preformatted}>{task.description || 'Sin descripción'}</p></section>
+    <ActivityTabs itemKind="task" itemId={task.id} />
+  </>
 }
 
-export function TaskDetail({ task }: { task: Task }) {
-  return (
-    <div className={styles.detail}>
-      <dl className={styles.facts}>
-        <dt>Estado</dt>
-        <dd>
-          <Badge
-            label={TASK_STATUS_LABELS[task.status]}
-            tone={TASK_STATUS_TONES[task.status]}
-          />
-        </dd>
-        <dt>Asignado a</dt>
-        <dd>
-          {task.assignee !== undefined && task.assignee !== ''
-            ? task.assignee
-            : 'Sin asignar'}
-        </dd>
-        <dt>Creado</dt>
-        <dd>{formatDate(task.created_at)}</dd>
-        <dt>Actualizado</dt>
-        <dd>{formatDate(task.updated_at)}</dd>
-      </dl>
-      <section aria-label="Descripción">
-        <h3 className={styles.sectionTitle}>Descripción</h3>
-        <p className={styles.preformatted}>{task.description}</p>
-      </section>
-      <CommentList itemKind="task" itemId={task.id} />
-      <StatusHistory itemKind="task" itemId={task.id} />
-    </div>
-  )
+export function TaskDetailDialog({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  const result = useAsync(signal => getTask(taskId, { signal }), [taskId], { refreshOn: TASK_RESOURCES })
+  const missing = result.error?.status === 404
+  return <DetailDialog open title={missing ? (result.data ? result.data.title : 'Tarea no encontrada') : result.data?.title ?? 'Tarea'} onClose={onClose}>
+    {missing ? <p>{result.data ? 'Ya no existe' : 'Tarea no encontrada'}</p> : <><QueryState result={result} label="Cargando tarea…" />{result.data && <TaskDetail task={result.data} />}</>}
+  </DetailDialog>
 }

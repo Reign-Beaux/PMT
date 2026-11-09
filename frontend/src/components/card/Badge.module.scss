@@ -1,33 +1,40 @@
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
   min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius);
-  font-size: 0.85em;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
   overflow-wrap: anywhere;
+
+  &::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
 }
 
 .neutral {
-  color: var(--color-text);
-  background-color: color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+  color: var(--lozenge-neutral-text);
+  background-color: var(--lozenge-neutral-bg);
 }
 
 .info {
-  color: var(--color-info);
-  background-color: color-mix(in srgb, var(--color-info) 15%, transparent);
+  color: var(--lozenge-progress-text);
+  background-color: var(--lozenge-progress-bg);
 }
 
 .success {
-  color: var(--color-success);
-  background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
+  color: var(--lozenge-success-text);
+  background-color: var(--lozenge-success-bg);
 }
 
 .warning {
-  color: var(--color-warning);
-  background-color: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  color: var(--lozenge-warning-text);
+  background-color: var(--lozenge-warning-bg);
 }
 
 .danger {
-  color: var(--color-danger);
-  background-color: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  color: var(--lozenge-danger-text);
+  background-color: var(--lozenge-danger-bg);
 }

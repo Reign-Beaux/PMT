@@ -1,3 +1,4 @@
+@layer reset {
 *,
 *::before,
 *::after {
@@ -21,4 +22,6 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
 }

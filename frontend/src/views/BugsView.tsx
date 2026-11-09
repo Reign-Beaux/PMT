@@ -1,106 +1,35 @@
 import { useState } from 'react'
-import { useParams } from 'react-router'
-import { getProjectBugs } from '../api/bugs'
-import { Card } from '../components/card/Card'
-import { DetailDialog } from '../components/dialog/DetailDialog'
-import { Empty, ErrorState, Loading } from '../components/feedback'
-import { KanbanBoard, KanbanColumn } from '../components/kanban'
-import { groupBugsByStatus } from '../domain/groupBugsByStatus'
-import { useAsync } from '../hooks/useAsync'
-import { BUG_RESOURCES } from '../realtime/refreshResources'
+import { useProjectContext } from '../shell/useProjectContext'
 import { useDetailSelection } from '../routes/useDetailSelection'
+import { BUG_STATUS_LABELS } from '../domain/status'
+import { BUG_STATUS_TONES } from '../domain/statusTone'
+import { formatShortDate } from '../domain/formatDate'
+import { Badge } from '../components/card/Badge'
+import { Icon } from '../components/Icon'
+import { Filters } from '../components/Filters'
+import { QueryState } from '../components/QueryState'
+import { Empty } from '../components/feedback'
+import { DetailDialog } from '../components/dialog/DetailDialog'
 import { BugDetail } from './BugDetail'
-import styles from './BugsView.module.scss'
+import s from '../styles/App.module.scss'
 
 export function BugsView() {
-  const { projectId } = useParams()
-  if (projectId === undefined) return null
-  return <BugsBoard projectId={projectId} />
-}
-
-function BugsBoard({ projectId }: { projectId: string }) {
+  const { bugs } = useProjectContext()
   const { selection, select, clear } = useDetailSelection()
-  const { status, data, error, retry } = useAsync(
-    (signal) => getProjectBugs(projectId, { signal }),
-    [projectId],
-    { refreshOn: BUG_RESOURCES },
-  )
-
-  const selectedBug =
-    selection?.kind === 'bug' && data !== undefined
-      ? data.find((bug) => bug.id === selection.id)
-      : undefined
-
-  // Ids del bug seleccionado que ya se encontraron en la lista: si un refresco
-  // lo quita, el diálogo muestra "Ya no existe" en vez de "Bug no encontrado".
-  // Estado derivado durante el render (como useAsync con sus deps).
-  const [seenIds, setSeenIds] = useState<readonly string[]>([])
-  if (selectedBug !== undefined && !seenIds.includes(selectedBug.id)) {
-    setSeenIds((previous) =>
-      previous.includes(selectedBug.id)
-        ? previous
-        : [...previous, selectedBug.id],
-    )
-  }
-
-  const dialogOpen = selection?.kind === 'bug' && data !== undefined
-
-  return (
-    <section className={styles.view}>
-      <h2 className={styles.name}>Bugs</h2>
-      {status === 'loading' && <Loading label="Cargando bugs…" />}
-      {status === 'error' && error !== undefined && (
-        <ErrorState message={error.message} onRetry={retry} />
-      )}
-      {data !== undefined && (
-        <>
-          {data.length === 0 && (
-            <Empty message="Este proyecto no tiene bugs" />
-          )}
-          <KanbanBoard label="Tablero de bugs">
-            {groupBugsByStatus(data).map((column) => (
-              <KanbanColumn
-                key={column.status}
-                id={column.status}
-                label={column.label}
-                count={column.bugs.length}
-              >
-                <ul className={styles.cards}>
-                  {column.bugs.map((bug) => (
-                    <li key={bug.id}>
-                      <Card
-                        title={bug.title}
-                        id={bug.id}
-                        subtitle={
-                          bug.product_version !== ''
-                            ? `Versión ${bug.product_version}`
-                            : 'Versión —'
-                        }
-                        onOpen={() => select({ kind: 'bug', id: bug.id })}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </KanbanColumn>
-            ))}
-          </KanbanBoard>
-        </>
-      )}
-      {dialogOpen &&
-        selection?.kind === 'bug' &&
-        (selectedBug !== undefined ? (
-          <DetailDialog open title={selectedBug.title} onClose={clear}>
-            <BugDetail bug={selectedBug} />
-          </DetailDialog>
-        ) : seenIds.includes(selection.id) ? (
-          <DetailDialog open title="Ya no existe" onClose={clear}>
-            <p>Ya no existe</p>
-          </DetailDialog>
-        ) : (
-          <DetailDialog open title="Bug no encontrado" onClose={clear}>
-            <p>Bug no encontrado</p>
-          </DetailDialog>
-        ))}
+  const [filter, setFilter] = useState<'all' | 'open' | 'done'>('all')
+  const [seenIds, setSeenIds] = useState<string[]>([])
+  const selected = selection?.kind === 'bug' ? bugs.data?.find(bug => bug.id === selection.id) : undefined
+  if (selected && !seenIds.includes(selected.id)) setSeenIds([...seenIds, selected.id])
+  const items = bugs.data?.filter(bug => filter === 'all' || (filter === 'done' ? bug.status === 'done' : !['done', 'rejected'].includes(bug.status)))
+  return <>
+    <section aria-label="Bugs del proyecto">
+      <div className={s['section-toolbar']}><h2>Bugs {bugs.data && <span className={s.count}>{bugs.data.length}</span>}</h2><Filters label="Filtrar bugs" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Todos' }, { value: 'open', label: 'Abiertos' }, { value: 'done', label: 'Corregidos' }]} /></div>
+      <QueryState result={bugs} label="Cargando bugs…" />
+      {bugs.data && (items?.length ? <div className={`${s.panel} ${s['table-wrap']}`}><table className={s.bugTable}>
+        <caption className={s['sr-only']}>Bugs del proyecto</caption><thead><tr><th scope="col">Bug</th><th scope="col">Estado</th><th scope="col">Versión</th><th scope="col">Reportado por</th><th scope="col">Creado</th></tr></thead>
+        <tbody>{items.map(bug => <tr key={bug.id}><td><div className={s.taskNameCell}><Icon name="bug" /><button type="button" className={s.taskTitle} onClick={() => select({ kind: 'bug', id: bug.id })}>{bug.title}</button></div></td><td><Badge label={BUG_STATUS_LABELS[bug.status]} tone={BUG_STATUS_TONES[bug.status]} /></td><td>{bug.product_version || '—'}</td><td>{bug.reported_by || '—'}</td><td><time dateTime={bug.created_at}>{formatShortDate(bug.created_at)}</time></td></tr>)}</tbody>
+      </table></div> : <Empty message={bugs.data.length === 0 ? 'Este proyecto no tiene bugs' : 'No hay bugs para este filtro'} />)}
     </section>
-  )
+    {selection?.kind === 'bug' && bugs.data && <DetailDialog key={selection.id} open title={selected?.title ?? (seenIds.includes(selection.id) ? 'Ya no existe' : 'Bug no encontrado')} onClose={clear}>{selected ? <BugDetail bug={selected} /> : <p>{seenIds.includes(selection.id) ? 'Ya no existe' : 'Bug no encontrado'}</p>}</DetailDialog>}
+  </>
 }

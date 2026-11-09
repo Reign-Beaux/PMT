@@ -7,8 +7,6 @@ import { EventsProvider } from './realtime/EventsProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <EventsProvider>
-      <RouterProvider router={createBrowserRouter(routes)} />
-    </EventsProvider>
+    <EventsProvider><RouterProvider router={createBrowserRouter(routes)} /></EventsProvider>
   </StrictMode>,
 )

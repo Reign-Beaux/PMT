@@ -1,0 +1,47 @@
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-round);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.neutral {
+  color: var(--lozenge-neutral-text);
+  background-color: var(--lozenge-neutral-bg);
+}
+
+.progress {
+  color: var(--lozenge-progress-text);
+  background-color: var(--lozenge-progress-bg);
+}
+
+.success {
+  color: var(--lozenge-success-text);
+  background-color: var(--lozenge-success-bg);
+}
+
+.warning {
+  color: var(--lozenge-warning-text);
+  background-color: var(--lozenge-warning-bg);
+}
+
+.danger {
+  color: var(--lozenge-danger-text);
+  background-color: var(--lozenge-danger-bg);
+}
+
+.discovery {
+  color: var(--lozenge-discovery-text);
+  background-color: var(--lozenge-discovery-bg);
+}
+
+.empty {
+  background-color: transparent;
+  border: 1px dashed var(--color-border-strong);
+}

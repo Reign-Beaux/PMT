@@ -1,0 +1,61 @@
+// Botones del sistema de diseño: primario (acción principal) y secundario.
+// Los módulos los consumen con @use '<ruta>/styles/buttons' as *; si un botón
+// ya tenía min-height 44px por área táctil, se conserva junto al mixin.
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    color: var(--color-text-disabled);
+    background-color: var(--color-surface-hover);
+    border-color: transparent;
+    cursor: not-allowed;
+  }
+}
+
+@mixin button-primary {
+  @include button-base;
+
+  color: var(--color-text-on-primary);
+  background-color: var(--color-primary);
+  border: 1px solid transparent;
+
+  &:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+  &:active {
+    background-color: var(--color-primary-pressed);
+  }
+}
+
+@mixin button-secondary {
+  @include button-base;
+
+  color: var(--color-text);
+  background-color: transparent;
+  border: 1px solid var(--color-border-strong);
+
+  &:hover {
+    background-color: var(--color-surface-hover);
+  }
+
+  &:active {
+    background-color: var(--color-surface-selected);
+  }
+}

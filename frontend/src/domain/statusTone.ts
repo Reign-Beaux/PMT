@@ -21,12 +21,12 @@ export const STAGE_STATUS_TONES: Record<StageStatus, BadgeTone> = {
 
 export const TASK_STATUS_TONES: Record<TaskStatus, BadgeTone> = {
   backlog: 'neutral',
-  ready: 'neutral',
+  ready: 'info',
   in_dev: 'info',
   in_review: 'info',
   changes_requested: 'warning',
   in_qa: 'info',
-  pending_close: 'success',
+  pending_close: 'info',
   done: 'success',
   cancelled: 'danger',
 }
@@ -38,7 +38,7 @@ export const BUG_STATUS_TONES: Record<BugStatus, BadgeTone> = {
   in_review: 'info',
   changes_requested: 'warning',
   in_qa: 'info',
-  pending_close: 'success',
+  pending_close: 'info',
   done: 'success',
   rejected: 'danger',
 }

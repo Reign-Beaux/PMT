@@ -5,6 +5,7 @@ import { EventsProvider } from '../../realtime/EventsProvider'
 import { createFakeConnection } from '../../test/fakeConnection'
 import type { FakeConnection } from '../../test/fakeConnection'
 import { StatusHistory } from './StatusHistory'
+import badgeStyles from '../card/Badge.module.scss'
 import { formatDate } from '../../domain/formatDate'
 
 function makeTaskChange(overrides: Record<string, unknown> = {}) {
@@ -118,6 +119,30 @@ describe('StatusHistory (tarea 06)', () => {
       '/api/tasks/t1/status-changes',
       expect.anything(),
     )
+  })
+
+  it('cada cambio muestra desde y hacia como dos lozenges con su tono (tarea 10)', async () => {
+    stubFetch({
+      taskChanges: [
+        makeTaskChange({ from_status: 'backlog', to_status: 'done' }),
+      ],
+    })
+
+    render(<StatusHistory itemKind="task" itemId="t1" />)
+
+    const section = await screen.findByRole('region', {
+      name: 'Historial de estados',
+    })
+    const item = await within(section).findByRole('listitem')
+    expect(item.textContent).toContain('Backlog → Terminada')
+    const lozenges = Array.from(item.querySelectorAll('span')).filter((span) =>
+      span.classList.contains(badgeStyles.badge),
+    )
+    expect(lozenges).toHaveLength(2)
+    expect(lozenges[0].textContent).toBe('Backlog')
+    expect(lozenges[0].classList.contains(badgeStyles.neutral)).toBe(true)
+    expect(lozenges[1].textContent).toBe('Terminada')
+    expect(lozenges[1].classList.contains(badgeStyles.success)).toBe(true)
   })
 
   it('variante bug pide /bugs/{id}/status-changes y muestra etiquetas de bug', async () => {
@@ -319,7 +344,9 @@ describe('StatusHistory — refresco por eventos (tarea 03)', () => {
       await vi.advanceTimersByTimeAsync(300)
     })
 
-    expect(screen.getByText('Terminada')).toBeDefined()
+    // "Terminada" también es ahora el lozenge del estado destino: el motivo
+    // se busca en el párrafo.
+    expect(screen.getByText('Terminada', { selector: 'p' })).toBeDefined()
     expect(screen.getByText('Empieza el desarrollo')).toBeDefined()
   })
 })

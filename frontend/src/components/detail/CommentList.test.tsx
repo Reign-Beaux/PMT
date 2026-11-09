@@ -94,6 +94,31 @@ describe('CommentList (tarea 05)', () => {
     expect(items[2].textContent).toContain('Tercero')
   })
 
+  it('cada comentario muestra el avatar decorativo con las iniciales del autor (tarea 10)', async () => {
+    stubFetch({
+      comments: [
+        makeComment(),
+        makeComment({
+          id: 'c2',
+          body: 'Segundo',
+          actor_name: 'Beto Cruz',
+          actor_profile: '',
+        }),
+      ],
+    })
+
+    render(<CommentList itemKind="task" itemId="t1" />)
+
+    const section = await screen.findByRole('region', { name: 'Comentarios' })
+    const items = await within(section).findAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    const avatarAna = items[0].querySelector('[aria-hidden="true"]')
+    expect(avatarAna).not.toBeNull()
+    expect(avatarAna?.textContent).toBe('A')
+    const avatarBeto = items[1].querySelector('[aria-hidden="true"]')
+    expect(avatarBeto?.textContent).toBe('BC')
+  })
+
   it('un body con HTML y saltos de línea se muestra como texto literal', async () => {
     stubFetch({
       comments: [makeComment({ body: '<b>x</b>\nsegunda línea' })],
