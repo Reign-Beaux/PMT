@@ -40,7 +40,8 @@ type Command struct {
 	Actor   kernel.Actor  `json:"-"`
 }
 
-// Item es una tarea con su nuevo status y su última versión.
+// Item es una tarea con su nuevo status y su última versión. DoneAt no se
+// expone: solo las consultas de lectura traen done_at.
 type Item struct {
 	ID          uuid.UUID     `json:"id"`
 	StageID     uuid.UUID     `json:"stage_id"`
@@ -50,6 +51,7 @@ type Item struct {
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 	Assignee    string        `json:"assignee,omitempty"`
+	DoneAt      *time.Time    `json:"-"`
 }
 
 // Handler ejecuta la operación.

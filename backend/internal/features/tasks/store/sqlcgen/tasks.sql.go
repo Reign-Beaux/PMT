@@ -64,7 +64,8 @@ func (q *Queries) DeleteTask(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee,
+       d.changed_at AS done_at
 FROM tasks s
 LEFT JOIN LATERAL (
     SELECT title, description FROM task_changes
@@ -72,6 +73,12 @@ LEFT JOIN LATERAL (
     ORDER BY version DESC
     LIMIT 1
 ) c ON true
+LEFT JOIN task_status_changes d ON d.id = (
+    SELECT tsc.id FROM task_status_changes tsc
+    WHERE tsc.task_id = s.id AND tsc.to_status = 'done' AND s.status = 'done'
+    ORDER BY tsc.changed_at DESC, tsc.id DESC
+    LIMIT 1
+)
 WHERE s.id = $1 AND s.retired_at IS NULL
 `
 
@@ -85,6 +92,7 @@ type GetTaskRow struct {
 	UpdatedAt   time.Time
 	RetiredAt   pgtype.Timestamptz
 	Assignee    pgtype.Text
+	DoneAt      pgtype.Timestamptz
 }
 
 func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (GetTaskRow, error) {
@@ -100,6 +108,7 @@ func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (GetTaskRow, error)
 		&i.UpdatedAt,
 		&i.RetiredAt,
 		&i.Assignee,
+		&i.DoneAt,
 	)
 	return i, err
 }
@@ -149,7 +158,8 @@ func (q *Queries) ListTaskIDs(ctx context.Context, stageID uuid.UUID) ([]uuid.UU
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee,
+       d.changed_at AS done_at
 FROM tasks s
 LEFT JOIN LATERAL (
     SELECT title, description FROM task_changes
@@ -157,6 +167,12 @@ LEFT JOIN LATERAL (
     ORDER BY version DESC
     LIMIT 1
 ) c ON true
+LEFT JOIN task_status_changes d ON d.id = (
+    SELECT tsc.id FROM task_status_changes tsc
+    WHERE tsc.task_id = s.id AND tsc.to_status = 'done' AND s.status = 'done'
+    ORDER BY tsc.changed_at DESC, tsc.id DESC
+    LIMIT 1
+)
 WHERE s.stage_id = $1 AND s.retired_at IS NULL AND ($2::text = '' OR s.status = $2::text)
 ORDER BY s.created_at, s.id
 `
@@ -176,6 +192,7 @@ type ListTasksRow struct {
 	UpdatedAt   time.Time
 	RetiredAt   pgtype.Timestamptz
 	Assignee    pgtype.Text
+	DoneAt      pgtype.Timestamptz
 }
 
 func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTasksRow, error) {
@@ -197,6 +214,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 			&i.UpdatedAt,
 			&i.RetiredAt,
 			&i.Assignee,
+			&i.DoneAt,
 		); err != nil {
 			return nil, err
 		}

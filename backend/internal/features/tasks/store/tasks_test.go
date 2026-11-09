@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"pmt/internal/features/tasks/domain"
 	"pmt/internal/features/tasks/store/sqlcgen"
@@ -41,6 +43,23 @@ func TestDeleteTranslatesReferences(t *testing.T) {
 				t.Fatalf("err = %v", err)
 			}
 		})
+	}
+}
+
+func TestToDomainMapsDoneAt(t *testing.T) {
+	when := time.Date(2026, 11, 8, 12, 30, 0, 0, time.UTC)
+
+	done := toDomainGet(sqlcgen.GetTaskRow{
+		Status: "done",
+		DoneAt: pgtype.Timestamptz{Time: when, Valid: true},
+	})
+	if done.DoneAt == nil || !done.DoneAt.Equal(when) {
+		t.Errorf("GetTaskRow done: DoneAt = %v, quiero %v", done.DoneAt, when)
+	}
+
+	open := toDomainList(sqlcgen.ListTasksRow{Status: "in_dev"})
+	if open.DoneAt != nil {
+		t.Errorf("ListTasksRow sin historial: DoneAt = %v, quiero nil", open.DoneAt)
 	}
 }
 

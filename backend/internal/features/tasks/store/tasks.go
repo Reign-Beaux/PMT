@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -52,7 +53,7 @@ func (s *Tasks) Get(ctx context.Context, id uuid.UUID) (domain.Task, error) {
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("obtener tarea: %w", err)
 	}
-	return toDomain(sqlcgen.Task(row)), nil
+	return toDomainGet(row), nil
 }
 
 // List devuelve la última versión de las tareas sin retirar de una etapa, de la más antigua a la más reciente.
@@ -77,7 +78,7 @@ func (s *Tasks) ListByStatus(ctx context.Context, stageID uuid.UUID, status doma
 	}
 	tasks := make([]domain.Task, 0, len(rows))
 	for _, row := range rows {
-		tasks = append(tasks, toDomain(sqlcgen.Task(row)))
+		tasks = append(tasks, toDomainList(row))
 	}
 	return tasks, nil
 }
@@ -176,4 +177,31 @@ func toDomain(row sqlcgen.Task) domain.Task {
 		UpdatedAt:   row.UpdatedAt,
 		Assignee:    row.Assignee.String,
 	}
+}
+
+func toDomainGet(row sqlcgen.GetTaskRow) domain.Task {
+	t := toDomain(sqlcgen.Task{
+		ID: row.ID, StageID: row.StageID, Title: row.Title, Description: row.Description,
+		Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		RetiredAt: row.RetiredAt, Assignee: row.Assignee,
+	})
+	t.DoneAt = doneAt(row.DoneAt)
+	return t
+}
+
+func toDomainList(row sqlcgen.ListTasksRow) domain.Task {
+	t := toDomain(sqlcgen.Task{
+		ID: row.ID, StageID: row.StageID, Title: row.Title, Description: row.Description,
+		Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		RetiredAt: row.RetiredAt, Assignee: row.Assignee,
+	})
+	t.DoneAt = doneAt(row.DoneAt)
+	return t
+}
+
+func doneAt(ts pgtype.Timestamptz) *time.Time {
+	if !ts.Valid {
+		return nil
+	}
+	return &ts.Time
 }

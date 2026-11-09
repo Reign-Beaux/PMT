@@ -4,7 +4,8 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetTask :one
-SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee,
+       d.changed_at AS done_at
 FROM tasks s
 LEFT JOIN LATERAL (
     SELECT title, description FROM task_changes
@@ -12,6 +13,12 @@ LEFT JOIN LATERAL (
     ORDER BY version DESC
     LIMIT 1
 ) c ON true
+LEFT JOIN task_status_changes d ON d.id = (
+    SELECT tsc.id FROM task_status_changes tsc
+    WHERE tsc.task_id = s.id AND tsc.to_status = 'done' AND s.status = 'done'
+    ORDER BY tsc.changed_at DESC, tsc.id DESC
+    LIMIT 1
+)
 WHERE s.id = $1 AND s.retired_at IS NULL;
 
 -- name: LockTask :one
@@ -26,7 +33,8 @@ ORDER BY id
 FOR UPDATE;
 
 -- name: ListTasks :many
-SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee
+SELECT s.id, s.stage_id, COALESCE(c.title, s.title)::text AS title, COALESCE(c.description, s.description)::text AS description, s.status, s.created_at, s.updated_at, s.retired_at, s.assignee,
+       d.changed_at AS done_at
 FROM tasks s
 LEFT JOIN LATERAL (
     SELECT title, description FROM task_changes
@@ -34,6 +42,12 @@ LEFT JOIN LATERAL (
     ORDER BY version DESC
     LIMIT 1
 ) c ON true
+LEFT JOIN task_status_changes d ON d.id = (
+    SELECT tsc.id FROM task_status_changes tsc
+    WHERE tsc.task_id = s.id AND tsc.to_status = 'done' AND s.status = 'done'
+    ORDER BY tsc.changed_at DESC, tsc.id DESC
+    LIMIT 1
+)
 WHERE s.stage_id = @stage_id AND s.retired_at IS NULL AND (@status::text = '' OR s.status = @status::text)
 ORDER BY s.created_at, s.id;
 

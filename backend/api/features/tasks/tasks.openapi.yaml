@@ -596,3 +596,7 @@ components:
         updated_at:
           type: string
           format: date-time
+        done_at:
+          type: string
+          format: date-time
+          description: Fecha del cambio más reciente a done. Solo viene si el status actual es done.

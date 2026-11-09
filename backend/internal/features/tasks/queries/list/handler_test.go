@@ -2,11 +2,13 @@ package list
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -40,6 +42,42 @@ func TestRESTReturnsEmptyArray(t *testing.T) {
 
 	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "[]" {
 		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+	}
+}
+
+func TestRESTIncludesDoneAtOnlyForDone(t *testing.T) {
+	when := time.Date(2026, 11, 8, 12, 30, 0, 0, time.UTC)
+	reader := &fakeReader{tasks: []domain.Task{
+		{Title: "cerrada", Status: domain.StatusDone, DoneAt: &when},
+		{Title: "abierta", Status: domain.StatusInDev},
+	}}
+	mux := http.NewServeMux()
+	New(reader, fakeStages{}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/stages/"+uuid.NewString()+"/tasks", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+	}
+	var items []Item
+	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items = %+v", items)
+	}
+	if items[0].DoneAt == nil || !items[0].DoneAt.Equal(when) {
+		t.Errorf("done: DoneAt = %v, quiero %v", items[0].DoneAt, when)
+	}
+	if items[1].DoneAt != nil {
+		t.Errorf("in_dev: DoneAt = %v, quiero nil", items[1].DoneAt)
+	}
+	if !strings.Contains(rec.Body.String(), `"done_at":"2026-11-08T12:30:00Z"`) {
+		t.Errorf("el JSON no trae done_at en RFC 3339: %s", rec.Body)
+	}
+	if got := strings.Count(rec.Body.String(), "done_at"); got != 1 {
+		t.Errorf("la clave done_at aparece %d veces, quiero 1: %s", got, rec.Body)
 	}
 }
 

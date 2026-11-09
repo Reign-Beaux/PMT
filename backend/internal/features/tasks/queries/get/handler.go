@@ -25,6 +25,7 @@ type Result struct {
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 	Assignee    string        `json:"assignee,omitempty"`
+	DoneAt      *time.Time    `json:"done_at,omitempty"`
 }
 
 // Handler ejecuta la operación.

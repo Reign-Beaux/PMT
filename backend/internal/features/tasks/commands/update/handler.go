@@ -33,7 +33,8 @@ type Command struct {
 	Actor kernel.Actor `json:"-"`
 }
 
-// Result es la tarea actualizada.
+// Result es la tarea actualizada. DoneAt no se expone: solo las consultas de
+// lectura traen done_at.
 type Result struct {
 	ID          uuid.UUID     `json:"id"`
 	StageID     uuid.UUID     `json:"stage_id"`
@@ -43,6 +44,7 @@ type Result struct {
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 	Assignee    string        `json:"assignee,omitempty"`
+	DoneAt      *time.Time    `json:"-"`
 }
 
 // Handler ejecuta la operación.

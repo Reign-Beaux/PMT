@@ -50,6 +50,8 @@ const (
 )
 
 // Task es la raíz del agregado de una tarea. Referencia a su etapa por ID.
+// DoneAt es la fecha del cambio más reciente a done; solo viene si el status
+// actual es done.
 type Task struct {
 	ID          uuid.UUID
 	StageID     uuid.UUID
@@ -59,6 +61,7 @@ type Task struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Assignee    string
+	DoneAt      *time.Time
 }
 
 // NewTask crea una tarea válida en su estado inicial.
