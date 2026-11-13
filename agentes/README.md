@@ -14,7 +14,7 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
    Repite con `PC`, `TL`, `DP`, `DevBackend`, `DevFrontend`, `CR`, `QAP` y `QA`.
 
-2. **Configuración.** Copia `agentes.env.example` a `.agentes.env` en la raíz del proyecto y ajústalo. Añade `.agentes.env`, `.agentes/` y `.qwen/` al `.gitignore` del proyecto: la cadena de base de datos queda ahí.
+2. **Configuración.** Copia `agentes.env.example` a `.agentes.env` en la raíz del proyecto y ajústalo. Añade `.agentes.env`, `.agentes/` y `.qwen/` al `.gitignore` del proyecto: la cadena de base de datos queda ahí. Solo la recibe DevBackend, para crear el archivo de configuración local de la app en la tarea de configuración; desde entonces todos levantan la app con ese archivo.
 
 3. **Effort de mcode.** Es global: se fija en `defaultModelThinking.effort` de `~/.minimax/config.yaml`. `iniciar.sh` avisa si difiere del `.env`.
 
