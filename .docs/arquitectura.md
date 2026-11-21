@@ -21,7 +21,7 @@ REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se du
 | Acceso a datos | `pgx/v5` y `sqlc` |
 | Identificadores | UUID (`github.com/google/uuid`) |
 | Configuración | Viper |
-| Migraciones | `goose`, como herramienta de `go.mod` |
+| Migraciones | `goose` como librería: embebidas y aplicadas al arrancar |
 | MCP | SDK oficial de Go (`modelcontextprotocol/go-sdk`), Streamable HTTP |
 | WebSocket | `github.com/coder/websocket` |
 | YAML de importación | `gopkg.in/yaml.v3` |
@@ -34,22 +34,23 @@ backend/
 ├── api/features/<feature>/     contratos: <feature>.openapi.yaml (REST) y <feature>.mcp.json (MCP)
 ├── cmd/pmt-server/             punto de entrada; `pmt-server agent ...` administra tokens
 ├── internal/
-│   ├── app/                    configuración, armado de features, rutas, arranque y cierre
+│   ├── app/                    armado de features, rutas, arranque y cierre
 │   ├── kernel/                 Actor, Profile, errores de negocio
 │   ├── platform/
 │   │   ├── rest/               servidor HTTP, autenticación, errores
 │   │   ├── mcp/                servidor MCP, autenticación, errores de herramienta
 │   │   ├── events/             listener de NOTIFY y WebSocket /api/events
 │   │   ├── web/                frontend compilado con fallback SPA
-│   │   └── postgres/           conexión, errores y migraciones/
+│   │   ├── config/             carga de la configuración; options/ con una sección por archivo
+│   │   ├── health/             /healthz y /readyz
+│   │   └── postgres/           conexión, errores, migrate.go y migraciones/
 │   └── features/<feature>/
 │       ├── feature.go          construye y registra las slices
 │       ├── domain/             agregado, reglas, transiciones, permisos
 │       ├── store/              persistencia; queries/ (SQL) y sqlcgen/ (generado)
 │       ├── commands/<op>/      operación que escribe
 │       └── queries/<op>/       operación que lee
-├── config.yaml                 configuración local, fuera de git
-├── config.example.yaml         plantilla
+├── config/                     config.dev.yaml (fuera de git) y config.prod.yaml
 ├── sqlc.yaml
 └── bin/                        binario y log, fuera de git
 ```
@@ -127,7 +128,7 @@ Hay 59 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`
 
 ## Datos
 
-- 22 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00022_create_product_version_changes`. Se aplican con `go tool goose`.
+- 22 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00022_create_product_version_changes`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
 - `sqlc.yaml` tiene una entrada por feature con consultas, todas sobre el esquema de las migraciones. Tras cambiar migraciones o consultas: `go tool sqlc generate`. El código de `sqlcgen/` no se edita a mano.
 - **Transacciones:** las operaciones que escriben varias filas usan `pgx.BeginFunc` en su `store`, y `imports` y `workflow` comparten una `pgx.Tx`. Los cambios de status bloquean con `FOR UPDATE` y comparan el status de origen; si cambió entre leer y guardar, responden `el status cambió, vuelve a consultar`. Los lotes bloquean por orden de ID.
 - **Concurrencia:** los agregados no tienen control de versión. Fuera de los casos anteriores, gana la última escritura.
@@ -143,19 +144,36 @@ Los recursos son `project`, `stage`, `task`, `bug`, `comment` y `status_change`.
 
 ## Frontend servido
 
-`platform/web` sirve el compilado del frontend (`frontend.dist`, por omisión `../frontend/dist`) en toda ruta que no sea `/api` ni `/mcp`, con fallback a `index.html` para las rutas del SPA. Si falta el compilado, la API funciona igual y las rutas de la interfaz responden "frontend no compilado".
+`platform/web` sirve el compilado del frontend (`frontend.dist`) en toda ruta que no sea `/api`, `/mcp`, `/healthz` ni `/readyz`, con fallback a `index.html` para las rutas del SPA. Si `frontend.dist` está vacío, no existe o no tiene `index.html`, el servidor arranca igual: registra un aviso en el log, las rutas de la interfaz responden 404 "frontend no compilado", y `/api`, `/mcp`, `/healthz` y `/readyz` funcionan normal.
 
 ## Configuración
 
-`internal/app/config.go` la lee una sola vez al arrancar, desde `config.yaml` en el directorio de arranque:
+`internal/platform/config` la carga una sola vez al arrancar, igual que en DBP, y `main.go` se la pasa a `app.Run` y a `app.RunAgent`:
 
-| Llave | Variable que la sobrescribe | Por omisión |
+- `CONFIG_FILE` da la ruta del archivo. Si falta, se lee `config/config.<ENV>.yaml` relativo al directorio de arranque, con `ENV` por omisión `dev`.
+- Cada llave se sobrescribe con una variable de entorno de su mismo nombre en mayúsculas y con `_` en lugar de `.` (Viper `AutomaticEnv`).
+- Cada sección se lee a su estructura en `options/` y se valida ahí.
+- Un `frontend.dist` relativo se resuelve contra el directorio del archivo de configuración.
+
+| Llave | Variable | Regla |
 | --- | --- | --- |
-| `database.url` | `DATABASE_URL` | obligatoria |
-| `server.addr` | `SERVER_ADDR` | `127.0.0.1:8080` |
-| `frontend.dist` | `FRONTEND_DIST` | `../frontend/dist` |
+| `server.addr` | `SERVER_ADDR` | obligatoria |
+| `database.connection_string` | `DATABASE_CONNECTION_STRING` | obligatoria |
+| `frontend.dist` | `FRONTEND_DIST` | opcional; si falta el compilado, el servidor arranca igual (ver Frontend servido) |
 
-Este esquema no sigue el que el kit pide a los proyectos (un YAML por ambiente); está anotado en la deuda técnica.
+| Archivo | En git | Contenido |
+| --- | --- | --- |
+| `backend/config/config.dev.yaml` | no | `127.0.0.1:8080`, la base `pmt` y `../../frontend/dist` |
+| `backend/config/config.prod.yaml` | sí | `0.0.0.0:8080`, `changeme # override: DATABASE_CONNECTION_STRING` y `frontend.dist: ""`, porque la imagen fija `FRONTEND_DIST` |
+| `frontend/e2e/harness/config.e2e.yaml` | sí | El backend de pruebas e2e: `127.0.0.1:8090` y la base por variable ([frontend.md](frontend.md)) |
+
+## Salud
+
+`GET /healthz` responde 200 mientras el proceso atienda. `GET /readyz` responde 200 si la base contesta un ping en 2 s y 503 si no. Ninguna pasa por la autenticación.
+
+## Imagen
+
+El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` con Go, y deja en alpine el binario, `config/config.prod.yaml` y el `dist` en `/app/web`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING`.
 
 ## Pruebas del servidor
 

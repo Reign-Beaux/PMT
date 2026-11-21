@@ -1,0 +1,13 @@
+.git
+.agentes*
+.qwen
+.mcp.json
+.docs
+agentes
+**/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+frontend/.harness
+backend/bin
+backend/config/config.dev.yaml

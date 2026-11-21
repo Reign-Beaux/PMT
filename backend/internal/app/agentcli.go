@@ -11,6 +11,7 @@ import (
 	"pmt/internal/features/agents"
 	"pmt/internal/features/agents/commands/create"
 	"pmt/internal/kernel"
+	"pmt/internal/platform/config"
 	"pmt/internal/platform/postgres"
 )
 
@@ -22,16 +23,11 @@ const agentUsage = `uso:
 
 create y rotate escriben solo el token en la salida estándar. No se puede volver a obtener.`
 
-// RunAgent administra los agentes. Lee la configuración sin escribirla.
-func RunAgent(args []string, stdout io.Writer) error {
-	cfg, err := LoadConfig("config.yaml")
-	if err != nil {
-		return err
-	}
-
+// RunAgent administra los agentes con la configuración del ambiente.
+func RunAgent(cfg config.Config, args []string, stdout io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	defer cancel()
-	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	pool, err := postgres.Connect(ctx, cfg.Database.ConnectionString)
 	if err != nil {
 		return err
 	}

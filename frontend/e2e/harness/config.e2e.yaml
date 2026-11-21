@@ -1,0 +1,9 @@
+# Configuración del backend de pruebas e2e (CONFIG_FILE en playwright.config.ts).
+# Nunca apunta al 8080: la base llega por DATABASE_CONNECTION_STRING desde
+# PMT_TEST_DATABASE_URL, validada como pmt_frontend_test.
+server:
+  addr: 127.0.0.1:8090
+database:
+  connection_string: changeme # override: DATABASE_CONNECTION_STRING
+frontend:
+  dist: ../../dist

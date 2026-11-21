@@ -1,8 +1,0 @@
-database:
-  url: "postgres://usuario:contraseña@localhost:5432/pmt?sslmode=disable"
-
-server:
-  addr: "127.0.0.1:8080"
-
-# frontend:
-#   dist: "../frontend/dist"  # ruta del build del frontend que sirve pmt-server (env FRONTEND_DIST)

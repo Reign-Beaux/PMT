@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,7 +25,9 @@ import (
 	"pmt/internal/features/tasks"
 	"pmt/internal/features/workflow"
 	"pmt/internal/kernel"
+	"pmt/internal/platform/config"
 	"pmt/internal/platform/events"
+	"pmt/internal/platform/health"
 	"pmt/internal/platform/mcp"
 	"pmt/internal/platform/postgres"
 	"pmt/internal/platform/rest"
@@ -33,27 +36,26 @@ import (
 
 const connectTimeout = 5 * time.Second
 
-// Run arranca la aplicación y la mantiene activa hasta recibir una señal de cierre.
-func Run() error {
-	cfg, err := LoadConfig("config.yaml")
-	if err != nil {
-		return err
-	}
-
+// Run aplica las migraciones pendientes, arranca la aplicación y la mantiene
+// activa hasta recibir una señal de cierre.
+func Run(cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	connectCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	pool, err := postgres.Connect(connectCtx, cfg.DatabaseURL)
+	pool, err := postgres.Connect(connectCtx, cfg.Database.ConnectionString)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
+	if err = postgres.Migrate(ctx, pool); err != nil {
+		return fmt.Errorf("aplicar migraciones: %w", err)
+	}
 
 	mux := http.NewServeMux()
-	listener := events.NewListener(events.PgxDialer{DatabaseURL: cfg.DatabaseURL})
+	listener := events.NewListener(events.PgxDialer{DatabaseURL: cfg.Database.ConnectionString})
 	mux.Handle("GET /api/events", events.Handler(listener))
 	listenerDone := make(chan struct{})
 	go func() {
@@ -64,17 +66,20 @@ func Run() error {
 	tools := mcp.NewServer()
 	registerFeatures(mux, tools, pool)
 
-	frontend := web.Handler(cfg.FrontendDist)
-	serveErr := rest.Serve(ctx, cfg.ServerAddr, routes(mux, tools, agents.NewAuthenticator(pool), frontend))
+	frontend := web.Handler(cfg.Frontend.Dist)
+	serveErr := rest.Serve(ctx, cfg.Server.Addr, routes(mux, tools, agents.NewAuthenticator(pool), pool, frontend))
 	stop() // si Serve falló antes de la señal, el listener termina con ctx
 	<-listenerDone
 	return serveErr
 }
 
-// routes protege la API y el MCP con la autenticación por token y sirve el
-// frontend compilado en el resto de las rutas.
-func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator, frontend http.Handler) http.Handler {
+// routes protege la API y el MCP con la autenticación por token, expone las
+// sondas de salud sin autenticación y sirve el frontend compilado en el resto
+// de las rutas.
+func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator, pinger health.Pinger, frontend http.Handler) http.Handler {
 	root := http.NewServeMux()
+	root.HandleFunc("GET /healthz", health.Live)
+	root.HandleFunc("GET /readyz", health.Ready(pinger))
 	apiHandler := rest.Authenticate(authenticator)(api)
 	root.Handle("/api", apiHandler)
 	root.Handle("/api/", apiHandler)

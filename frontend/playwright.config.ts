@@ -11,6 +11,7 @@ assertTestDatabase(process.env.PMT_TEST_DATABASE_URL)
 const frontendDir = path.dirname(fileURLToPath(import.meta.url))
 const harnessDir = path.join(frontendDir, '.harness')
 const binario = path.join(harnessDir, 'pmt-server-pruebas')
+const configPruebas = path.join(frontendDir, 'e2e', 'harness', 'config.e2e.yaml')
 
 export default defineConfig({
   testDir: './e2e',
@@ -37,17 +38,16 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // Backend de pruebas: binario propio en frontend/.harness, arrancado sin
-      // config.yaml (mandan DATABASE_URL/SERVER_ADDR). Nunca toca backend/bin
-      // ni la instancia del 8080. Playwright solo baja lo que él levanta.
+      // Backend de pruebas: binario propio en frontend/.harness con su propio
+      // CONFIG_FILE (127.0.0.1:8090, frontend/dist); nunca lee
+      // backend/config/config.dev.yaml ni toca backend/bin o el 8080. La base
+      // llega por DATABASE_CONNECTION_STRING y el servidor aplica las
+      // migraciones al arrancar. Playwright solo baja lo que él levanta.
       command: `mkdir -p .harness && go build -C ../backend -o ${binario} ./cmd/pmt-server && cd .harness && exec ./pmt-server-pruebas`,
-      url: `${API_TARGET}/api/projects`,
+      url: `${API_TARGET}/readyz`,
       env: {
-        DATABASE_URL: process.env.PMT_TEST_DATABASE_URL ?? '',
-        SERVER_ADDR: '127.0.0.1:8090',
-        // El binario corre desde frontend/.harness: el default relativo
-        // ../frontend/dist no aplica; se apunta al dist real del build.
-        FRONTEND_DIST: path.join(frontendDir, 'dist'),
+        CONFIG_FILE: configPruebas,
+        DATABASE_CONNECTION_STRING: process.env.PMT_TEST_DATABASE_URL ?? '',
         GOCACHE: path.join(harnessDir, 'go-cache'),
       },
       reuseExistingServer: true,

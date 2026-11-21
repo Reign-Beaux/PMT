@@ -8,7 +8,7 @@ Cómo se corre PMT en esta máquina. Los comandos de Go se ejecutan desde `backe
 | --- | --- |
 | PostgreSQL | Contenedor Docker `postgresql` (postgres 18), base `pmt`. Arranca solo con Docker |
 | `pmt-server` | `backend/bin/pmt-server`, en `127.0.0.1:8080`, con su log en `backend/bin/pmt-server.log` |
-| Configuración | `backend/config.yaml`, fuera de git ([arquitectura.md](arquitectura.md#configuración)) |
+| Configuración | `backend/config/config.dev.yaml`, fuera de git ([arquitectura.md](arquitectura.md#configuración)) |
 | Frontend | `frontend/dist`, servido por `pmt-server` |
 | Tokens | `~/.config/pmt/tokens/<agente>`, permiso 600 |
 | Respaldos viejos | `~/Respaldos/pmt/` (`pg_dump` de octubre y noviembre de 2026) |
@@ -16,13 +16,13 @@ Cómo se corre PMT en esta máquina. Los comandos de Go se ejecutan desde `backe
 
 ## Arrancar
 
-`pmt-server` **no arranca solo** al reiniciar la máquina.
+`pmt-server` **no arranca solo** al reiniciar la máquina. Se arranca desde `backend/`, porque lee `config/config.dev.yaml` relativo al directorio de arranque, y aplica las migraciones pendientes antes de abrir el puerto.
 
 ```bash
 cd backend
 pgrep -af bin/pmt-server        # ¿ya corre?
 setsid nohup ./bin/pmt-server >> bin/pmt-server.log 2>&1 < /dev/null &
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/   # 200
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/readyz   # 200
 ```
 
 Una sesión de Claude Code que se abrió con el servidor apagado no tiene el MCP `pmt`: se reconecta con `/mcp`.
@@ -38,19 +38,19 @@ mv bin/pmt-server.nuevo bin/pmt-server
 setsid nohup ./bin/pmt-server >> bin/pmt-server.log 2>&1 < /dev/null &
 ```
 
-Si hubo cambios en el frontend, primero `cd frontend && pnpm build`.
+Si hubo cambios en el frontend, primero `cd frontend && pnpm build`. Si el binario nuevo trae migraciones, respalda antes la base (ver Migraciones): las aplica al arrancar.
+
+La imagen de contenedor se construye desde la raíz con `docker build -t pmt .` y se corre con `DATABASE_CONNECTION_STRING` en el entorno.
 
 ## Migraciones
 
+Van embebidas en el binario y `pmt-server` aplica las que falten al arrancar. No hay paso manual: para migrar se reemplaza el binario y se arranca. Para ver en qué versión está una base:
+
 ```bash
-cd backend
-export GOOSE_DRIVER=postgres
-export GOOSE_DBSTRING="<url de config.yaml>"
-go tool goose -dir internal/platform/postgres/migrations status
-go tool goose -dir internal/platform/postgres/migrations up
+docker exec postgresql psql -U <usuario> pmt -qtAc "select max(version_id) from goose_db_version"
 ```
 
-Antes de migrar la base real, respáldala:
+Antes de arrancar un binario con migraciones nuevas contra la base real, respáldala:
 
 ```bash
 docker exec postgresql pg_dump --clean --if-exists -U <usuario> pmt > ~/Respaldos/pmt/respaldo-<motivo>-<fecha>.sql
@@ -92,4 +92,3 @@ Lo que los agentes necesitan decirle al usuario queda en `.agentes/para-usuario.
 ## Pendiente de operación
 
 - Servicio de usuario de systemd para que `pmt-server` arranque solo.
-- Configuración con un YAML por ambiente, como en los proyectos del kit ([deuda_tecnica.md](deuda_tecnica.md)).

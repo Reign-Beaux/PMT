@@ -1,3 +1,5 @@
 /.agentes.env
 /.agentes/
 /.qwen/
+
+/backend/config/config.dev.yaml

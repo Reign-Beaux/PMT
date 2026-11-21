@@ -3,7 +3,7 @@
 // por esta ejecución, incluso cuando la prueba falla.
 import crypto from 'node:crypto'
 import { test as base } from '@playwright/test'
-import { ensureSchema, psql } from './db'
+import { psql } from './db'
 import { API_TARGET, DB, RUN_ID, TARGET_LINE } from './env'
 
 export type HarnessProject = { id: string; name: string }
@@ -47,7 +47,6 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void }>({
   // "provide" (no "use") para no confundir al linter de hooks de React.
   harnessTarget: [
     async ({ playwright }, provide) => {
-      ensureSchema()
       const id = crypto.randomUUID()
       sentinelId = id
       psql(`insert into projects (id, name) values ('${id}', '${SENTINEL_NAME}')`)

@@ -72,8 +72,8 @@ pnpm test:e2e     # Playwright contra 5173 y el backend de pruebas en 8090
 
 **`pnpm test:e2e`** exige `PMT_TEST_DATABASE_URL` con la base `pmt_frontend_test`; si no, aborta antes de levantar nada. El harness:
 
-1. Compila su propio `pmt-server` en `frontend/.harness/` y lo arranca en 8090 sin `config.yaml`. No toca `backend/bin` ni el 8080.
-2. Migra la base con goose si está vacía.
+1. Compila su propio `pmt-server` en `frontend/.harness/` y lo arranca con `CONFIG_FILE=e2e/harness/config.e2e.yaml` (127.0.0.1:8090, `frontend/dist`) y la base en `DATABASE_CONNECTION_STRING`, tomada de `PMT_TEST_DATABASE_URL`. No lee `backend/config/config.dev.yaml` ni toca `backend/bin` o el 8080. Espera a que `/readyz` responda.
+2. El propio servidor aplica las migraciones que falten al arrancar.
 3. Crea un proyecto centinela y lo lee por la API para confirmar que el 8090 usa la base de pruebas.
 4. Crea sus datos con prefijo `e2e-<RUN_ID>-` y los borra al terminar, aunque falle, y comprueba por SQL que no queda nada.
 

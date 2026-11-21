@@ -5,14 +5,20 @@ import (
 	"os"
 
 	"pmt/internal/app"
+	"pmt/internal/platform/config"
 )
 
 func main() {
-	run := app.Run
-	if len(os.Args) > 1 && os.Args[1] == "agent" {
-		run = func() error { return app.RunAgent(os.Args[2:], os.Stdout) }
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
 	}
-	if err := run(); err != nil {
+	if len(os.Args) > 1 && os.Args[1] == "agent" {
+		err = app.RunAgent(cfg, os.Args[2:], os.Stdout)
+	} else {
+		err = app.Run(cfg)
+	}
+	if err != nil {
 		log.Fatal(err)
 	}
 }

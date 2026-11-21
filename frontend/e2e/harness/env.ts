@@ -5,6 +5,5 @@ import { assertTestDatabase, assertTestTarget, resolveApiTarget } from '../../co
 
 export const API_TARGET = assertTestTarget(resolveApiTarget(process.env))
 export const DB = assertTestDatabase(process.env.PMT_TEST_DATABASE_URL)
-export const DATABASE_URL = process.env.PMT_TEST_DATABASE_URL ?? ''
 export const RUN_ID = crypto.randomUUID().replaceAll('-', '').slice(0, 8)
 export const TARGET_LINE = `Destino: ${API_TARGET} · base ${DB.database} (usuario ${DB.user})`
