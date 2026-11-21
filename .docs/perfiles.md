@@ -16,7 +16,7 @@ PMT trabaja con nueve perfiles de agentes y el usuario. Cada agente tiene su tok
 | **QAP** | Quality Assurance Planning | Diseña el plan de pruebas cuando una tarea crea o cambia una funcionalidad que afecta frontend y backend. Los casos de error van de los absurdos a los comunes e incluyen rechazos del backend. Lo envía al TL. |
 | **QA** | Quality Assurance | Prueba los criterios que el plan de desarrollo le asigna y lo que afecta el cambio, revisa los datos en la base, registra hallazgos y aprueba con evidencia. Confirma o rechaza bugs. |
 
-**El usuario** (`User`) actúa sin token como `saul`. Tiene todo lo de PP, pero no aprueba como CR, QA ni TL.
+**El usuario** (`User`) es una persona con cuenta: entra al frontend con su correo y contraseña, o usa un token de API suyo, y actúa con su `username`. Tiene todo lo de PP, pero no aprueba como CR, QA ni TL.
 
 ## Flujo de una etapa
 

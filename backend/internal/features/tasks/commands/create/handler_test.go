@@ -41,7 +41,7 @@ func TestHandleCreatesTask(t *testing.T) {
 	repo := &fakeRepo{}
 	stageID := uuid.New()
 
-	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, StageID: stageID, Title: " Revisar "})
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, StageID: stageID, Title: " Revisar "})
 
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestHandleCreatesTask(t *testing.T) {
 func TestHandleRejectsInvalidTask(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, StageID: uuid.New(), Title: " "})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, StageID: uuid.New(), Title: " "})
 
 	if !errors.Is(err, domain.ErrTaskTitleRequired) {
 		t.Fatalf("err = %v", err)
@@ -70,7 +70,7 @@ func TestHandleRejectsInvalidTask(t *testing.T) {
 func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	repo := &fakeRepo{}
 
-	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, StageID: uuid.New(), Title: "Revisar"})
+	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, StageID: uuid.New(), Title: "Revisar"})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)
@@ -86,7 +86,7 @@ func TestRESTRejectsOutsidePlanning(t *testing.T) {
 	rec := httptest.NewRecorder()
 	path := "/api/stages/" + uuid.NewString() + "/tasks"
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"title":"A"}`)))
+	mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"title":"A"}`))))
 
 	if rec.Code != http.StatusConflict {
 		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -117,7 +117,7 @@ func TestREST(t *testing.T) {
 			New(&fakeRepo{err: tt.err}, fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

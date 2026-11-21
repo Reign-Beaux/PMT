@@ -115,7 +115,7 @@ func TestHandleRejects(t *testing.T) {
 	}{
 		{"TL ajeno descarta", openFinding(domain.ItemTask), domain.StatusDismissed, otherTL, "M", false, kernel.ErrNotStageLead, 1},
 		{"CR descarta, sin consultar el ámbito", openFinding(domain.ItemTask), domain.StatusDismissed, cr, "M", false, domain.ErrDismissForbidden, 0},
-		{"User descarta", openFinding(domain.ItemTask), domain.StatusDismissed, kernel.Owner, "M", false, domain.ErrDismissForbidden, 0},
+		{"User descarta", openFinding(domain.ItemTask), domain.StatusDismissed, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "M", false, domain.ErrDismissForbidden, 0},
 		{"TL marca corregido", openFinding(domain.ItemTask), domain.StatusFixed, tl, "M", false, domain.ErrFixForbidden, 0},
 		{"ya cerrado", closed, domain.StatusFixed, cr, "M", false, domain.ErrFindingClosed, 0},
 		{"resolución desconocida", openFinding(domain.ItemTask), "open", cr, "M", false, domain.ErrResolutionInvalid, 0},

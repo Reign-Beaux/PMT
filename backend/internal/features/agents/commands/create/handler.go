@@ -26,21 +26,35 @@ type Result struct {
 	Token   string
 }
 
+// Users indica si un nombre ya es el username de un usuario. Lo cumple la feature auth.
+type Users interface {
+	Exists(ctx context.Context, username string) (bool, error)
+}
+
 // Handler ejecuta la operación.
 type Handler struct {
-	repo Repository
+	repo  Repository
+	users Users
 }
 
 // New crea el handler.
-func New(repo Repository) *Handler {
-	return &Handler{repo: repo}
+func New(repo Repository, users Users) *Handler {
+	return &Handler{repo: repo, users: users}
 }
 
-// Handle crea el agente. Solo guarda el hash del token.
+// Handle crea el agente. Solo guarda el hash del token. Un nombre que ya es
+// username de un usuario se rechaza: el historial no podría distinguirlos.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	agent, err := domain.NewAgent(cmd.Name, cmd.Profile)
 	if err != nil {
 		return Result{}, err
+	}
+	taken, err := h.users.Exists(ctx, agent.Name)
+	if err != nil {
+		return Result{}, err
+	}
+	if taken {
+		return Result{}, domain.ErrAgentNameIsUser
 	}
 
 	token := domain.NewToken()

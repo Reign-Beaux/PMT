@@ -33,15 +33,15 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		want   error
 	}{
 		{"PP libera", StatusPlanning, StatusStandBy, pp, "", nil},
-		{"usuario libera", StatusPlanning, StatusStandBy, kernel.Owner, "", nil},
+		{"usuario libera", StatusPlanning, StatusStandBy, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", nil},
 		{"PC no libera", StatusPlanning, StatusStandBy, pc, "", kernel.ErrTransitionForbidden},
 		{"TL no mueve proyectos", StatusStandBy, StatusInDev, tl, "", kernel.ErrTransitionForbidden},
 		{"PP detiene", StatusWorking, StatusStopped, pp, "pausa", nil},
-		{"usuario detiene", StatusWorking, StatusStopped, kernel.Owner, "pausa", nil},
+		{"usuario detiene", StatusWorking, StatusStopped, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "pausa", nil},
 		{"PC no detiene", StatusWorking, StatusStopped, pc, "pausa", kernel.ErrTransitionForbidden},
 		{"detener sin motivo", StatusWorking, StatusStopped, pp, "  ", kernel.ErrReasonRequired},
 		{"PP reanuda", StatusStopped, StatusWorking, pp, "", nil},
-		{"usuario reanuda", StatusStopped, StatusWorking, kernel.Owner, "", nil},
+		{"usuario reanuda", StatusStopped, StatusWorking, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", nil},
 		{"PC no reanuda", StatusStopped, StatusWorking, pc, "", kernel.ErrTransitionForbidden},
 		{"PC no cancela", StatusWorking, StatusCancelled, pc, "x", kernel.ErrTransitionForbidden},
 		{"reabrir sin motivo", StatusCancelled, StatusPlanning, pp, "", kernel.ErrReasonRequired},

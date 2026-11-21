@@ -40,7 +40,7 @@ func TestHandleProfileFailsBeforeCheckingProject(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusReported)
 	projects := fakeProjects{err: errors.New("no debió consultar el proyecto")}
 
-	_, err := New(repo, projects).Handle(context.Background(), Command{ID: id, Status: domain.StatusConfirmed, Actor: kernel.Owner})
+	_, err := New(repo, projects).Handle(context.Background(), Command{ID: id, Status: domain.StatusConfirmed, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 	if !errors.Is(err, kernel.ErrTransitionForbidden) {
 		t.Fatalf("err = %v", err)

@@ -10,7 +10,7 @@ import (
 // allowedChange devuelve una tarea, un actor y un equipo con los que la transición
 // pasa perfil y ámbito. Sin perfiles devuelve un actor cualquiera.
 func allowedChange(from, to Status) (Task, kernel.Actor, kernel.Team) {
-	actor := kernel.Owner
+	actor := kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}
 	if profiles := statusProfiles[from][to]; len(profiles) > 0 {
 		actor = kernel.Actor{Name: "agente", Profile: profiles[0]}
 	}
@@ -75,11 +75,11 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		{"QA aprueba", Task{Status: StatusInQA}, StatusPendingClose, qa, "verificado en /tmp/qa.log", nil},
 		{"aprobar sin motivo", Task{Status: StatusInQA}, StatusPendingClose, qa, "", kernel.ErrReasonRequired},
 		{"aprobar con solo espacios", Task{Status: StatusInQA}, StatusPendingClose, qa, "  ", kernel.ErrReasonRequired},
-		{"usuario no aprueba", Task{Status: StatusInQA}, StatusPendingClose, kernel.Owner, "verificado", kernel.ErrTransitionForbidden},
+		{"usuario no aprueba", Task{Status: StatusInQA}, StatusPendingClose, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "verificado", kernel.ErrTransitionForbidden},
 		{"TL cierra", Task{Status: StatusPendingClose}, StatusDone, tl, "", nil},
-		{"usuario no cierra", Task{Status: StatusPendingClose}, StatusDone, kernel.Owner, "", kernel.ErrTransitionForbidden},
+		{"usuario no cierra", Task{Status: StatusPendingClose}, StatusDone, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", kernel.ErrTransitionForbidden},
 		{"PP cancela con motivo", Task{Status: StatusReady}, StatusCancelled, pp, "ya no", nil},
-		{"usuario cancela con motivo", Task{Status: StatusReady}, StatusCancelled, kernel.Owner, "ya no", nil},
+		{"usuario cancela con motivo", Task{Status: StatusReady}, StatusCancelled, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "ya no", nil},
 		{"cancelar sin motivo", Task{Status: StatusReady}, StatusCancelled, pp, "  ", kernel.ErrReasonRequired},
 		{"TL ajeno no cancela", Task{Status: StatusReady}, StatusCancelled, otherTL, "ya no", kernel.ErrNotStageLead},
 		{"reabrir sin motivo", Task{Status: StatusCancelled}, StatusBacklog, pp, "", kernel.ErrReasonRequired},
@@ -114,7 +114,7 @@ func TestChangeStatusTracksAssignee(t *testing.T) {
 	}
 
 	task.Status = StatusCancelled
-	if err := task.ChangeStatus(StatusBacklog, kernel.Owner, "vuelve", kernel.Team{}); err != nil {
+	if err := task.ChangeStatus(StatusBacklog, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "vuelve", kernel.Team{}); err != nil {
 		t.Fatal(err)
 	}
 	if task.Assignee != "" {

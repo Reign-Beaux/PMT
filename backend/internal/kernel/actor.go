@@ -2,7 +2,6 @@ package kernel
 
 import (
 	"context"
-	"errors"
 	"slices"
 )
 
@@ -24,15 +23,12 @@ const (
 )
 
 // Actor identifica a quien ejecuta una operación. Lo resuelve el servidor y
-// nunca llega como argumento.
+// nunca llega como argumento. Un usuario actúa con su username y el perfil User;
+// un agente, con su nombre y su perfil.
 type Actor struct {
 	Name    string
 	Profile Profile
 }
-
-// Owner es el usuario humano: el actor de toda petición sin token. No tiene fila
-// en agents, por lo que no puede ser TL, miembro de un equipo ni dueño de una tarea.
-var Owner = Actor{Name: "saul", Profile: ProfileUser}
 
 // IsDev indica si el perfil es de desarrollo, sea frontend o backend.
 func (p Profile) IsDev() bool {
@@ -55,13 +51,20 @@ func (t Team) HasMember(name string) bool {
 	return slices.Contains(t.Members, name)
 }
 
-// ErrUnauthenticated indica que el token no corresponde a un agente activo.
-var ErrUnauthenticated = errors.New("token inválido")
+// ErrUnauthenticated indica que el token no corresponde a un agente ni a un
+// usuario activos.
+var ErrUnauthenticated = Unauthorized("token inválido")
 
-// Authenticator resuelve un token a su actor. Devuelve ErrUnauthenticated si el
-// token no es válido; cualquier otro error es técnico.
+// ErrSessionInvalid indica que la cookie no corresponde a una sesión vigente de
+// un usuario activo.
+var ErrSessionInvalid = Unauthorized("sesión no válida")
+
+// Authenticator resuelve las credenciales de una petición a su actor: la cookie
+// de sesión del navegador o un token de API (de usuario o de agente). Devuelve
+// un error de tipo KindUnauthorized si no son válidas; cualquier otro es técnico.
 type Authenticator interface {
-	Authenticate(ctx context.Context, token string) (Actor, error)
+	AuthenticateSession(ctx context.Context, session string) (Actor, error)
+	AuthenticateToken(ctx context.Context, token string) (Actor, error)
 }
 
 // IsPlanner indica si el perfil planea: PP o el usuario, que tiene lo de PP.

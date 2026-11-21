@@ -18,6 +18,8 @@ var (
 	ErrAgentProfileInvalid = kernel.Invalid("perfil desconocido: usa PP, PC, TL, DevFrontend, DevBackend, CR, QAP, QA, DP o User")
 	// ErrAgentNameTaken indica que ya existe un agente con ese nombre.
 	ErrAgentNameTaken = kernel.Conflict("ya existe un agente con ese nombre")
+	// ErrAgentNameIsUser indica que el nombre ya es el username de un usuario.
+	ErrAgentNameIsUser = kernel.Conflict("ya existe un usuario con ese nombre")
 	// ErrAgentNotFound indica que el agente no existe.
 	ErrAgentNotFound = kernel.NotFound("agente no encontrado")
 	// ErrAgentRevoked indica que el agente está revocado.

@@ -48,6 +48,8 @@ func kindCode(kind kernel.ErrorKind) string {
 		return "conflict"
 	case kernel.KindForbidden:
 		return "forbidden"
+	case kernel.KindUnauthorized:
+		return "unauthorized"
 	default:
 		return "invalid"
 	}

@@ -3,6 +3,8 @@ package lookup
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"pmt/internal/features/agents/domain"
 	"pmt/internal/kernel"
@@ -33,4 +35,14 @@ func (h *Handler) Handle(ctx context.Context, name string) (kernel.Profile, erro
 		return "", domain.ErrAgentRevoked
 	}
 	return agent.Profile, nil
+}
+
+// Exists indica si hay un agente con ese nombre, revocado o no: su nombre sigue
+// en el historial.
+func (h *Handler) Exists(ctx context.Context, name string) (bool, error) {
+	_, err := h.reader.GetByName(ctx, strings.TrimSpace(name))
+	if errors.Is(err, domain.ErrAgentNotFound) {
+		return false, nil
+	}
+	return err == nil, err
 }

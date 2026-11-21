@@ -18,7 +18,7 @@ func TestHandleRule4(t *testing.T) {
 		repo, id := newRepoWith(t, domain.StatusPlanning)
 		tasks := &fakeTasks{}
 
-		if _, err := New(repo, tasks, waitingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Owner}); err != nil {
+		if _, err := New(repo, tasks, waitingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}}); err != nil {
 			t.Fatal(err)
 		}
 		if tasks.checks != 1 {
@@ -29,7 +29,7 @@ func TestHandleRule4(t *testing.T) {
 	t.Run("sin tarea activa", func(t *testing.T) {
 		repo, id := newRepoWith(t, domain.StatusPlanning)
 
-		_, err := New(repo, &fakeTasks{releasable: empty}, waitingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Owner})
+		_, err := New(repo, &fakeTasks{releasable: empty}, waitingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 		if !errors.Is(err, empty) {
 			t.Fatalf("err = %v", err)
@@ -42,7 +42,7 @@ func TestHandleRule4(t *testing.T) {
 	t.Run("solo desde planning", func(t *testing.T) {
 		repo, id := newRepoWith(t, domain.StatusStopped)
 
-		if _, err := New(repo, &fakeTasks{releasable: empty}, waitingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Owner}); err != nil {
+		if _, err := New(repo, &fakeTasks{releasable: empty}, waitingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -54,7 +54,7 @@ func TestHandleRule4(t *testing.T) {
 		}
 		repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
 
-		_, err = New(repo, &fakeTasks{releasable: empty}, workingProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Actor: kernel.Owner})
+		_, err = New(repo, &fakeTasks{releasable: empty}, workingProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 		if !errors.Is(err, empty) {
 			t.Fatalf("err = %v", err)
@@ -71,7 +71,7 @@ func TestHandleRule4(t *testing.T) {
 		}
 		repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
 
-		if _, err := New(repo, &fakeTasks{releasable: empty}, workingProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStopped, Actor: kernel.Owner, Reason: "motivo"}); err != nil {
+		if _, err := New(repo, &fakeTasks{releasable: empty}, workingProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStopped, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Reason: "motivo"}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -146,7 +146,7 @@ func TestHandleRule10InOwnPlanning(t *testing.T) {
 	}
 	repo := &fakeRepo{stages: map[uuid.UUID]domain.Stage{s.ID: s}}
 
-	_, err = New(repo, &fakeTasks{}, frozenProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Actor: kernel.Owner})
+	_, err = New(repo, &fakeTasks{}, frozenProject).Handle(context.Background(), Command{ID: s.ID, Status: domain.StatusStandBy, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 	if !errors.Is(err, domain.ErrStageProjectFrozen) {
 		t.Fatalf("err = %v", err)
@@ -160,7 +160,7 @@ func TestHandleProjectCheckFailure(t *testing.T) {
 	failure := errors.New("fallo de lectura")
 	repo, id := newRepoWith(t, domain.StatusPlanning)
 
-	_, err := New(repo, &fakeTasks{}, fakeProjects{err: failure}).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Owner})
+	_, err := New(repo, &fakeTasks{}, fakeProjects{err: failure}).Handle(context.Background(), Command{ID: id, Status: domain.StatusStandBy, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 	if !errors.Is(err, failure) {
 		t.Fatalf("err = %v", err)
@@ -172,7 +172,7 @@ func TestHandleUserCannotCloseStageWithAllTasksDone(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusInDev)
 	tasks := &fakeTasks{allDone: true}
 
-	_, err := New(repo, tasks, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: kernel.Owner})
+	_, err := New(repo, tasks, workingProject).Handle(context.Background(), Command{ID: id, Status: domain.StatusDone, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 	if !errors.Is(err, kernel.ErrTransitionForbidden) {
 		t.Fatalf("err = %v", err)

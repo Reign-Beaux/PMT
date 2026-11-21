@@ -1,0 +1,26 @@
+package login
+
+import (
+	"net/http"
+
+	"pmt/internal/features/auth/domain"
+	"pmt/internal/platform/rest"
+)
+
+// Register registra la ruta de la operación. Es pública: no pide sesión.
+func (h *Handler) Register(mux *http.ServeMux, secure bool) {
+	mux.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		var cmd Command
+		if err := rest.DecodeJSON(w, r, &cmd); err != nil {
+			rest.WriteError(w, err)
+			return
+		}
+		result, err := h.Handle(r.Context(), cmd)
+		if err != nil {
+			rest.WriteError(w, err)
+			return
+		}
+		rest.SetSessionCookie(w, result.Session, int(domain.SessionTTL.Seconds()), secure)
+		rest.WriteJSON(w, http.StatusOK, result.User)
+	})
+}

@@ -61,7 +61,7 @@ func TestHandleAdds(t *testing.T) {
 	id := uuid.New()
 	actors := []kernel.Actor{
 		tl,
-		kernel.Owner,
+		kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		{Name: "dev", Profile: kernel.ProfileDevBackend},
 	}
 	for _, kind := range []domain.ItemKind{domain.ItemProject, domain.ItemStage, domain.ItemTask, domain.ItemBug} {
@@ -141,7 +141,7 @@ func TestREST(t *testing.T) {
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPost, "/api/comments", strings.NewReader(tt.body))
 
-			mux.ServeHTTP(rec, req.WithContext(rest.WithActor(req.Context(), kernel.Owner)))
+			mux.ServeHTTP(rec, req.WithContext(rest.WithActor(req.Context(), kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

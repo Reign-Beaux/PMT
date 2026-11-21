@@ -43,7 +43,7 @@ func TestHandle(t *testing.T) {
 		{"frontend", tl, kernel.ProfileDevFrontend, nil},
 		{"TL ajeno", kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
 		{"PP", kernel.Actor{Name: "tl", Profile: kernel.ProfilePP}, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
-		{"usuario", kernel.Owner, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
+		{"usuario", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
 		{"no es dev", tl, kernel.ProfileCR, domain.ErrAgentNotDev},
 	}
 	for _, tt := range tests {

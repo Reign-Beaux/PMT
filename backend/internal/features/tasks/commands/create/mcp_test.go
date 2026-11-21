@@ -10,6 +10,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
@@ -17,6 +18,7 @@ func connect(t *testing.T, repo Repository) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
+	platformmcp.ActAs(server, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 	New(repo, fakeStages{}).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()

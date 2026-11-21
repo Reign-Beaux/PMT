@@ -32,7 +32,7 @@ func TestHandleRecordsStatusChange(t *testing.T) {
 func TestHandleRecordsNothingOnRejectedTransition(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusBacklog)
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusBacklog, Actor: kernel.Owner})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{ID: id, Status: domain.StatusBacklog, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}})
 
 	if err == nil {
 		t.Fatal("se esperaba error")

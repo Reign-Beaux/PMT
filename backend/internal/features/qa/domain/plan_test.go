@@ -30,7 +30,7 @@ func TestNewPlan(t *testing.T) {
 	}{
 		{"válido", " Plan ", []uuid.UUID{task}, qap, nil},
 		{"perfil sin permiso", "Plan", []uuid.UUID{task}, tl, ErrQAPOnly},
-		{"usuario sin permiso", "Plan", []uuid.UUID{task}, kernel.Owner, ErrQAPOnly},
+		{"usuario sin permiso", "Plan", []uuid.UUID{task}, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ErrQAPOnly},
 		{"sin título", "  ", []uuid.UUID{task}, qap, ErrTitleRequired},
 		{"sin tareas", "Plan", nil, qap, ErrTasksRequired},
 		{"tarea repetida", "Plan", []uuid.UUID{task, task}, qap, ErrTaskRepeated},
@@ -150,7 +150,7 @@ func TestReturn(t *testing.T) {
 		t.Errorf("sin correcciones: err = %v", err)
 	}
 	wrong := plan(StatusSubmitted)
-	if err := wrong.Return("X", kernel.Owner); !errors.Is(err, ErrTLOnly) {
+	if err := wrong.Return("X", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}); !errors.Is(err, ErrTLOnly) {
 		t.Errorf("perfil: err = %v", err)
 	}
 	approved := plan(StatusApproved)

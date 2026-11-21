@@ -9,7 +9,7 @@ test('navegación y contexto idéntico entre Etapas y Bugs', async ({ page }) =>
   await page.goto('/')
   await expect(page).toHaveURL(/\/projects$/)
   const nav = page.getByRole('navigation', { name: 'Navegación principal' })
-  await expect(nav.getByRole('link')).toHaveText(['Dashboard', 'Projects'])
+  await expect(nav.getByRole('link')).toHaveText(['Dashboard', 'Projects', 'Cuenta'])
   await page.getByRole('link', { name: /PMT En operación/ }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(project.name)
   await expect(page.locator('main')).toContainText(project.description)

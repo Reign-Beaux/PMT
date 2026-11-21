@@ -56,7 +56,7 @@ func TestHandleSavesNewVersion(t *testing.T) {
 	repo := newRepo()
 
 	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{
-		Actor: kernel.Owner,
+		Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ID:    repo.current.ID, Title: "Crear login con Google", Reason: "Incongruencia", RequestedBy: "PM",
 	})
 
@@ -77,9 +77,9 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin title", Command{Actor: kernel.Owner, Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
-		{"sin motivo", Command{Actor: kernel.Owner, Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Actor: kernel.Owner, Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"sin title", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
+		{"sin motivo", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
 	}
 
 	for _, tt := range tests {
@@ -102,7 +102,7 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 func TestHandleMissingOrRetired(t *testing.T) {
 	repo := newRepo()
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: uuid.New(), Title: "A", Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: uuid.New(), Title: "A", Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrTaskNotFound) {
 		t.Fatalf("err = %v", err)
@@ -131,7 +131,7 @@ func TestREST(t *testing.T) {
 			New(repo, fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/tasks/"+tt.id(repo.current.ID)+"/revise", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/tasks/"+tt.id(repo.current.ID)+"/revise", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -145,7 +145,7 @@ func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
 	repo := newRepo()
 
 	_, err := New(repo, fakeStages{err: errOwnPlanning}).Handle(context.Background(), Command{
-		Actor: kernel.Owner,
+		Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ID:    repo.current.ID, Title: "A", Reason: "M", RequestedBy: "PM",
 	})
 

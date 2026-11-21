@@ -39,7 +39,7 @@ func TestHandleDeletesInPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, status: domain.StatusPlanning}
 
-	if err := New(repo).Handle(context.Background(), id, kernel.Owner); err != nil {
+	if err := New(repo).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}); err != nil {
 		t.Fatal(err)
 	}
 	if !repo.deleted {
@@ -57,7 +57,7 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 			id := uuid.New()
 			repo := &fakeRepo{existing: id, status: status}
 
-			err := New(repo).Handle(context.Background(), id, kernel.Owner)
+			err := New(repo).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 			if !errors.Is(err, domain.ErrProjectNotPlanning) {
 				t.Fatalf("err = %v", err)
@@ -91,7 +91,7 @@ func TestREST(t *testing.T) {
 			New(&fakeRepo{existing: id, status: tt.state, err: tt.err}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/projects/"+tt.id, nil))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodDelete, "/api/projects/"+tt.id, nil)))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

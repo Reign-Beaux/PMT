@@ -47,7 +47,7 @@ func TestHandleAdds(t *testing.T) {
 	parent := uuid.New()
 
 	result, err := newHandler(repo).Handle(context.Background(), Command{
-		Actor:   kernel.Owner,
+		Actor:   kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		StageID: parent, Title: "Nueva", Reason: "Faltaba", RequestedBy: "PM",
 	})
 
@@ -68,9 +68,9 @@ func TestHandleRejectsInvalidInput(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin title", Command{Actor: kernel.Owner, Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
-		{"sin motivo", Command{Actor: kernel.Owner, Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Actor: kernel.Owner, Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"sin title", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Reason: "M", RequestedBy: "PM"}, domain.ErrTaskTitleRequired},
+		{"sin motivo", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Title: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Title: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
 	}
 
 	for _, tt := range tests {
@@ -93,7 +93,7 @@ func TestHandleRejectsRetiredStage(t *testing.T) {
 	repo := &fakeRepo{}
 
 	_, err := New(repo, fakeStages{err: domain.ErrStageNotFound}).Handle(context.Background(), Command{
-		Actor: kernel.Owner,
+		Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		Title: "Nueva", Reason: "Faltaba", RequestedBy: "PM",
 	})
 
@@ -128,7 +128,7 @@ func TestREST(t *testing.T) {
 			newHandler(&fakeRepo{err: tt.err}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

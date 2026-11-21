@@ -255,7 +255,7 @@ func TestRESTReturnsWholeStage(t *testing.T) {
 	New(repo, &fakeTasks{}, workingProject).Register(mux)
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`)))
+	mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`))))
 
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {

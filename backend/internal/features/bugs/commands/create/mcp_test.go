@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/kernel"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
@@ -15,6 +16,7 @@ func call(t *testing.T, h *Handler, args map[string]any) *sdk.CallToolResult {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
+	platformmcp.ActAs(server, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 	h.RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()

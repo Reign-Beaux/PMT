@@ -43,7 +43,7 @@ func TestHandle(t *testing.T) {
 		want   error
 	}{
 		{"PP asigna", pp, fakeAgents{profile: kernel.ProfileTL}, nil},
-		{"usuario asigna", kernel.Owner, fakeAgents{profile: kernel.ProfileTL}, nil},
+		{"usuario asigna", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, fakeAgents{profile: kernel.ProfileTL}, nil},
 		{"TL no asigna", kernel.Actor{Profile: kernel.ProfileTL}, fakeAgents{profile: kernel.ProfileTL}, domain.ErrAssignLeadForbidden},
 		{"agente sin perfil TL", pp, fakeAgents{profile: kernel.ProfileDevBackend}, domain.ErrAgentNotLead},
 		{"agente inexistente, como el usuario", pp, fakeAgents{err: missing}, missing},

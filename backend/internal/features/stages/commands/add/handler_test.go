@@ -56,7 +56,7 @@ func TestHandleAdds(t *testing.T) {
 	parent := uuid.New()
 
 	result, err := newHandler(repo).Handle(context.Background(), Command{
-		Actor:     kernel.Owner,
+		Actor:     kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ProjectID: parent, Name: "Nueva", Reason: "Faltaba", RequestedBy: "PM",
 	})
 
@@ -77,9 +77,9 @@ func TestHandleRejectsInvalidInput(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin name", Command{Actor: kernel.Owner, Reason: "M", RequestedBy: "PM"}, domain.ErrStageNameRequired},
-		{"sin motivo", Command{Actor: kernel.Owner, Name: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Actor: kernel.Owner, Name: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"sin name", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Reason: "M", RequestedBy: "PM"}, domain.ErrStageNameRequired},
+		{"sin motivo", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Name: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Name: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
 	}
 
 	for _, tt := range tests {
@@ -121,7 +121,7 @@ func TestREST(t *testing.T) {
 			newHandler(&fakeRepo{err: tt.err}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -134,7 +134,7 @@ func TestHandleBornsInOwnPlanningWhenProjectIsWorking(t *testing.T) {
 	repo := &fakeRepo{}
 
 	result, err := New(repo, fakeProjects{working: true}).Handle(context.Background(), Command{
-		Actor:     kernel.Owner,
+		Actor:     kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ProjectID: uuid.New(), Name: "Pagos", Reason: " Petición ", RequestedBy: "PM",
 	})
 
@@ -153,7 +153,7 @@ func TestHandleRequiresReasonInOwnPlanning(t *testing.T) {
 	repo := &fakeRepo{}
 
 	_, err := New(repo, fakeProjects{working: true}).Handle(context.Background(), Command{
-		Actor:     kernel.Owner,
+		Actor:     kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ProjectID: uuid.New(), Name: "Pagos", RequestedBy: "PM",
 	})
 
@@ -164,7 +164,7 @@ func TestHandleRequiresReasonInOwnPlanning(t *testing.T) {
 
 func TestHandleReturnsProjectError(t *testing.T) {
 	_, err := New(&fakeRepo{}, fakeProjects{err: domain.ErrProjectNotFound}).Handle(context.Background(), Command{
-		Actor:     kernel.Owner,
+		Actor:     kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ProjectID: uuid.New(), Name: "Pagos", Reason: "M", RequestedBy: "PM",
 	})
 

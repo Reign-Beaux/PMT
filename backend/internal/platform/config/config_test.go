@@ -7,15 +7,26 @@ import (
 	"testing"
 )
 
-const valid = `server:
+const valid = `app:
+  public_url: http://127.0.0.1:8080
+server:
   addr: 127.0.0.1:8080
 database:
   connection_string: postgres://localhost/pmt
 frontend:
   dist: ""
+auth:
+  cookie_secure: false
+owner:
+  email: dueno@example.com
+  password: contrasena-de-prueba
+  username: dueno
 `
 
-var overrides = []string{"SERVER_ADDR", "DATABASE_CONNECTION_STRING", "FRONTEND_DIST"}
+var overrides = []string{
+	"APP_PUBLIC_URL", "SERVER_ADDR", "DATABASE_CONNECTION_STRING", "FRONTEND_DIST",
+	"AUTH_COOKIE_SECURE", "OWNER_EMAIL", "OWNER_PASSWORD", "OWNER_USERNAME",
+}
 
 func clearOverrides(t *testing.T) {
 	t.Helper()
@@ -42,6 +53,16 @@ func TestLoad(t *testing.T) {
 	if cfg.Server.Addr != "127.0.0.1:8080" || cfg.Database.ConnectionString != "postgres://localhost/pmt" || cfg.Frontend.Dist != "" {
 		t.Fatal("secciones no cargadas")
 	}
+	if cfg.App.PublicURL != "http://127.0.0.1:8080" || cfg.Auth.CookieSecure || cfg.Owner.Email != "dueno@example.com" || cfg.Owner.Username != "dueno" || cfg.Owner.Password == "" {
+		t.Fatal("app, auth u owner no cargadas")
+	}
+	t.Setenv("OWNER_USERNAME", "otro")
+	t.Setenv("AUTH_COOKIE_SECURE", "true")
+	cfg, err = Load()
+	if err != nil || cfg.Owner.Username != "otro" || !cfg.Auth.CookieSecure {
+		t.Fatalf("sobrescritura de owner y auth fallida: %v", err)
+	}
+	clearOverrides(t)
 	t.Setenv("DATABASE_CONNECTION_STRING", "postgres://user:p%40ss@localhost/db?x=1&y=2")
 	t.Setenv("SERVER_ADDR", "127.0.0.1:8090")
 	cfg, err = Load()
@@ -55,6 +76,7 @@ func TestLoad(t *testing.T) {
 	for _, tc := range []struct{ old, key string }{
 		{"  connection_string: postgres://localhost/pmt\n", "database.connection_string"},
 		{"  addr: 127.0.0.1:8080", "server.addr"},
+		{"  public_url: http://127.0.0.1:8080\n", "app.public_url"},
 	} {
 		write(strings.Replace(valid, tc.old, "", 1))
 		if _, err = Load(); err == nil || !strings.Contains(err.Error(), tc.key) {
@@ -81,6 +103,9 @@ func TestProdConfig(t *testing.T) {
 	}
 	if cfg.Server.Addr != "0.0.0.0:8080" || cfg.Database.ConnectionString != "changeme" || cfg.Frontend.Dist != "" {
 		t.Fatalf("configuración de producción inesperada: addr=%q dist=%q", cfg.Server.Addr, cfg.Frontend.Dist)
+	}
+	if cfg.App.PublicURL != "https://pmt.saulantonio.com" || !cfg.Auth.CookieSecure || cfg.Owner.Email != "changeme" || cfg.Owner.Username != "changeme" {
+		t.Fatalf("app, auth u owner de producción inesperados: url=%q secure=%t", cfg.App.PublicURL, cfg.Auth.CookieSecure)
 	}
 }
 

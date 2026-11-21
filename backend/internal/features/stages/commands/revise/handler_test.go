@@ -42,7 +42,7 @@ func TestHandleSavesNewVersion(t *testing.T) {
 	repo := newRepo()
 
 	result, err := New(repo).Handle(context.Background(), Command{
-		Actor: kernel.Owner,
+		Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser},
 		ID:    repo.current.ID, Name: "Crear login con Google", Reason: "Incongruencia", RequestedBy: "PM",
 	})
 
@@ -63,9 +63,9 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin name", Command{Actor: kernel.Owner, Reason: "M", RequestedBy: "PM"}, domain.ErrStageNameRequired},
-		{"sin motivo", Command{Actor: kernel.Owner, Name: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Actor: kernel.Owner, Name: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"sin name", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Reason: "M", RequestedBy: "PM"}, domain.ErrStageNameRequired},
+		{"sin motivo", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Name: "A", RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Name: "A", Reason: "M"}, domain.ErrChangeRequesterRequired},
 	}
 
 	for _, tt := range tests {
@@ -88,7 +88,7 @@ func TestHandleKeepsCurrentWhenInvalid(t *testing.T) {
 func TestHandleMissingOrRetired(t *testing.T) {
 	repo := newRepo()
 
-	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: uuid.New(), Name: "A", Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: uuid.New(), Name: "A", Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrStageNotFound) {
 		t.Fatalf("err = %v", err)
@@ -117,7 +117,7 @@ func TestREST(t *testing.T) {
 			New(repo).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/stages/"+tt.id(repo.current.ID)+"/revise", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/stages/"+tt.id(repo.current.ID)+"/revise", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -130,7 +130,7 @@ func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
 	repo := newRepo()
 	repo.current.AddReason = "Petición"
 
-	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: repo.current.ID, Name: "A", Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: repo.current.ID, Name: "A", Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrStageInOwnPlanning) || len(repo.changes) != 0 {
 		t.Errorf("err = %v, cambios = %+v", err, repo.changes)
@@ -156,7 +156,7 @@ func TestHandleChecksProfile(t *testing.T) {
 		gets  int
 	}{
 		{"PP", kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}, nil, 1},
-		{"usuario", kernel.Owner, nil, 1},
+		{"usuario", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, nil, 1},
 		{"TL de la etapa", kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}, nil, 1},
 		{"TL de otra etapa", kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ErrNotStageLead, 1},
 		{"PC", kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}, domain.ErrReviseForbidden, 0},

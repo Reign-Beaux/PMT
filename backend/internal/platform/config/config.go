@@ -11,9 +11,12 @@ import (
 
 // Config contiene la configuración tipada por sección.
 type Config struct {
+	App      *options.AppSettings
 	Server   *options.ServerSettings
 	Database *options.DatabaseSettings
 	Frontend *options.FrontendSettings
+	Auth     *options.AuthSettings
+	Owner    *options.OwnerSettings
 }
 
 // Load lee el archivo del ambiente, aplica las variables de entorno y valida
@@ -39,6 +42,9 @@ func Load() (Config, error) {
 	}
 	var c Config
 	var err error
+	if c.App, err = options.LoadAppSettingsFrom(v); err != nil {
+		return Config{}, err
+	}
 	if c.Server, err = options.LoadServerSettingsFrom(v); err != nil {
 		return Config{}, err
 	}
@@ -46,6 +52,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if c.Frontend, err = options.LoadFrontendSettingsFrom(v); err != nil {
+		return Config{}, err
+	}
+	if c.Auth, err = options.LoadAuthSettingsFrom(v); err != nil {
+		return Config{}, err
+	}
+	if c.Owner, err = options.LoadOwnerSettingsFrom(v); err != nil {
 		return Config{}, err
 	}
 	return c, nil

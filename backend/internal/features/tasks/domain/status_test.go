@@ -50,7 +50,7 @@ func TestChangeStatusRejectsUnknownStatus(t *testing.T) {
 	for _, status := range []Status{"", "archived", "BACKLOG", " ready "} {
 		task := Task{Status: StatusBacklog}
 
-		if err := task.ChangeStatus(status, kernel.Owner, "motivo", kernel.Team{}); !errors.Is(err, ErrTaskStatusInvalid) {
+		if err := task.ChangeStatus(status, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "motivo", kernel.Team{}); !errors.Is(err, ErrTaskStatusInvalid) {
 			t.Errorf("status %q: err = %v", status, err)
 		}
 		if task.Status != StatusBacklog {

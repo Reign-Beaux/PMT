@@ -98,7 +98,7 @@ func TestHandleRejects(t *testing.T) {
 	}{
 		{"TL", with(func(c *Command) { c.Actor = kernel.Actor{Name: "tl", Profile: kernel.ProfileTL} }), domain.ErrCreateForbidden, 0},
 		{"Dev", with(func(c *Command) { c.Actor = kernel.Actor{Name: "dev", Profile: kernel.ProfileDevBackend} }), domain.ErrCreateForbidden, 0},
-		{"User", with(func(c *Command) { c.Actor = kernel.Owner }), domain.ErrCreateForbidden, 0},
+		{"User", with(func(c *Command) { c.Actor = kernel.Actor{Name: "saul", Profile: kernel.ProfileUser} }), domain.ErrCreateForbidden, 0},
 		{"tipo desconocido", with(func(c *Command) { c.ItemKind = "stage" }), domain.ErrItemKindInvalid, 0},
 		{"sin blocking", with(func(c *Command) { c.Blocking = nil }), domain.ErrBlockingRequired, 0},
 		{"sin descripción", with(func(c *Command) { c.Description = "  " }), domain.ErrDescriptionRequired, 0},
@@ -134,7 +134,7 @@ func TestREST(t *testing.T) {
 		status int
 	}{
 		{"válido", body(id.String()), cr, http.StatusCreated},
-		{"perfil sin permiso", body(id.String()), kernel.Owner, http.StatusForbidden},
+		{"perfil sin permiso", body(id.String()), kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, http.StatusForbidden},
 		{"sin blocking", `{"item_kind":"task","item_id":"` + id.String() + `","description":"Falla"}`, cr, http.StatusBadRequest},
 		{"id inválido", body("abc"), cr, http.StatusBadRequest},
 		{"no existe", body(uuid.NewString()), cr, http.StatusNotFound},

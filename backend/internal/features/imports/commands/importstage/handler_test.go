@@ -65,7 +65,7 @@ func writeFile(t *testing.T, content string) string {
 
 func command(t *testing.T, content string) Command {
 	t.Helper()
-	return Command{Actor: kernel.Owner, ProjectID: uuid.New(), Path: writeFile(t, content)}
+	return Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ProjectID: uuid.New(), Path: writeFile(t, content)}
 }
 
 func TestHandlePlanningCreatesPlainStages(t *testing.T) {

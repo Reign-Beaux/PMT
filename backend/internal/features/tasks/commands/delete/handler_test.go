@@ -49,7 +49,7 @@ func TestHandleDeletesInPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	if err := New(repo, fakeStages{}).Handle(context.Background(), id, kernel.Owner); err != nil {
+	if err := New(repo, fakeStages{}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}); err != nil {
 		t.Fatal(err)
 	}
 	if !repo.deleted {
@@ -61,7 +61,7 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), id, kernel.Owner)
+	err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)
@@ -75,7 +75,7 @@ func TestHandleRejectsElementWithChanges(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, hasChanges: true}
 
-	err := New(repo, fakeStages{}).Handle(context.Background(), id, kernel.Owner)
+	err := New(repo, fakeStages{}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 	if !errors.Is(err, domain.ErrTaskHasChanges) {
 		t.Fatalf("err = %v", err)
@@ -105,7 +105,7 @@ func TestREST(t *testing.T) {
 			New(&fakeRepo{existing: id}, fakeStages{err: tt.stages}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/tasks/"+tt.id, nil))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodDelete, "/api/tasks/"+tt.id, nil)))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

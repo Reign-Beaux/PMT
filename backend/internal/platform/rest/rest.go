@@ -96,6 +96,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		status = http.StatusConflict
 	case kernel.KindForbidden:
 		status = http.StatusForbidden
+	case kernel.KindUnauthorized:
+		status = http.StatusUnauthorized
 	}
 	writeMessage(w, status, businessErr.Message)
 }

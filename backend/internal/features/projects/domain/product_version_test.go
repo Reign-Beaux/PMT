@@ -12,7 +12,7 @@ func TestChangeProductVersionOnlyInWorking(t *testing.T) {
 		t.Run(string(status), func(t *testing.T) {
 			p := Project{Status: status, ProductVersion: "1.0.0"}
 
-			_, err := p.ChangeProductVersion("1.1.0", "motivo", kernel.Owner)
+			_, err := p.ChangeProductVersion("1.1.0", "motivo", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 			if !errors.Is(err, ErrProductVersionNotWorking) || kindOf(err) != kernel.KindConflict {
 				t.Fatalf("err = %v", err)

@@ -48,7 +48,7 @@ func TestHandleRetires(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	result, err := newHandler(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Reason: "No se pensó bien", RequestedBy: "PM"})
+	result, err := newHandler(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Reason: "No se pensó bien", RequestedBy: "PM"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -68,9 +68,9 @@ func TestHandleRejectsInvalidInput(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin motivo", Command{Actor: kernel.Owner, ID: id, RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Actor: kernel.Owner, ID: id, Reason: "M"}, domain.ErrChangeRequesterRequired},
-		{"no existe o ya retirada", Command{Actor: kernel.Owner, ID: uuid.New(), Reason: "M", RequestedBy: "PM"}, domain.ErrTaskNotFound},
+		{"sin motivo", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"no existe o ya retirada", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: uuid.New(), Reason: "M", RequestedBy: "PM"}, domain.ErrTaskNotFound},
 	}
 
 	for _, tt := range tests {
@@ -110,7 +110,7 @@ func TestREST(t *testing.T) {
 			newHandler(&fakeRepo{existing: id}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/tasks/"+tt.id+"/retire", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/tasks/"+tt.id+"/retire", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -124,7 +124,7 @@ func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	_, err := New(repo, fakeStages{err: errOwnPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo, fakeStages{err: errOwnPlanning}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, errOwnPlanning) || len(repo.changes) != 0 {
 		t.Errorf("err = %v, cambios = %+v", err, repo.changes)

@@ -15,6 +15,8 @@ import (
 
 	"pmt/internal/features/activity"
 	"pmt/internal/features/agents"
+	"pmt/internal/features/auth"
+	"pmt/internal/features/auth/commands/seedowner"
 	"pmt/internal/features/bugs"
 	"pmt/internal/features/devplans"
 	"pmt/internal/features/imports"
@@ -63,24 +65,59 @@ func Run(cfg config.Config) error {
 		close(listenerDone)
 	}()
 
+	users := auth.New(pool, agents.NewChecker(pool), auth.Settings{
+		PublicURL:    cfg.App.PublicURL,
+		CookieSecure: cfg.Auth.CookieSecure,
+	})
+	if err = users.SeedOwner(ctx, seedowner.Command{
+		Email: cfg.Owner.Email, Password: cfg.Owner.Password, Username: cfg.Owner.Username,
+	}); err != nil {
+		return fmt.Errorf("crear dueño: %w", err)
+	}
+	users.Register(mux)
+
 	tools := mcp.NewServer()
 	registerFeatures(mux, tools, pool)
 
 	frontend := web.Handler(cfg.Frontend.Dist)
-	serveErr := rest.Serve(ctx, cfg.Server.Addr, routes(mux, tools, agents.NewAuthenticator(pool), pool, frontend))
+	authenticator := credentials{users: users, agents: agents.NewAuthenticator(pool)}
+	serveErr := rest.Serve(ctx, cfg.Server.Addr, routes(mux, tools, authenticator, pool, frontend))
 	stop() // si Serve falló antes de la señal, el listener termina con ctx
 	<-listenerDone
 	return serveErr
 }
 
-// routes protege la API y el MCP con la autenticación por token, expone las
-// sondas de salud sin autenticación y sirve el frontend compilado en el resto
-// de las rutas.
+// credentials resuelve las credenciales de una petición: la cookie es siempre de
+// un usuario; un token con prefijo pmt_ es de usuario y cualquier otro, de agente.
+type credentials struct {
+	users interface {
+		AuthenticateSession(ctx context.Context, session string) (kernel.Actor, error)
+		AuthenticateToken(ctx context.Context, token string) (kernel.Actor, error)
+	}
+	agents interface {
+		Authenticate(ctx context.Context, token string) (kernel.Actor, error)
+	}
+}
+
+func (c credentials) AuthenticateSession(ctx context.Context, session string) (kernel.Actor, error) {
+	return c.users.AuthenticateSession(ctx, session)
+}
+
+func (c credentials) AuthenticateToken(ctx context.Context, token string) (kernel.Actor, error) {
+	if auth.IsUserToken(token) {
+		return c.users.AuthenticateToken(ctx, token)
+	}
+	return c.agents.Authenticate(ctx, token)
+}
+
+// routes protege la API y el MCP con la autenticación, expone las sondas de
+// salud y las rutas públicas de auth sin credenciales y sirve el frontend
+// compilado en el resto de las rutas.
 func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator, pinger health.Pinger, frontend http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.HandleFunc("GET /healthz", health.Live)
 	root.HandleFunc("GET /readyz", health.Ready(pinger))
-	apiHandler := rest.Authenticate(authenticator)(api)
+	apiHandler := rest.Authenticate(authenticator, auth.IsPublic)(api)
 	root.Handle("/api", apiHandler)
 	root.Handle("/api/", apiHandler)
 	root.Handle("/mcp", mcp.Authenticate(authenticator)(mcp.Handler(tools)))

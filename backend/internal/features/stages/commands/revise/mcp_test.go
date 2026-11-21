@@ -7,6 +7,7 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/kernel"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
@@ -14,6 +15,7 @@ func connect(t *testing.T, handler *Handler) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
+	platformmcp.ActAs(server, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 	handler.RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()

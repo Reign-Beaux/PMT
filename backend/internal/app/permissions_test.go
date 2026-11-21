@@ -76,10 +76,23 @@ func sampleArguments(t *testing.T, tool *sdk.Tool) map[string]any {
 // rechace a PC, que solo lee, con forbidden y antes de tocar la base: el pool es nulo,
 // así que una herramienta que llegue a ella entra en pánico y la prueba lo reporta.
 func TestWriteToolsRejectPC(t *testing.T) {
+	assertWriteToolsReject(t, &kernel.Actor{Name: "pc-prueba", Profile: kernel.ProfilePC}, "PC")
+}
+
+// TestWriteToolsRejectEmptyActor exige lo mismo para una llamada sin actor. La
+// autenticación siempre deja uno; si faltara, el actor vacío no puede escribir.
+func TestWriteToolsRejectEmptyActor(t *testing.T) {
+	assertWriteToolsReject(t, nil, "el actor vacío")
+}
+
+func assertWriteToolsReject(t *testing.T, actor *kernel.Actor, quien string) {
+	t.Helper()
 	ctx := context.Background()
 	server := mcp.NewServer()
 	registerFeatures(http.NewServeMux(), server, nil)
-	mcp.ActAs(server, kernel.Actor{Name: "pc-prueba", Profile: kernel.ProfilePC})
+	if actor != nil {
+		mcp.ActAs(server, *actor)
+	}
 	server.AddReceivingMiddleware(func(next sdk.MethodHandler) sdk.MethodHandler {
 		return func(ctx context.Context, method string, req sdk.Request) (result sdk.Result, err error) {
 			defer func() {
@@ -114,7 +127,7 @@ func TestWriteToolsRejectPC(t *testing.T) {
 		t.Run(tool.Name, func(t *testing.T) {
 			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: tool.Name, Arguments: sampleArguments(t, tool)})
 			if err != nil {
-				t.Fatalf("PC no fue rechazado: %v", err)
+				t.Fatalf("%s no fue rechazado: %v", quien, err)
 			}
 			text := ""
 			if len(result.Content) > 0 {
@@ -123,7 +136,7 @@ func TestWriteToolsRejectPC(t *testing.T) {
 				}
 			}
 			if !result.IsError || !strings.HasPrefix(text, "forbidden: ") {
-				t.Errorf("PC no fue rechazado por perfil: %q", text)
+				t.Errorf("%s no fue rechazado por perfil: %q", quien, text)
 			}
 		})
 	}

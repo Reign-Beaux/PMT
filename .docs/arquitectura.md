@@ -3,16 +3,16 @@
 El backend es un **monolito modular en Go organizado por vertical slices**. Un solo proceso, `pmt-server`, es dueño de la base PostgreSQL y sirve todo:
 
 ```text
-Navegador ── REST /api ─────────┐
+Navegador ── REST /api (cookie) ┐
            ── WebSocket /api/events ─┤
            ── frontend /  ──────┤
                                 ├── pmt-server ── commands y queries ── PostgreSQL
-Agentes ───── MCP /mcp ─────────┘                       ▲
+Agentes ───── MCP /mcp (token) ─┘                       ▲
                                                         │ NOTIFY pmt_changes
                       listener de eventos ◄─────────────┘
 ```
 
-REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se duplican.
+REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se duplican. Todo pide credenciales salvo las sondas de salud, el login, las invitaciones y los archivos del frontend ([Identidad](#identidad)).
 
 | Necesidad | Elección |
 | --- | --- |
@@ -25,20 +25,21 @@ REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se du
 | MCP | SDK oficial de Go (`modelcontextprotocol/go-sdk`), Streamable HTTP |
 | WebSocket | `github.com/coder/websocket` |
 | YAML de importación | `gopkg.in/yaml.v3` |
-| Pruebas | `testing` estándar: 179 archivos y unas 600 pruebas |
+| Contraseñas | argon2id (`golang.org/x/crypto/argon2`) |
+| Pruebas | `testing` estándar: 205 archivos y unas 630 pruebas |
 
 ## Estructura
 
 ```text
 backend/
 ├── api/features/<feature>/     contratos: <feature>.openapi.yaml (REST) y <feature>.mcp.json (MCP)
-├── cmd/pmt-server/             punto de entrada; `pmt-server agent ...` administra tokens
+├── cmd/pmt-server/             punto de entrada; `pmt-server agent ...` administra tokens de agente
 ├── internal/
 │   ├── app/                    armado de features, rutas, arranque y cierre
 │   ├── kernel/                 Actor, Profile, errores de negocio
 │   ├── platform/
-│   │   ├── rest/               servidor HTTP, autenticación, errores
-│   │   ├── mcp/                servidor MCP, autenticación, errores de herramienta
+│   │   ├── rest/               servidor HTTP, autenticación por cookie o Bearer, errores
+│   │   ├── mcp/                servidor MCP, autenticación por Bearer, errores de herramienta
 │   │   ├── events/             listener de NOTIFY y WebSocket /api/events
 │   │   ├── web/                frontend compilado con fallback SPA
 │   │   ├── config/             carga de la configuración; options/ con una sección por archivo
@@ -90,7 +91,8 @@ Cada slice es un paquete con `handler.go` (la operación, su autorización y las
 | `activity` | Comentarios |
 | `imports` | `import_project` e `import_stage` desde YAML ([importar.md](importar.md)) |
 | `workflow` | Operaciones sobre varios agregados: `release_project`, `start_stage`, el cierre y el retiro de etapas, y `get_project_progress` |
-| `agents` | Agentes y tokens. Sin REST ni MCP: solo `pmt-server agent` |
+| `agents` | Agentes y sus tokens. Sin REST ni MCP: solo `pmt-server agent` |
+| `auth` | Usuarios, sesiones del navegador, invitaciones y tokens de API de usuario. Solo REST |
 
 ## Herramientas MCP
 
@@ -109,26 +111,55 @@ Hay 60 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`
 | `activity` | `add_comment`, `list_comments` |
 | `imports` | `import_project`, `import_stage` |
 
-**REST** expone lo mismo bajo `/api/`, salvo `imports`, que es solo MCP. La fuente de verdad son los `*.openapi.yaml`. Además hay `GET` de un proyecto, una etapa y una tarea por su ID.
+**REST** expone lo mismo bajo `/api/`, salvo `imports`, que es solo MCP. La fuente de verdad son los `*.openapi.yaml`. Además hay `GET` de un proyecto, una etapa y una tarea por su ID, y las rutas de `auth` ([auth.openapi.yaml](../backend/api/features/auth/auth.openapi.yaml)):
+
+| Ruta | Quién |
+| --- | --- |
+| `POST /api/auth/login`, `POST /api/auth/logout` | Pública |
+| `GET /api/invitations/{token}`, `POST /api/invitations/{token}/accept` | Pública: el token del enlace es la credencial |
+| `GET /api/auth/me`, `POST /api/auth/me/password` | El usuario; cambiar la contraseña solo con la cookie |
+| `GET`, `POST /api/tokens`, `DELETE /api/tokens/{id}` | El usuario, sobre sus propios tokens |
+| `GET`, `POST /api/invitations`, `GET /api/users`, `POST /api/users/{id}/disable` y `/enable` | El dueño de la instancia |
 
 ## Identidad
 
-- Cada agente tiene un token: 32 bytes aleatorios en hexadecimal. PMT solo guarda su SHA-256, y el perfil del agente no cambia.
-- `/api/` y `/mcp` pasan por la autenticación, que resuelve el `Actor` y lo pasa a cada handler. El actor nunca es un argumento de la herramienta ni del cuerpo.
-- Token inválido o revocado: 401. **Sin cabecera, o con `Bearer` vacío, actúa el usuario**: `saul`, perfil `User`. Así entra el navegador.
-- Los tokens viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`.
-- El token evita errores y deja rastro; no protege contra un proceso con acceso a esta máquina. Por eso el servidor escucha en `127.0.0.1`.
+Hay dos clases de actor ([dominio.md](dominio.md#conceptos)):
+
+- **Usuario:** una persona con correo, nombre, contraseña y `username`. Actúa como `Actor{Name: username, Profile: User}`. El perfil por sesión llega en la fase 1b del [plan de producción](plan_produccion.md).
+- **Agente:** fila de `agents` con nombre y perfil fijo, administrada con `pmt-server agent`. Sigue igual que antes.
+
+Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni al revés: lo validan `auth` (al aceptar una invitación y al crear el dueño) y `pmt-server agent create`, cada uno con el `Checker` de la otra feature.
+
+**Credenciales.** `platform/rest.Authenticate` y `platform/mcp.Authenticate` resuelven el actor y lo pasan a cada handler; nunca es un argumento de la herramienta ni del cuerpo.
+
+| Credencial | Dónde | Resuelve |
+| --- | --- | --- |
+| Cookie `pmt_session` | `/api/`, incluido el WebSocket `/api/events` | El usuario de una sesión vigente (30 días) |
+| `Authorization: Bearer pmt_<64 hex>` | `/api/` y `/mcp` | El usuario dueño del token |
+| `Authorization: Bearer <64 hex>` | `/api/` y `/mcp` | El agente del token, como antes |
+
+- Con cabecera `Authorization` manda el token; sin ella, la cookie. `/mcp` solo acepta tokens.
+- Sin credenciales, con `Bearer` vacío, o con una cookie o un token inválidos, vencidos, revocados o de un usuario desactivado: **401**. No hay acceso anónimo: el antiguo «sin token actúa `saul`» ya no existe.
+- Abiertas sin credenciales: `/healthz`, `/readyz`, las rutas públicas de `auth` (`auth.IsPublic`) y los archivos del frontend.
+- Si una ruta protegida llegara sin actor, `ActorFrom` devuelve el actor vacío, sin perfil. `permissions_test.go` exige que toda herramienta de escritura lo rechace sin tocar la base.
+
+**Secretos.** Sesiones, tokens de API e invitaciones son 32 bytes aleatorios; PMT solo guarda su SHA-256. Las contraseñas se guardan con argon2id. El token de API y el enlace de invitación solo se muestran al crearlos.
+
+**Cookie.** `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` según `auth.cookie_secure`. Cambiar la contraseña cierra las demás sesiones del usuario; desactivarlo borra todas y revoca sus tokens.
+
+**Tokens de agente.** Viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`. Un token de usuario se crea en la pantalla Cuenta del frontend y se usa igual.
 
 ## Errores
 
 - Los errores de negocio se crean en `domain` con `kernel.Invalid`, `NotFound`, `Conflict` o `Forbidden`.
 - REST responde 400, 404, 409 o 403 con `{"error": "mensaje"}`. Cualquier otro error se registra en el log y responde 500 con un mensaje genérico.
-- MCP antepone el tipo para que el agente lo distinga sin interpretar el texto: `invalid: `, `not_found: `, `conflict: ` o `forbidden: `. Cualquier otro sale como `error interno`.
+- `kernel.Unauthorized` es la credencial ausente o inválida: REST responde 401.
+- MCP antepone el tipo para que el agente lo distinga sin interpretar el texto: `invalid: `, `not_found: `, `conflict: `, `forbidden: ` o `unauthorized: `. Cualquier otro sale como `error interno`.
 - `store` traduce las violaciones de llave foránea y de unicidad a errores de negocio.
 
 ## Datos
 
-- 22 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00022_create_product_version_changes`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
+- 25 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00025_create_invitations`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
 - `sqlc.yaml` tiene una entrada por feature con consultas, todas sobre el esquema de las migraciones. Tras cambiar migraciones o consultas: `go tool sqlc generate`. El código de `sqlcgen/` no se edita a mano.
 - **Transacciones:** las operaciones que escriben varias filas usan `pgx.BeginFunc` en su `store`, y `imports` y `workflow` comparten una `pgx.Tx`. Los cambios de status bloquean con `FOR UPDATE` y comparan el status de origen; si cambió entre leer y guardar, responden `el status cambió, vuelve a consultar`. Los lotes bloquean por orden de ID.
 - **Concurrencia:** los agregados no tienen control de versión. Fuera de los casos anteriores, gana la última escritura.
@@ -160,12 +191,21 @@ Los recursos son `project`, `stage`, `task`, `bug`, `comment` y `status_change`.
 | `server.addr` | `SERVER_ADDR` | obligatoria |
 | `database.connection_string` | `DATABASE_CONNECTION_STRING` | obligatoria |
 | `frontend.dist` | `FRONTEND_DIST` | opcional; si falta el compilado, el servidor arranca igual (ver Frontend servido) |
+| `app.public_url` | `APP_PUBLIC_URL` | obligatoria; base de los enlaces de invitación |
+| `auth.cookie_secure` | `AUTH_COOKIE_SECURE` | `true` marca la cookie como `Secure` (solo HTTPS) |
+| `owner.email` | `OWNER_EMAIL` | dueño de la instancia; se crea al arrancar si no hay usuarios |
+| `owner.password` | `OWNER_PASSWORD` | al menos 8 caracteres |
+| `owner.username` | `OWNER_USERNAME` | su `username`; no puede ser nombre de un agente |
+
+Si faltan `owner.email` u `owner.password` no se crea el dueño (avisa en el log si solo falta uno). Si hay usuarios, `owner.*` no se lee. Un dueño mal configurado con la base vacía detiene el arranque.
+
+Como en DBP, una llave solo se puede sobrescribir con su variable si existe en el archivo: por eso los archivos llevan todas, aunque sea con `changeme # override: ...`.
 
 | Archivo | En git | Contenido |
 | --- | --- | --- |
-| `backend/config/config.dev.yaml` | no | `127.0.0.1:8080`, la base `pmt` y `../../frontend/dist` |
-| `backend/config/config.prod.yaml` | sí | `0.0.0.0:8080`, `changeme # override: DATABASE_CONNECTION_STRING` y `frontend.dist: ""`, porque la imagen fija `FRONTEND_DIST` |
-| `frontend/e2e/harness/config.e2e.yaml` | sí | El backend de pruebas e2e: `127.0.0.1:8090` y la base por variable ([frontend.md](frontend.md)) |
+| `backend/config/config.dev.yaml` | no | `127.0.0.1:8080`, la base `pmt`, `../../frontend/dist`, `public_url` `http://127.0.0.1:8080`, cookie sin `Secure` y el dueño `saul` |
+| `backend/config/config.prod.yaml` | sí | `0.0.0.0:8080`, `https://pmt.saulantonio.com`, cookie `Secure`, `frontend.dist: ""` porque la imagen fija `FRONTEND_DIST`, y `changeme # override: ...` en la base y en `owner.*` |
+| `frontend/e2e/harness/config.e2e.yaml` | sí | El backend de pruebas e2e: `127.0.0.1:8090`, `public_url` `http://localhost:5173`, y la base y el dueño de pruebas por variable ([frontend.md](frontend.md)) |
 
 ## Salud
 
@@ -173,14 +213,16 @@ Los recursos son `project`, `stage`, `task`, `bug`, `comment` y `status_change`.
 
 ## Imagen
 
-El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` con Go, y deja en alpine el binario, `config/config.prod.yaml` y el `dist` en `/app/web`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING`.
+El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` con Go, y deja en alpine el binario, `config/config.prod.yaml` y el `dist` en `/app/web`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING` y, la primera vez, `OWNER_EMAIL`, `OWNER_PASSWORD` y `OWNER_USERNAME`.
 
 ## Pruebas del servidor
 
 - Cada slice prueba su handler y sus adaptadores con dobles de la persistencia. `store` tiene pruebas propias.
 - `internal/app/contracts_test.go`: las herramientas registradas coinciden con su documentación `.mcp.json`.
-- `internal/app/permissions_test.go`: toda herramienta que no empiece con `list_` ni `get_` rechaza a PC sin tocar la base. Una herramienta nueva de solo lectura debe seguir esa convención de nombre.
-- `internal/app/routes_test.go`: autenticación y reparto de rutas.
+- `internal/app/permissions_test.go`: toda herramienta que no empiece con `list_` ni `get_` rechaza a PC y al actor vacío sin tocar la base. Una herramienta nueva de solo lectura debe seguir esa convención de nombre.
+- `internal/app/routes_test.go`: 401 sin credenciales, cookie y token de usuario, token de agente, usuario desactivado, rutas públicas y reparto de rutas.
+- `internal/features/auth/feature_test.go`: el recorrido de login, tokens, invitación, desactivación y cambio de contraseña por HTTP, sobre el repositorio en memoria de `auth/authtest`.
+- Las pruebas de adaptadores REST y MCP de otras features actúan como usuario con `asUser` (`usuario_test.go`) o `platformmcp.ActAs`.
 
 ```bash
 cd backend && go vet ./... && go test -race ./...
@@ -194,7 +236,8 @@ Para no buscarlo:
 - **`kernel.Transactor`:** cada `store` abre su propia transacción.
 - **Filtrado de herramientas MCP por perfil:** todos reciben las 60.
 - **`idempotency_key`:** un reintento repite la operación.
-- **Login del usuario humano:** el navegador entra sin token, como `saul`.
+- **Envío de correos:** el dueño copia el enlace de invitación y lo manda él.
+- **Perfil por sesión, miembros de proyecto y bloqueos por persona:** fases 1b, 1c y 1d del [plan](plan_produccion.md).
 - **Multi-tenencia:** una sola organización.
 
 ## Agregar una operación

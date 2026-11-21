@@ -4,7 +4,7 @@ info:
   version: 0.1.0
 security:
   - bearerAuth: []
-  - {}
+  - cookieAuth: []
 paths:
   /api/stages/{stage_id}/tasks:
     parameters:
@@ -250,7 +250,7 @@ paths:
           format: uuid
     put:
       summary: Cambia el status de una tarea
-      description: Solo admite las transiciones permitidas, cada una con su perfil. Exigen reason cancelar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No escribe en task_changes y devuelve la última versión de la tarea. Deja un registro inmutable en el historial de status.
+      description: "Solo admite las transiciones permitidas, cada una con su perfil. Exigen reason cancelar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa. Depende del proyecto y de la etapa: para avanzar, el proyecto debe estar en in_dev o working y la etapa en in_dev; cancelar y reabrir exigen proyecto ni stopped ni cancelled y etapa ni done ni cancelled. No escribe en task_changes y devuelve la última versión de la tarea. Deja un registro inmutable en el historial de status."
       requestBody:
         required: true
         content:
@@ -450,9 +450,13 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pmt_session
   responses:
     Unauthorized:
-      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      description: Sin credenciales, o con un token o una sesión inválidos, revocados o de un usuario desactivado.
       content:
         application/json:
           schema:

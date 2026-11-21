@@ -1,0 +1,363 @@
+openapi: 3.1.0
+info:
+  title: PMT - Usuarios y acceso
+  version: 0.1.0
+  description: |
+    Usuarios, sesiones del navegador, invitaciones y tokens de API. Solo REST: el MCP no administra cuentas.
+    Toda ruta de `/api`, `/api/events` y `/mcp` pide credenciales salvo las marcadas sin `security`.
+    El navegador usa la cookie `pmt_session` (HttpOnly, SameSite=Lax; Secure con `auth.cookie_secure`).
+    Los agentes mandan `Authorization: Bearer <token>`: un token `pmt_…` es de un usuario y actúa con su
+    `username` y el perfil `User`; uno sin prefijo es de un agente de `pmt-server agent`.
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+paths:
+  /api/auth/login:
+    post:
+      summary: Abre una sesión con correo y contraseña
+      description: Pública. Responde la cookie de sesión de 30 días.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Sesión abierta; `Set-Cookie` con `pmt_session`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          description: El usuario está desactivado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/auth/logout:
+    post:
+      summary: Cierra la sesión del navegador
+      description: Pública. Borra la sesión de la cookie, si la hay, y la cookie.
+      security: []
+      responses:
+        "204":
+          description: Sesión cerrada
+  /api/auth/me:
+    get:
+      summary: Devuelve el usuario que actúa
+      description: Con cookie o token de usuario. Un token de agente responde 403.
+      responses:
+        "200":
+          description: Usuario
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/auth/me/password:
+    post:
+      summary: Cambia la contraseña del usuario
+      description: Solo con la cookie de sesión. Cierra las demás sesiones del usuario; sus tokens siguen vigentes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "204":
+          description: Contraseña cambiada
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/tokens:
+    get:
+      summary: Lista los tokens vigentes del usuario
+      description: Sin el token en sí, que solo se muestra al crearlo.
+      responses:
+        "200":
+          description: Tokens, del más nuevo al más viejo
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ApiToken" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Crea un token de API del usuario
+      description: El token (`pmt_` y 64 caracteres hexadecimales) solo viene en esta respuesta. PMT guarda su SHA-256.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "201":
+          description: Token creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiToken"
+                  - type: object
+                    required: [token]
+                    properties:
+                      token: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/tokens/{id}:
+    delete:
+      summary: Revoca un token del usuario
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204":
+          description: Token revocado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No existe, ya está revocado o es de otro usuario
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/invitations:
+    get:
+      summary: Lista las invitaciones
+      description: Solo el dueño de la instancia.
+      responses:
+        "200":
+          description: Invitaciones, de la más nueva a la más vieja
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invitation" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Invita a un correo
+      description: Solo el dueño de la instancia. Vence en 7 días. No envía correos; el enlace (`app.public_url` + `/invitacion/<token>`) solo viene en esta respuesta. Un correo ya registrado responde 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email: { type: string }
+      responses:
+        "201":
+          description: Invitación creada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, email, url, expires_at]
+                properties:
+                  id: { type: string, format: uuid }
+                  email: { type: string }
+                  url: { type: string }
+                  expires_at: { type: string, format: date-time }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/invitations/{token}:
+    get:
+      summary: Consulta una invitación
+      description: Pública. Vale si no se usó, no venció y no hay usuario con ese correo.
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Correo y validez
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email, valid]
+                properties:
+                  email: { type: string }
+                  valid: { type: boolean }
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/invitations/{token}/accept:
+    post:
+      summary: Acepta una invitación y crea la cuenta
+      description: |
+        Pública. El correo es el de la invitación. `username` es el nombre del actor en PMT y no cambia:
+        de 1 a 40 caracteres en minúsculas, números y guiones, sin guion al inicio ni al final, y distinto
+        de cualquier usuario o agente (409). Responde la cookie de sesión.
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, username, password]
+              properties:
+                name: { type: string }
+                username: { type: string, pattern: "^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$" }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: Cuenta creada; `Set-Cookie` con `pmt_session`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400":
+          description: Datos inválidos, o la invitación venció o ya se usó
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/users:
+    get:
+      summary: Lista los usuarios
+      description: Solo el dueño de la instancia. Por username, activos y desactivados.
+      responses:
+        "200":
+          description: Usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+  /api/users/{id}/disable:
+    post:
+      summary: Desactiva a un usuario
+      description: Solo el dueño de la instancia. Cierra sus sesiones y revoca sus tokens. El dueño no se puede desactivar (409).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Usuario desactivado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/users/{id}/enable:
+    post:
+      summary: Reactiva a un usuario
+      description: Solo el dueño de la instancia. Sus tokens revocados no vuelven.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Usuario reactivado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pmt_session
+  responses:
+    Unauthorized:
+      description: Sin credenciales, o con un token o una sesión inválidos, revocados o de un usuario desactivado.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    User:
+      type: object
+      required: [id, email, username, name, is_instance_owner, disabled, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        username: { type: string }
+        name: { type: string }
+        is_instance_owner: { type: boolean }
+        disabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+    ApiToken:
+      type: object
+      required: [id, name, created_at, last_used_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: [string, "null"], format: date-time }
+    Invitation:
+      type: object
+      required: [id, email, expires_at, accepted_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        expires_at: { type: string, format: date-time }
+        accepted_at: { type: [string, "null"], format: date-time }

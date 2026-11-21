@@ -43,7 +43,7 @@ func (r *fakeRepo) Update(_ context.Context, p domain.Project) (domain.Project, 
 func TestHandleUpdatesProject(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "PMT v4", Description: "Otro"})
+	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "PMT v4", Description: "Otro"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestHandleUpdatesProject(t *testing.T) {
 func TestHandleReplacesProductVersion(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "PMT", ProductVersion: " 1.0.0 "})
+	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "PMT", ProductVersion: " 1.0.0 "})
 
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestHandleReplacesProductVersion(t *testing.T) {
 		t.Errorf("result = %+v", result)
 	}
 
-	result, err = New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "PMT"})
+	result, err = New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "PMT"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestHandleReplacesProductVersion(t *testing.T) {
 func TestHandleKeepsProjectWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: " "})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: " "})
 
 	if !errors.Is(err, domain.ErrProjectNameRequired) {
 		t.Fatalf("err = %v", err)
@@ -91,7 +91,7 @@ func TestHandleKeepsProjectWhenInvalid(t *testing.T) {
 func TestHandleMissingProject(t *testing.T) {
 	repo, _ := newRepoWith(t)
 
-	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: uuid.New(), Name: "PMT"})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: uuid.New(), Name: "PMT"})
 
 	if !errors.Is(err, domain.ErrProjectNotFound) {
 		t.Fatalf("err = %v", err)
@@ -111,7 +111,7 @@ func TestHandleOutsidePlanning(t *testing.T) {
 			p.ProductVersion = "1.0.0"
 			repo.projects[id] = p
 
-			result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Otro", Description: "Nueva", ProductVersion: "1.0.0"})
+			result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Otro", Description: "Nueva", ProductVersion: "1.0.0"})
 
 			if err != nil {
 				t.Fatal(err)
@@ -120,7 +120,7 @@ func TestHandleOutsidePlanning(t *testing.T) {
 				t.Errorf("result = %+v", result)
 			}
 
-			_, err = New(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Tercero", ProductVersion: "2.0.0"})
+			_, err = New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Tercero", ProductVersion: "2.0.0"})
 
 			if !errors.Is(err, domain.ErrProductVersionFrozen) {
 				t.Fatalf("err = %v", err)
@@ -152,7 +152,7 @@ func TestRESTOutsidePlanning(t *testing.T) {
 			New(repo).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String(), strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String(), strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -183,7 +183,7 @@ func TestREST(t *testing.T) {
 			New(repo).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+tt.id, strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/projects/"+tt.id, strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

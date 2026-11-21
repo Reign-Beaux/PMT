@@ -8,8 +8,15 @@ import { StageView } from '../views/StageView'
 import { BugsView } from '../views/BugsView'
 import { NotFoundView } from '../views/NotFoundView'
 import { ComponentsDemoView } from '../views/ComponentsDemoView'
+import { RequireAuth } from '../shell/RequireAuth'
+import { LoginView } from '../views/LoginView'
+import { InvitationView } from '../views/InvitationView'
+import { AccountView } from '../views/AccountView'
 
-export const routes: RouteObject[] = [{
+export const routes: RouteObject[] = [
+  { path: '/login', element: <LoginView /> },
+  { path: '/invitacion/:token', element: <InvitationView /> },
+  { element: <RequireAuth />, children: [{
   element: <AppShell />,
   children: [
     { path: '/', element: <Navigate to="/projects" replace /> },
@@ -20,7 +27,9 @@ export const routes: RouteObject[] = [{
       { path: 'bugs', element: <BugsView /> },
       { path: 'stages/:stageId', element: <StageView /> },
     ] },
+    { path: '/cuenta', element: <AccountView /> },
     ...(import.meta.env.DEV ? [{ path: '/dev/componentes', element: <ComponentsDemoView /> }] : []),
     { path: '*', element: <NotFoundView /> },
   ],
-}]
+  }] },
+]

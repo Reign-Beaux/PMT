@@ -18,6 +18,8 @@ const (
 	KindConflict
 	// KindForbidden indica que el perfil de quien actúa no permite la operación.
 	KindForbidden
+	// KindUnauthorized indica que la petición no trae credenciales válidas.
+	KindUnauthorized
 )
 
 // Error es un error de negocio con un mensaje apto para quien hace la petición.
@@ -64,6 +66,11 @@ func Conflict(message string) *Error {
 // Forbidden crea un error de permiso.
 func Forbidden(message string) *Error {
 	return &Error{Kind: KindForbidden, Message: message}
+}
+
+// Unauthorized crea un error de credenciales ausentes o inválidas.
+func Unauthorized(message string) *Error {
+	return &Error{Kind: KindUnauthorized, Message: message}
 }
 
 // Errores de autorización y de motivo comunes a las features con status.

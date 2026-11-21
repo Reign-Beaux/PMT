@@ -31,7 +31,29 @@ export interface GetOptions {
 
 const TIMEOUT_MS = 15_000
 
+/** Evento de window que se emite cuando la API responde 401: la sesión venció. */
+export const UNAUTHORIZED_EVENT = 'pmt:unauthorized'
+
 export async function get<T>(path: string, options?: GetOptions): Promise<T> {
+  return request<T>('GET', path, undefined, options)
+}
+
+/** POST con cuerpo JSON opcional. Un 204 resuelve undefined. */
+export function post<T>(path: string, body?: unknown, options?: GetOptions): Promise<T> {
+  return request<T>('POST', path, body, options)
+}
+
+/** DELETE. Un 204 resuelve undefined. */
+export function del<T>(path: string, options?: GetOptions): Promise<T> {
+  return request<T>('DELETE', path, undefined, options)
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body: unknown,
+  options?: GetOptions,
+): Promise<T> {
   const external = options?.signal
   if (external?.aborted) {
     throw new HttpError('aborted', 'Consulta cancelada')
@@ -47,17 +69,29 @@ export async function get<T>(path: string, options?: GetOptions): Promise<T> {
   external?.addEventListener('abort', onExternalAbort, { once: true })
 
   try {
-    const response = await fetch(`/api${path}`, {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    })
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    const init: RequestInit = { headers, signal: controller.signal }
+    if (method !== 'GET') {
+      init.method = method
+      if (body !== undefined) {
+        headers['Content-Type'] = 'application/json'
+        init.body = JSON.stringify(body)
+      }
+    }
+    const response = await fetch(`/api${path}`, init)
 
     if (!response.ok) {
+      if (response.status === 401 && !path.startsWith('/auth/')) {
+        window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+      }
       throw new HttpError('http', await httpErrorMessage(response), {
         status: response.status,
       })
     }
 
+    if (response.status === 204) {
+      return undefined as T
+    }
     const text = await response.text()
     try {
       return JSON.parse(text) as T

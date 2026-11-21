@@ -15,7 +15,7 @@ func actorFor(status domain.Status) kernel.Actor {
 	if status == domain.StatusInDev || status == domain.StatusDone {
 		return kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}
 	}
-	return kernel.Owner
+	return kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}
 }
 
 // fakeProjects responde como un proyecto con esos permisos.

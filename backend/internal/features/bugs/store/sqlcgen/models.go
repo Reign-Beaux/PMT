@@ -20,6 +20,16 @@ type Agent struct {
 	CreatedAt time.Time
 }
 
+type ApiToken struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Name       string
+	TokenHash  []byte
+	CreatedAt  time.Time
+	LastUsedAt pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+}
+
 type Bug struct {
 	ID               uuid.UUID
 	ProjectID        uuid.UUID
@@ -97,6 +107,16 @@ type Finding struct {
 	ClosedAt     pgtype.Timestamptz
 }
 
+type Invitation struct {
+	ID         uuid.UUID
+	Email      string
+	TokenHash  []byte
+	InvitedBy  uuid.UUID
+	ExpiresAt  time.Time
+	AcceptedAt pgtype.Timestamptz
+	CreatedAt  time.Time
+}
+
 type ProductVersionChange struct {
 	ID           uuid.UUID
 	ProjectID    uuid.UUID
@@ -127,6 +147,13 @@ type ProjectStatusChange struct {
 	ActorProfile string
 	Reason       string
 	ChangedAt    time.Time
+}
+
+type Session struct {
+	ID        []byte
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	CreatedAt time.Time
 }
 
 type Stage struct {
@@ -234,4 +261,16 @@ type TestPlanVersion struct {
 	Reason     string
 	CreatedBy  string
 	CreatedAt  time.Time
+}
+
+type User struct {
+	ID              uuid.UUID
+	Email           string
+	Username        string
+	Name            string
+	PasswordHash    string
+	IsInstanceOwner bool
+	DisabledAt      pgtype.Timestamptz
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

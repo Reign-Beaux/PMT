@@ -18,11 +18,16 @@ var testActor = kernel.Actor{Name: "agente", Profile: kernel.ProfileTL}
 
 type fakeAuthenticator struct{}
 
-func (fakeAuthenticator) Authenticate(_ context.Context, token string) (kernel.Actor, error) {
+func (fakeAuthenticator) AuthenticateToken(_ context.Context, token string) (kernel.Actor, error) {
 	if token == "bueno" {
 		return testActor, nil
 	}
 	return kernel.Actor{}, kernel.ErrUnauthenticated
+}
+
+// AuthenticateSession nunca se usa en el MCP: solo acepta tokens.
+func (fakeAuthenticator) AuthenticateSession(context.Context, string) (kernel.Actor, error) {
+	return testActor, nil
 }
 
 type whoamiInput struct{}
@@ -61,8 +66,8 @@ func TestAuthenticate(t *testing.T) {
 		status int
 		actor  string
 	}{
-		{"sin cabecera", "", http.StatusOK, kernel.Owner.Name},
-		{"variable vacía", "Bearer", http.StatusOK, kernel.Owner.Name},
+		{"sin cabecera", "", http.StatusUnauthorized, ""},
+		{"variable vacía", "Bearer", http.StatusUnauthorized, ""},
 		{"válido", "Bearer bueno", http.StatusOK, testActor.Name},
 		{"inválido", "Bearer malo", http.StatusUnauthorized, ""},
 	}
@@ -96,12 +101,16 @@ func TestVerifierKeepsTechnicalErrors(t *testing.T) {
 
 type authenticatorFunc func(context.Context, string) (kernel.Actor, error)
 
-func (f authenticatorFunc) Authenticate(ctx context.Context, token string) (kernel.Actor, error) {
+func (f authenticatorFunc) AuthenticateToken(ctx context.Context, token string) (kernel.Actor, error) {
 	return f(ctx, token)
 }
 
+func (f authenticatorFunc) AuthenticateSession(ctx context.Context, session string) (kernel.Actor, error) {
+	return f(ctx, session)
+}
+
 func TestActorFromWithoutExtra(t *testing.T) {
-	if got := ActorFrom(&sdk.CallToolRequest{}); got != kernel.Owner {
+	if got := ActorFrom(&sdk.CallToolRequest{}); got != (kernel.Actor{}) {
 		t.Errorf("actor = %+v", got)
 	}
 }

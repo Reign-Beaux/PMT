@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
 import { assertTestDatabase, assertTestTarget, resolveApiTarget } from './config/apiTarget'
+import { TEST_OWNER } from './e2e/harness/owner'
 
 // Validación al cargar: destino (solo 127.0.0.1:8090) y base (solo
 // pmt_frontend_test) antes de levantar servidores o crear datos.
@@ -42,12 +43,15 @@ export default defineConfig({
       // CONFIG_FILE (127.0.0.1:8090, frontend/dist); nunca lee
       // backend/config/config.dev.yaml ni toca backend/bin o el 8080. La base
       // llega por DATABASE_CONNECTION_STRING y el servidor aplica las
-      // migraciones al arrancar. Playwright solo baja lo que él levanta.
+      // migraciones al arrancar y crea el dueño de pruebas si no hay usuarios. Playwright solo baja lo que él levanta.
       command: `mkdir -p .harness && go build -C ../backend -o ${binario} ./cmd/pmt-server && cd .harness && exec ./pmt-server-pruebas`,
       url: `${API_TARGET}/readyz`,
       env: {
         CONFIG_FILE: configPruebas,
         DATABASE_CONNECTION_STRING: process.env.PMT_TEST_DATABASE_URL ?? '',
+        OWNER_EMAIL: TEST_OWNER.email,
+        OWNER_PASSWORD: TEST_OWNER.password,
+        OWNER_USERNAME: TEST_OWNER.username,
         GOCACHE: path.join(harnessDir, 'go-cache'),
       },
       reuseExistingServer: true,

@@ -47,7 +47,7 @@ func TestHandle(t *testing.T) {
 		want   error
 	}{
 		{"PP quita en planning", pp, withLead(domain.StatusPlanning), nil, nil},
-		{"usuario quita en stand_by", kernel.Owner, withLead(domain.StatusStandBy), nil, nil},
+		{"usuario quita en stand_by", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, withLead(domain.StatusStandBy), nil, nil},
 		{"etapa en in_dev", pp, withLead(domain.StatusInDev), nil, domain.ErrLeadNotRemovable},
 		{"etapa en done", pp, withLead(domain.StatusDone), nil, domain.ErrLeadNotRemovable},
 		{"etapa sin TL", pp, domain.Stage{Status: domain.StatusPlanning}, nil, domain.ErrStageWithoutLead},

@@ -48,19 +48,19 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		{"TL toma", StatusStandBy, StatusInDev, tl, "", nil},
 		{"TL ajeno no toma", StatusStandBy, StatusInDev, otherTL, "", kernel.ErrNotStageLead},
 		{"PP no toma", StatusStandBy, StatusInDev, pp, "", kernel.ErrTransitionForbidden},
-		{"usuario no toma", StatusStandBy, StatusInDev, kernel.Owner, "", kernel.ErrTransitionForbidden},
+		{"usuario no toma", StatusStandBy, StatusInDev, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", kernel.ErrTransitionForbidden},
 		{"TL cierra", StatusInDev, StatusDone, tl, "", nil},
-		{"usuario no cierra", StatusInDev, StatusDone, kernel.Owner, "", kernel.ErrTransitionForbidden},
+		{"usuario no cierra", StatusInDev, StatusDone, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", kernel.ErrTransitionForbidden},
 		{"reabrir sin motivo", StatusDone, StatusInDev, pp, "", kernel.ErrReasonRequired},
 		{"TL detiene", StatusInDev, StatusStopped, tl, "pausa", nil},
-		{"usuario detiene", StatusInDev, StatusStopped, kernel.Owner, "pausa", nil},
+		{"usuario detiene", StatusInDev, StatusStopped, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "pausa", nil},
 		{"PC no detiene", StatusInDev, StatusStopped, pc, "pausa", kernel.ErrTransitionForbidden},
 		{"detener sin motivo", StatusInDev, StatusStopped, pp, " ", kernel.ErrReasonRequired},
 		{"PP reanuda", StatusStopped, StatusInDev, pp, "", nil},
-		{"usuario reanuda", StatusStopped, StatusInDev, kernel.Owner, "", nil},
+		{"usuario reanuda", StatusStopped, StatusInDev, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", nil},
 		{"PC no reanuda", StatusStopped, StatusInDev, pc, "", kernel.ErrTransitionForbidden},
 		{"PC no cancela", StatusInDev, StatusCancelled, pc, "x", kernel.ErrTransitionForbidden},
-		{"usuario cancela", StatusInDev, StatusCancelled, kernel.Owner, "x", nil},
+		{"usuario cancela", StatusInDev, StatusCancelled, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "x", nil},
 		{"TL ajeno no detiene", StatusInDev, StatusStopped, otherTL, "x", kernel.ErrNotStageLead},
 	}
 	for _, tt := range tests {
@@ -82,7 +82,7 @@ func TestStageWithoutLeadRejectsEveryTL(t *testing.T) {
 }
 
 func TestEnsureCanAssignLead(t *testing.T) {
-	for _, actor := range []kernel.Actor{{Profile: kernel.ProfilePP}, kernel.Owner} {
+	for _, actor := range []kernel.Actor{{Profile: kernel.ProfilePP}, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}} {
 		if err := EnsureCanAssignLead(actor); err != nil {
 			t.Fatalf("%v: %v", actor, err)
 		}
@@ -132,7 +132,7 @@ func TestEnsureReviser(t *testing.T) {
 		want  error
 	}{
 		{"PP", kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}, nil},
-		{"usuario", kernel.Owner, nil},
+		{"usuario", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, nil},
 		{"TL de la etapa", kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}, nil},
 		{"TL de otra etapa", kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ErrNotStageLead},
 		{"PC", kernel.Actor{Name: "pc", Profile: kernel.ProfilePC}, ErrReviseForbidden},

@@ -41,7 +41,7 @@ func TestHandleStageRules(t *testing.T) {
 			repo.reached = tt.reached
 			stages := tt.stages
 
-			_, err := New(repo, &stages).Handle(context.Background(), Command{ID: id, Status: tt.to, Actor: kernel.Owner, Reason: "motivo"})
+			_, err := New(repo, &stages).Handle(context.Background(), Command{ID: id, Status: tt.to, Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Reason: "motivo"})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v", err)

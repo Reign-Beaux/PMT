@@ -63,7 +63,7 @@ func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
 func TestHandleUpdatesStage(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Desarrollo", Description: "Otra"})
+	result, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Desarrollo", Description: "Otra"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestHandleUpdatesStage(t *testing.T) {
 func TestHandleKeepsStageWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: " "})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: " "})
 
 	if !errors.Is(err, domain.ErrStageNameRequired) {
 		t.Fatalf("err = %v", err)
@@ -89,7 +89,7 @@ func TestHandleKeepsStageWhenInvalid(t *testing.T) {
 func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Otra"})
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Otra"})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)
@@ -104,7 +104,7 @@ func TestHandleRejectsElementWithChanges(t *testing.T) {
 	repo.hasChanges = true
 	before := repo.stages[id].Name
 
-	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Otra"})
+	_, err := New(repo, fakeProjects{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Otra"})
 
 	if !errors.Is(err, domain.ErrStageHasChanges) {
 		t.Fatalf("err = %v", err)
@@ -120,7 +120,7 @@ func TestRESTRejectsOutsidePlanning(t *testing.T) {
 	New(repo, fakeProjects{err: errNotPlanning}).Register(mux)
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String(), strings.NewReader(`{"name":"Otra"}`)))
+	mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/stages/"+id.String(), strings.NewReader(`{"name":"Otra"}`))))
 
 	if rec.Code != http.StatusConflict {
 		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -149,7 +149,7 @@ func TestREST(t *testing.T) {
 			New(repo, fakeProjects{}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/stages/"+tt.id, strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/stages/"+tt.id, strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -170,7 +170,7 @@ func ownPlanningRepo(t *testing.T) (*fakeRepo, uuid.UUID) {
 func TestHandleEditsStageInOwnPlanning(t *testing.T) {
 	repo, id := ownPlanningRepo(t)
 
-	result, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Cobros"})
+	result, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Cobros"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestHandleRejectsOwnPlanningOutsideWorking(t *testing.T) {
 	repo, id := ownPlanningRepo(t)
 	errNotWorking := kernel.Conflict("el proyecto no está en working")
 
-	_, err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Cobros"})
+	_, err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Cobros"})
 
 	if !errors.Is(err, errNotWorking) {
 		t.Errorf("err = %v", err)
@@ -194,7 +194,7 @@ func TestHandleRejectsOwnPlanningOutsideWorking(t *testing.T) {
 func TestHandleKeepsProjectRuleForStageDefinedInPlanning(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Name: "Cobros"})
+	_, err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Name: "Cobros"})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Errorf("status planning no debe bastar: err = %v", err)

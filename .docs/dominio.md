@@ -17,9 +17,11 @@ Conceptos que PMT guarda y reglas que aplica. La documentación usa el término 
 | **Comentario** | `Comment` | Constancia de una decisión que no es una transición, o de un bloqueo, sobre un proyecto, etapa, tarea o bug. |
 | **Plan QAP** | `test_plans` | Plan de pruebas de una etapa, vinculado a tareas. QAP lo escribe, el TL lo aprueba y QA lo ejecuta. |
 | **Plan de desarrollo** | `DevPlan` | Cómo se hará un grupo de tareas o un bug. DP lo escribe y Dev lo sigue. |
-| **Agente** | `Agent` | Trabajador de IA con nombre, perfil y token. No se borra: se revoca. |
+| **Usuario** | `User` (feature `auth`) | Persona que entra a PMT con correo y contraseña, por invitación del dueño de la instancia. Tiene nombre y un `username` en minúsculas, números y guiones que no cambia y no coincide con ningún agente. Crea sus propios tokens de API para sus agentes. Se desactiva, no se borra. |
+| **Dueño de la instancia** | `IsInstanceOwner` | El primer usuario, creado al arrancar desde la configuración. Invita y desactiva o reactiva usuarios. No se puede desactivar. |
+| **Agente** | `Agent` | Trabajador de IA con nombre, perfil y token propio, creado con `pmt-server agent`. No se borra: se revoca. |
 | **Perfil** | `Profile` | PP, PC, TL, DP, DevFrontend, DevBackend, CR, QAP, QA o `User`, el usuario humano. |
-| **Actor** | `Actor` | Quien realiza una operación, con su perfil. El servidor lo obtiene del token. |
+| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username` y el perfil `User`, sea desde el navegador o con su token; un agente, con su nombre y su perfil. El nombre es lo que queda en historiales, comentarios y hallazgos. |
 
 **Cancelar o retirar.** `cancelled` es un status reversible, para trabajo iniciado o que puede volver. Retirar (`retire`) es definitivo, para lo que nunca debió estar: deja un cambio y saca el elemento de las consultas, sin borrar nada.
 
@@ -175,6 +177,7 @@ Detener o cancelar un padre congela lo de abajo, sin cambiar su status.
 
 ## Permisos
 
+- **Toda petición se identifica.** Sin cookie ni token válidos, PMT responde 401 ([arquitectura.md](arquitectura.md#identidad)).
 - **Todo comando de escritura exige perfil.** Uno sin permiso recibe `forbidden` antes de que se lea la base.
 - **Planeación** (`create_*`, `update_*`, `delete_*`, `add_*`, `retire_*` de proyectos, etapas y tareas, `revise_task`, `import_*`, `change_product_version`, `release_project`, `assign_stage_lead`, `remove_stage_lead`): solo PP y `User`. `revise_stage` también el TL de esa etapa.
 - **PC** solo lee: no escribe nada, ni comentarios.

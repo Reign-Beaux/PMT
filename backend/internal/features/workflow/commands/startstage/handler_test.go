@@ -103,7 +103,7 @@ func TestHandleRejects(t *testing.T) {
 		{"proyecto detenido", projects.StatusStopped, stages.StatusStandBy, tl, stages.ErrStageProjectNotReady},
 		{"proyecto cancelado", projects.StatusCancelled, stages.StatusStandBy, tl, stages.ErrStageProjectNotReady},
 		{"TL ajeno", projects.StatusStandBy, stages.StatusStandBy, kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ErrNotStageLead},
-		{"usuario", projects.StatusStandBy, stages.StatusStandBy, kernel.Owner, kernel.ErrTransitionForbidden},
+		{"usuario", projects.StatusStandBy, stages.StatusStandBy, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, kernel.ErrTransitionForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

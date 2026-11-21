@@ -36,7 +36,8 @@ export async function mockApi(page: Page) {
     if (!url.pathname.startsWith('/api/')) { await route.fallback(); return }
     const pathname = url.pathname
     let data: unknown
-    if (pathname === '/api/projects') {
+    if (pathname === '/api/auth/me') data = { id: '00000000-0000-4000-8000-000000000009', email: 'saul@example.com', username: 'saul', name: 'Saúl', is_instance_owner: true, disabled: false, created_at: date }
+    else if (pathname === '/api/projects') {
       if (state.failProjects > 0) { state.failProjects -= 1; await route.fulfill({ status: 503, json: { error: 'Servicio temporalmente no disponible' } }); return }
       data = state.projects
     } else if (pathname === `/api/projects/${ids.project}`) data = state.projects.find(item => item.id === ids.project)

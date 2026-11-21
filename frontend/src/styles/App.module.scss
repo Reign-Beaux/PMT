@@ -51,6 +51,10 @@
   .live { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 11px; }
   .live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px #75d4b10c; }
   .sidebar-bottom p { font-size: 10px; color: var(--subtle); margin-top: 8px; }
+  .sidebar-user { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; }
+  .sidebar-user:hover { background: #1b202d; }
+  .sidebar-user strong { font-size: 12px; font-weight: 550; overflow-wrap: anywhere; }
+  .sidebar-user small { font-size: 10px; color: var(--muted); }
   .app { margin-left: 224px; }
   .topbar { min-height: 67px; padding: 0 40px; display: flex; gap: 15px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
   .breadcrumbs { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }

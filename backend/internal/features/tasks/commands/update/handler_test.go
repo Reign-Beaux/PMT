@@ -58,7 +58,7 @@ func (r *fakeRepo) HasChanges(context.Context, uuid.UUID) (bool, error) {
 func TestHandleUpdatesTask(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Title: "Probar", Description: "Otra"})
+	result, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Title: "Probar", Description: "Otra"})
 
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestHandleUpdatesTask(t *testing.T) {
 func TestHandleKeepsTaskWhenInvalid(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Title: " "})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Title: " "})
 
 	if !errors.Is(err, domain.ErrTaskTitleRequired) {
 		t.Fatalf("err = %v", err)
@@ -84,11 +84,11 @@ func TestHandleKeepsTaskWhenInvalid(t *testing.T) {
 func TestHandleLastWriteWins(t *testing.T) {
 	repo, id := newRepoWith(t)
 	handler := New(repo, fakeStages{})
-	if _, err := handler.Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Title: "Probar"}); err != nil {
+	if _, err := handler.Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Title: "Probar"}); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := handler.Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Title: "Tarde"}); err != nil {
+	if _, err := handler.Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Title: "Tarde"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,7 +100,7 @@ func TestHandleLastWriteWins(t *testing.T) {
 func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	repo, id := newRepoWith(t)
 
-	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Title: "Otra"})
+	_, err := New(repo, fakeStages{err: errNotPlanning}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Title: "Otra"})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)
@@ -115,7 +115,7 @@ func TestHandleRejectsElementWithChanges(t *testing.T) {
 	repo.hasChanges = true
 	before := repo.tasks[id].Title
 
-	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Title: "Otra"})
+	_, err := New(repo, fakeStages{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Title: "Otra"})
 
 	if !errors.Is(err, domain.ErrTaskHasChanges) {
 		t.Fatalf("err = %v", err)
@@ -131,7 +131,7 @@ func TestRESTRejectsOutsidePlanning(t *testing.T) {
 	New(repo, fakeStages{err: errNotPlanning}).Register(mux)
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/tasks/"+id.String(), strings.NewReader(`{"title":"Otra"}`)))
+	mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/tasks/"+id.String(), strings.NewReader(`{"title":"Otra"}`))))
 
 	if rec.Code != http.StatusConflict {
 		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -161,7 +161,7 @@ func TestREST(t *testing.T) {
 			New(repo, fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/tasks/"+tt.id(id), strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/tasks/"+tt.id(id), strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)

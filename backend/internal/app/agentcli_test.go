@@ -17,6 +17,10 @@ func (fakeAgents) Create(_ context.Context, agent domain.Agent, _ []byte) (domai
 	return agent, nil
 }
 
+type sinUsuarios struct{}
+
+func (sinUsuarios) Exists(context.Context, string) (bool, error) { return false, nil }
+
 func TestAgentCommandUsage(t *testing.T) {
 	for _, args := range [][]string{nil, {"borrar"}, {"create", "sobra"}, {"create", "--otra", "x"}} {
 		err := runAgentCommand(context.Background(), agents.Admin{}, args, &bytes.Buffer{})
@@ -28,7 +32,7 @@ func TestAgentCommandUsage(t *testing.T) {
 
 func TestAgentCreateWritesOnlyTheToken(t *testing.T) {
 	var out bytes.Buffer
-	admin := agents.Admin{Create: create.New(fakeAgents{})}
+	admin := agents.Admin{Create: create.New(fakeAgents{}, sinUsuarios{})}
 
 	err := runAgentCommand(context.Background(), admin, []string{"create", "--name", "dev", "--profile", "DevBackend"}, &out)
 

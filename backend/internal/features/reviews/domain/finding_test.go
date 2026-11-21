@@ -14,7 +14,7 @@ var (
 	qa = kernel.Actor{Name: "qa", Profile: kernel.ProfileQA}
 	tl = kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}
 	pp = kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}
-	us = kernel.Owner
+	us = kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}
 )
 
 func TestEnsureCanCreate(t *testing.T) {

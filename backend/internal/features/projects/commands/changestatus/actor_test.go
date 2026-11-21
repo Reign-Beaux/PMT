@@ -7,5 +7,5 @@ import (
 
 // actorFor devuelve el actor de las pruebas: el usuario puede todo en un proyecto.
 func actorFor(domain.Status) kernel.Actor {
-	return kernel.Owner
+	return kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}
 }

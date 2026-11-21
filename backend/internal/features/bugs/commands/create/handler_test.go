@@ -109,7 +109,7 @@ func TestRESTRejectsProfile(t *testing.T) {
 	req = req.WithContext(rest.WithActor(req.Context(), kernel.Actor{Name: "qa", Profile: kernel.ProfileQA}))
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, req)
+	mux.ServeHTTP(rec, asUser(req))
 
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("código = %d: %s", rec.Code, rec.Body)
@@ -135,7 +135,7 @@ func TestREST(t *testing.T) {
 			New(&fakeRepo{}, tt.projects).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/projects/"+tt.id+"/bugs", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/projects/"+tt.id+"/bugs", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.want {
 				t.Errorf("código = %d: %s", rec.Code, rec.Body)

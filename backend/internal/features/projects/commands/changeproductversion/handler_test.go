@@ -80,7 +80,7 @@ func TestHandleChangesVersionAndRecords(t *testing.T) {
 func TestHandleUserCanChange(t *testing.T) {
 	repo, id := newRepoWith(t, domain.StatusWorking, "")
 
-	if _, err := New(repo).Handle(context.Background(), Command{ID: id, ProductVersion: "0.1.0", Reason: "inicio", Actor: kernel.Owner}); err != nil {
+	if _, err := New(repo).Handle(context.Background(), Command{ID: id, ProductVersion: "0.1.0", Reason: "inicio", Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -182,7 +182,7 @@ func TestREST(t *testing.T) {
 			New(repo).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/projects/"+tt.id(id)+"/product-version", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/projects/"+tt.id(id)+"/product-version", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.code {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -197,7 +197,7 @@ func TestRESTReturnsWholeProject(t *testing.T) {
 	New(repo).Register(mux)
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/projects/"+id.String()+"/product-version", strings.NewReader(`{"product_version":"2.0.0","reason":"cambio grande"}`)))
+	mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/projects/"+id.String()+"/product-version", strings.NewReader(`{"product_version":"2.0.0","reason":"cambio grande"}`))))
 
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -221,7 +221,7 @@ func TestRESTRejectsOtherProfile(t *testing.T) {
 	req = req.WithContext(rest.WithActor(req.Context(), kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}))
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, req)
+	mux.ServeHTTP(rec, asUser(req))
 
 	if rec.Code != http.StatusForbidden || repo.reads != 0 {
 		t.Errorf("status = %d, lecturas = %d, cuerpo = %s", rec.Code, repo.reads, rec.Body)

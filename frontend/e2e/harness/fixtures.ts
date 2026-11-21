@@ -2,9 +2,10 @@
 // generados aquí: seguros como literales SQL. La limpieza borra solo lo creado
 // por esta ejecución, incluso cuando la prueba falla.
 import crypto from 'node:crypto'
-import { test as base } from '@playwright/test'
+import { test as base, type APIRequestContext, type BrowserContextOptions } from '@playwright/test'
 import { psql } from './db'
 import { API_TARGET, DB, RUN_ID, TARGET_LINE } from './env'
+import { TEST_OWNER } from './owner'
 
 export type HarnessProject = { id: string; name: string }
 export type HarnessStage = { id: string; name: string; projectId: string; position: number }
@@ -41,7 +42,37 @@ const ACTOR_PROFILE = 'QA'
 const SENTINEL_NAME = `e2e-${RUN_ID}-centinela`
 let sentinelId = ''
 
-export const test = base.extend<{ harness: Harness }, { harnessTarget: void }>({
+type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>
+
+// Abre sesión con el dueño de pruebas; sin ella la API responde 401.
+async function login(ctx: APIRequestContext, baseURL: string) {
+  const res = await ctx.post(`${baseURL}/api/auth/login`, {
+    data: { email: TEST_OWNER.email, password: TEST_OWNER.password },
+  })
+  if (!res.ok()) {
+    throw new Error(`No se pudo entrar con el dueño de pruebas (${res.status()}): ${await res.text()}`)
+  }
+}
+
+export const test = base.extend<{ harness: Harness }, { harnessTarget: void; harnessSession: StorageState }>({
+  // Sesión del navegador: login por el proxy de Vite para que la cookie quede
+  // en localhost:5173, y cada página arranca con ella.
+  harnessSession: [
+    async ({ playwright }, provide) => {
+      const ctx = await playwright.request.newContext()
+      try {
+        await login(ctx, 'http://localhost:5173')
+        await provide(await ctx.storageState())
+      } finally {
+        await ctx.dispose()
+      }
+    },
+    { scope: 'worker' },
+  ],
+  storageState: async ({ harnessSession }, provide) => {
+    await provide(harnessSession)
+  },
+
   // Centinela de worker: confirma que el backend en 8090 usa pmt_frontend_test
   // antes de crear ningún dato de prueba. El callback de Playwright se llama
   // "provide" (no "use") para no confundir al linter de hooks de React.
@@ -53,6 +84,7 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void }>({
       try {
         const ctx = await playwright.request.newContext()
         try {
+          await login(ctx, API_TARGET)
           const res = await ctx.get(`${API_TARGET}/api/projects/${id}`)
           const body = res.ok() ? await res.json() : null
           if (!res.ok() || body?.name !== SENTINEL_NAME) {

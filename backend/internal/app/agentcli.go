@@ -10,6 +10,7 @@ import (
 
 	"pmt/internal/features/agents"
 	"pmt/internal/features/agents/commands/create"
+	"pmt/internal/features/auth"
 	"pmt/internal/kernel"
 	"pmt/internal/platform/config"
 	"pmt/internal/platform/postgres"
@@ -33,7 +34,7 @@ func RunAgent(cfg config.Config, args []string, stdout io.Writer) error {
 	}
 	defer pool.Close()
 
-	return runAgentCommand(ctx, agents.NewAdmin(pool), args, stdout)
+	return runAgentCommand(ctx, agents.NewAdmin(pool, auth.NewChecker(pool)), args, stdout)
 }
 
 func runAgentCommand(ctx context.Context, admin agents.Admin, args []string, stdout io.Writer) error {

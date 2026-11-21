@@ -144,7 +144,7 @@ func TestREST(t *testing.T) {
 			New(repo, &fakeStages{}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+tt.id(id)+"/status", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/projects/"+tt.id(id)+"/status", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -162,7 +162,7 @@ func TestRESTReturnsWholeProject(t *testing.T) {
 	New(repo, &fakeStages{}).Register(mux)
 	rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`)))
+	mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPut, "/api/projects/"+id.String()+"/status", strings.NewReader(`{"status":"stand_by"}`))))
 
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {

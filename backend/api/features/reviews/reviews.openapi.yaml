@@ -4,7 +4,7 @@ info:
   version: 0.1.0
 security:
   - bearerAuth: []
-  - {}
+  - cookieAuth: []
 paths:
   /api/findings:
     post:
@@ -124,6 +124,10 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pmt_session
   responses:
     Finding:
       description: Hallazgo
@@ -132,7 +136,7 @@ components:
           schema:
             $ref: "#/components/schemas/Finding"
     Unauthorized:
-      description: Token inválido o revocado. Sin token actúa el usuario, `saul`, con perfil `User`.
+      description: Sin credenciales, o con un token o una sesión inválidos, revocados o de un usuario desactivado.
       content:
         application/json:
           schema:

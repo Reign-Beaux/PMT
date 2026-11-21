@@ -37,7 +37,7 @@ func TestNewCommentRejects(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := NewComment(tt.kind, uuid.New(), tt.body, kernel.Owner); !errors.Is(err, tt.want) {
+			if _, err := NewComment(tt.kind, uuid.New(), tt.body, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}); !errors.Is(err, tt.want) {
 				t.Errorf("error = %v", err)
 			}
 		})
@@ -46,6 +46,13 @@ func TestNewCommentRejects(t *testing.T) {
 
 func TestNewCommentRejectsPC(t *testing.T) {
 	_, err := NewComment(ItemStage, uuid.New(), "Texto", kernel.Actor{Name: "pc", Profile: kernel.ProfilePC})
+	if !errors.Is(err, ErrCommentForbidden) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestNewCommentRejectsEmptyActor(t *testing.T) {
+	_, err := NewComment(ItemStage, uuid.New(), "Texto", kernel.Actor{})
 	if !errors.Is(err, ErrCommentForbidden) {
 		t.Fatalf("error = %v", err)
 	}

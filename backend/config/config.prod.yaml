@@ -1,6 +1,14 @@
+app:
+  public_url: https://pmt.saulantonio.com # override: APP_PUBLIC_URL
 server:
   addr: 0.0.0.0:8080
 database:
   connection_string: changeme # override: DATABASE_CONNECTION_STRING
 frontend:
   dist: ""
+auth:
+  cookie_secure: true
+owner:
+  email: changeme # override: OWNER_EMAIL
+  password: changeme # override: OWNER_PASSWORD
+  username: changeme # override: OWNER_USERNAME

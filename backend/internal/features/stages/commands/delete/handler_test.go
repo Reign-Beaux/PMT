@@ -62,7 +62,7 @@ func TestHandleDeletesInPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	if err := New(repo, fakeProjects{}).Handle(context.Background(), id, kernel.Owner); err != nil {
+	if err := New(repo, fakeProjects{}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}); err != nil {
 		t.Fatal(err)
 	}
 	if !repo.deleted {
@@ -74,7 +74,7 @@ func TestHandleRejectsOutsidePlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), id, kernel.Owner)
+	err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 	if !errors.Is(err, errNotPlanning) {
 		t.Fatalf("err = %v", err)
@@ -88,7 +88,7 @@ func TestHandleRejectsElementWithChanges(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, hasChanges: true}
 
-	err := New(repo, fakeProjects{}).Handle(context.Background(), id, kernel.Owner)
+	err := New(repo, fakeProjects{}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 	if !errors.Is(err, domain.ErrStageHasChanges) {
 		t.Fatalf("err = %v", err)
@@ -121,7 +121,7 @@ func TestREST(t *testing.T) {
 			New(&fakeRepo{existing: id, err: tt.err}, fakeProjects{err: tt.projects}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/stages/"+tt.id, nil))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodDelete, "/api/stages/"+tt.id, nil)))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -134,7 +134,7 @@ func TestHandleDeletesStageInOwnPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, ownPlan: true}
 
-	err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), id, kernel.Owner)
+	err := New(repo, fakeProjects{err: errNotPlanning}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestHandleRejectsOwnPlanningOutsideWorking(t *testing.T) {
 	repo := &fakeRepo{existing: id, ownPlan: true}
 	errNotWorking := kernel.Conflict("el proyecto no está en working")
 
-	err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), id, kernel.Owner)
+	err := New(repo, fakeProjects{working: errNotWorking}).Handle(context.Background(), id, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
 
 	if !errors.Is(err, errNotWorking) || repo.deleted {
 		t.Errorf("err = %v, eliminada = %v", err, repo.deleted)

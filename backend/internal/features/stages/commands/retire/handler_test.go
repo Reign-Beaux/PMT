@@ -79,9 +79,9 @@ func TestHandleRejectsInvalidInput(t *testing.T) {
 		cmd  Command
 		want error
 	}{
-		{"sin motivo", Command{Actor: kernel.Owner, ID: id, RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
-		{"sin solicitante", Command{Actor: kernel.Owner, ID: id, Reason: "M"}, domain.ErrChangeRequesterRequired},
-		{"no existe o ya retirada", Command{Actor: kernel.Owner, ID: uuid.New(), Reason: "M", RequestedBy: "PM"}, domain.ErrStageNotFound},
+		{"sin motivo", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, RequestedBy: "PM"}, domain.ErrChangeReasonRequired},
+		{"sin solicitante", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Reason: "M"}, domain.ErrChangeRequesterRequired},
+		{"no existe o ya retirada", Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: uuid.New(), Reason: "M", RequestedBy: "PM"}, domain.ErrStageNotFound},
 	}
 
 	for _, tt := range tests {
@@ -104,7 +104,7 @@ func TestHandleRejectsActiveTasks(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id}
 
-	_, err := New(repo, fakeTasks{active: true}).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Reason: "M", RequestedBy: "PM"})
+	_, err := New(repo, fakeTasks{active: true}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrStageHasActiveTasks) {
 		t.Fatalf("err = %v", err)
@@ -135,7 +135,7 @@ func TestREST(t *testing.T) {
 			newHandler(&fakeRepo{existing: id}).Register(mux)
 			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/stages/"+tt.id+"/retire", strings.NewReader(tt.body)))
+			mux.ServeHTTP(rec, asUser(httptest.NewRequest(http.MethodPost, "/api/stages/"+tt.id+"/retire", strings.NewReader(tt.body))))
 
 			if rec.Code != tt.status {
 				t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
@@ -148,7 +148,7 @@ func TestHandleRejectsStageInOwnPlanning(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{existing: id, ownPlan: true}
 
-	_, err := newHandler(repo).Handle(context.Background(), Command{Actor: kernel.Owner, ID: id, Reason: "M", RequestedBy: "PM"})
+	_, err := newHandler(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ID: id, Reason: "M", RequestedBy: "PM"})
 
 	if !errors.Is(err, domain.ErrStageInOwnPlanning) || len(repo.changes) != 0 {
 		t.Errorf("err = %v, cambios = %+v", err, repo.changes)

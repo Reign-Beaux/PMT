@@ -11,7 +11,7 @@ func allowedActor(from, to Status) kernel.Actor {
 	if profiles := statusProfiles[from][to]; len(profiles) > 0 {
 		return kernel.Actor{Name: "agente", Profile: profiles[0]}
 	}
-	return kernel.Owner
+	return kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}
 }
 
 func TestEveryTransitionHasProfiles(t *testing.T) {
@@ -49,7 +49,7 @@ func TestChangeStatusValidatesProfile(t *testing.T) {
 		{"CR sin motivo", StatusInReview, StatusPendingClose, actor(kernel.ProfileCR), " ", kernel.ErrReasonRequired},
 		{"TL cierra", StatusPendingClose, StatusDone, actor(kernel.ProfileTL), "", nil},
 		{"QA no cierra", StatusPendingClose, StatusDone, actor(kernel.ProfileQA), "", kernel.ErrTransitionForbidden},
-		{"usuario no cierra", StatusPendingClose, StatusDone, kernel.Owner, "", kernel.ErrTransitionForbidden},
+		{"usuario no cierra", StatusPendingClose, StatusDone, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "", kernel.ErrTransitionForbidden},
 		{"TL devuelve a CR", StatusPendingClose, StatusInReview, actor(kernel.ProfileTL), "falta", nil},
 		{"TL devuelve a QA", StatusPendingClose, StatusInQA, actor(kernel.ProfileTL), "falta", nil},
 		{"devolver sin motivo", StatusPendingClose, StatusInQA, actor(kernel.ProfileTL), "", kernel.ErrReasonRequired},

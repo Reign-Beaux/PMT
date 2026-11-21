@@ -54,10 +54,10 @@ func EnsureKind(kind ItemKind) error {
 	return ErrItemKindInvalid
 }
 
-// NewComment crea un comentario. Comenta cualquier perfil menos PC, que solo lee.
-// Solo espacios cuenta como vacío.
+// NewComment crea un comentario. Comenta cualquier perfil menos PC, que solo lee,
+// y el actor vacío, que no tiene perfil. Solo espacios cuenta como vacío.
 func NewComment(kind ItemKind, itemID uuid.UUID, body string, actor kernel.Actor) (Comment, error) {
-	if actor.Profile == kernel.ProfilePC {
+	if actor.Profile == kernel.ProfilePC || actor.Profile == "" {
 		return Comment{}, ErrCommentForbidden
 	}
 	if err := EnsureKind(kind); err != nil {
