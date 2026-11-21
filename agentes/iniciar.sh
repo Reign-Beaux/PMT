@@ -17,6 +17,14 @@ for A in $L; do
   case "$(dato "$A" EFFORT)" in medium|high) ;; *) echo "effort inválido para $A" >&2; exit 1;; esac
   T=$(token "$A")
   [ -n "$T" ] && [ -r "$HOME/.config/pmt/tokens/$T" ] || { echo "falta el token de $A: ${T:-sin nombre}" >&2; exit 1; }
+  for X in $(mcp_extra "$A"); do
+    [[ "$X" =~ ^[a-z0-9]+$ ]] && [ "$X" != pmt ] || { echo "MCP extra inválido para $A: $X" >&2; exit 1; }
+    [ -n "$(mcp_dato "$X" URL)" ] || { echo "falta MCP_$(echo "$X" | tr a-z A-Z)_URL para $A" >&2; exit 1; }
+    T=$(mcp_dato "$X" TOKEN)
+    [ -n "$T" ] && [ -r "$HOME/.config/pmt/tokens/$T" ] || { echo "falta el token del MCP $X: ${T:-sin nombre}" >&2; exit 1; }
+  done
+  case "$(herramienta "$A")" in mcode|qwen) [ -z "$(mcp_extra "$A")" ] ||
+    echo "aviso: $A usa $(herramienta "$A"), que no recibe MCP extra por agente" >&2;; esac
 done
 for V in PROYECTO_RUTA DB_URL DB_CONSULTA PUERTO_BACKEND PUERTO_FRONTEND PMT_URL HERDR_WORKSPACE; do
   [ -n "${!V:-}" ] || { echo "falta $V en $AGENTES_ENV" >&2; exit 1; }
@@ -80,6 +88,23 @@ cat > "$AGENTES_DIR/mcp.json" <<JSON
   }
 }
 JSON
+# Agente con MCP extra (solo Claude y Codex): mcp-<agente>.json con pmt y sus extra. Cada token sale de MCP_TOKEN_<NOMBRE>.
+for A in $TODOS; do
+  E=""
+  for X in $(mcp_extra "$A"); do E+="$X=$(mcp_dato "$X" URL) "; done
+  python3 - "$AGENTES_DIR/mcp.json" "$AGENTES_DIR/mcp-$A.json" $E <<'PY'
+import json,os,sys
+base,dest,extras=sys.argv[1],sys.argv[2],sys.argv[3:]
+if not extras:
+    if os.path.exists(dest): os.remove(dest)
+    sys.exit()
+d=json.load(open(base))
+for e in extras:
+    n,url=e.split('=',1)
+    d['mcpServers'][n]={'type':'http','url':url,'headers':{'Authorization':'Bearer ${MCP_TOKEN_%s:-}'%n.upper()}}
+json.dump(d,open(dest,'w'),indent=2)
+PY
+done
 # mcode lo toma de .mcp.json en la raíz del proyecto.
 [ -e "$PROYECTO_RUTA/.mcp.json" ] || cp "$AGENTES_DIR/mcp.json" "$PROYECTO_RUTA/.mcp.json"
 # Qwen lo toma de .qwen/settings.json del proyecto; se agrega pmt sin tocar lo demás. El token sale del entorno.

@@ -16,9 +16,11 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
 2. **Configuración.** Copia `agentes.env.example` a `.agentes.env` en la raíz del proyecto y ajústalo. Añade `.agentes.env`, `.agentes/` y `.qwen/` al `.gitignore` del proyecto: la cadena de base de datos queda ahí. Solo la recibe DevBackend, para escribirla en `config/config.dev.yaml` del backend en la tarea de configuración (un YAML por ambiente, sin `.env`: `dev` fuera de git, `prod` versionado con `changeme` en los secretos que producción sobrescribe con variables); desde entonces todos levantan la app con ese archivo.
 
-3. **Effort de mcode.** Es global: se fija en `defaultModelThinking.effort` de `~/.minimax/config.yaml`. `iniciar.sh` avisa si difiere del `.env`.
+3. **MCP extra (opcional).** Cada agente carga solo el MCP de PMT. Para darle otro servidor HTTP con Bearer, guarda su token en `~/.config/pmt/tokens/` y define en `.agentes.env` `MCP_<NOMBRE>_URL`, `MCP_<NOMBRE>_TOKEN` (el archivo) y `<AGENTE>_MCP=<nombre>[,<nombre>]`. `iniciar.sh` genera `.agentes/mcp-<agente>.json` con pmt y los extra, con el token como `${MCP_TOKEN_<NOMBRE>}`; `lanzar.sh` lo exporta desde el archivo y Claude lo usa con `--strict-mcp-config`. Codex los recibe por `-c`. mcode y Qwen no: leen un archivo común del proyecto. Un agente que ya corre toma el cambio al sacarlo con `/exit` y lanzarlo de nuevo.
 
-4. **Agentes.** Crea las pestañas que falten, guarda `.agentes/panes.env`, genera los perfiles en `.agentes/perfiles/`, crea `.mcp.json` si no existe y lanza a todos:
+4. **Effort de mcode.** Es global: se fija en `defaultModelThinking.effort` de `~/.minimax/config.yaml`. `iniciar.sh` avisa si difiere del `.env`.
+
+5. **Agentes.** Crea las pestañas que falten, guarda `.agentes/panes.env`, genera los perfiles en `.agentes/perfiles/`, crea `.mcp.json` si no existe y lanza a todos:
 
    ```bash
    /ruta/a/agentes/iniciar.sh /ruta/al/proyecto/.agentes.env
@@ -26,9 +28,9 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
    Para levantar solo algunos, añade sus nombres al final. Un agente que ya corre no se toca.
 
-5. **PP.** Abre su pestaña en herdr y descríbele el proyecto. Con tu visto bueno libera y levanta al TL con la etapa 1. Se trabaja una etapa por vez: cada etapa siguiente la levantas tú, o PP si se lo pides.
+6. **PP.** Abre su pestaña en herdr y descríbele el proyecto. Con tu visto bueno libera y levanta al TL con la etapa 1. Se trabaja una etapa por vez: cada etapa siguiente la levantas tú, o PP si se lo pides.
 
-6. **Vigía.** Arranca solo cada vez que se levanta al TL y termina cuando alguien anota en `para-usuario.md`, como el TL al cerrar su etapa. Su bitácora queda en `.agentes/vigia.log`. Si hace falta, lánzalo a mano desde la raíz del proyecto: `/ruta/a/agentes/vigia.sh`.
+7. **Vigía.** Arranca solo cada vez que se levanta al TL y termina cuando alguien anota en `para-usuario.md`, como el TL al cerrar su etapa. Su bitácora queda en `.agentes/vigia.log`. Si hace falta, lánzalo a mano desde la raíz del proyecto: `/ruta/a/agentes/vigia.sh`.
 
 ## Scripts
 

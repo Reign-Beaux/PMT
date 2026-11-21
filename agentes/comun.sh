@@ -25,6 +25,9 @@ dato() { local v="$(echo "$1" | tr a-z A-Z)_$2"; echo "${!v:-}"; }
 herramienta() { dato "$1" HERRAMIENTA; }
 token() { dato "$1" TOKEN; }
 modelo() { dato "$1" MODELO; }
+# MCP extra del agente (<AGENTE>_MCP, separados por comas) y datos de cada uno (MCP_<NOMBRE>_URL, MCP_<NOMBRE>_TOKEN).
+mcp_extra() { dato "$1" MCP | tr ',' ' '; }
+mcp_dato() { local v="MCP_$(echo "$1" | tr a-z A-Z)_$2"; echo "${!v:-}"; }
 # El effort guardado por relanzar-dp.sh manda sobre el del .env.
 effort() { cat "$AGENTES_DIR/$1.effort" 2>/dev/null || dato "$1" EFFORT; }
 nombrar() { "$HERDR" agent rename "$(pane "$1")" "${HERDR_PREFIJO:-}$1" >/dev/null 2>&1; }

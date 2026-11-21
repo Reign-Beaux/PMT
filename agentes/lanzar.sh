@@ -8,12 +8,20 @@ F="$AGENTES_DIR/perfiles/$A.md"
 [ -r "$HOME/.config/pmt/tokens/$T" ] && [ -n "$T" ] || { echo "falta el token de $A: $T" >&2; exit 1; }
 cd "$PROYECTO_RUTA" || exit 1
 export PMT_TOKEN="$(cat "$HOME/.config/pmt/tokens/$T")"
+# MCP extra del agente: su token va en MCP_TOKEN_<NOMBRE>. Claude los toma de mcp-<agente>.json; Codex, por -c.
+J="$AGENTES_DIR/mcp.json"; [ -f "$AGENTES_DIR/mcp-$A.json" ] && J="$AGENTES_DIR/mcp-$A.json"
+CX=()
+for X in $(mcp_extra "$A"); do
+  V="MCP_TOKEN_$(echo "$X" | tr a-z A-Z)"
+  export "$V=$(cat "$HOME/.config/pmt/tokens/$(mcp_dato "$X" TOKEN)")"
+  CX+=(-c "mcp_servers.$X.url=\"$(mcp_dato "$X" URL)\"" -c "mcp_servers.$X.bearer_token_env_var=\"$V\"")
+done
 case "$H" in
   claude)
     # claude-400 es función de shell: aquí se usa el comando que envuelve.
     exec claude --dangerously-skip-permissions --autocompact 400k --model "$M" --effort "$E" \
       --settings '{"enabledPlugins":{"engram@engram":false}}' \
-      --mcp-config "$AGENTES_DIR/mcp.json" --strict-mcp-config \
+      --mcp-config "$J" --strict-mcp-config \
       --append-system-prompt-file "$F" ;;
   codex)
     # ~/.codex tiene un pmt de la v3: se usa ~/.codex-flow.
@@ -23,7 +31,7 @@ case "$H" in
     I=$(python3 -c "import json,sys;print(json.dumps(open(sys.argv[1]).read()))" "$F")
     exec codex -m "$M" -c "developer_instructions=$I" -c "model_reasoning_effort=\"$E\"" -c allow_login_shell=false \
       -c notice.hide_rate_limit_model_nudge=true \
-      -c "mcp_servers.pmt.url=\"$PMT_URL\"" -c "projects.\"$PROYECTO_RUTA\".trust_level=\"trusted\"" ;;
+      -c "mcp_servers.pmt.url=\"$PMT_URL\"" -c "projects.\"$PROYECTO_RUTA\".trust_level=\"trusted\"" "${CX[@]}" ;;
   mcode)
     exec mcode --model "$M" --append-system-prompt-file "$F" ;;
   qwen)
