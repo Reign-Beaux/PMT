@@ -60,7 +60,7 @@ Nace en `planning`.
 
 - **Perfiles:** el TL de la etapa la inicia y la cierra. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User` y el TL de la etapa detienen, reanudan y reabren una etapa en `done`. Detener, cancelar y reabrir exigen motivo.
 - **Cierre:** solo pasa a `done` si todas sus tareas activas están en `done` o `cancelled`, con al menos una en `done`. Una etapa vacía o toda cancelada se cancela, no se cierra.
-- **Asignación:** PP o `User` le ponen TL con `assign_stage_lead`. El TL arma su equipo con `add_stage_member` y `remove_stage_member`.
+- **Asignación:** PP o `User` le ponen o cambian el TL con `assign_stage_lead` y lo quitan con `remove_stage_lead`, solo con la etapa sin iniciar (`planning` o `stand_by`); quitarlo no cambia el equipo. El TL arma su equipo con `add_stage_member` y `remove_stage_member`.
 
 ## Tareas
 
@@ -176,7 +176,7 @@ Detener o cancelar un padre congela lo de abajo, sin cambiar su status.
 ## Permisos
 
 - **Todo comando de escritura exige perfil.** Uno sin permiso recibe `forbidden` antes de que se lea la base.
-- **Planeación** (`create_*`, `update_*`, `delete_*`, `add_*`, `retire_*` de proyectos, etapas y tareas, `revise_task`, `import_*`, `change_product_version`, `release_project`): solo PP y `User`. `revise_stage` también el TL de esa etapa.
+- **Planeación** (`create_*`, `update_*`, `delete_*`, `add_*`, `retire_*` de proyectos, etapas y tareas, `revise_task`, `import_*`, `change_product_version`, `release_project`, `assign_stage_lead`, `remove_stage_lead`): solo PP y `User`. `revise_stage` también el TL de esa etapa.
 - **PC** solo lee: no escribe nada, ni comentarios.
 - **`User`** tiene lo de PP, pero no aprueba como CR, QA ni TL, ni gestiona hallazgos o planes.
 - **Un TL** solo actúa sobre su etapa y sus tareas.

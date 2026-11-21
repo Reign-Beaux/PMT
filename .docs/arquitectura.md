@@ -94,12 +94,12 @@ Cada slice es un paquete con `handler.go` (la operación, su autorización y las
 
 ## Herramientas MCP
 
-Hay 59 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`. La prueba `internal/app/contracts_test.go` falla si una herramienta y su documentación difieren. Cada agente recibe la lista completa; los permisos los aplica el handler.
+Hay 60 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`. La prueba `internal/app/contracts_test.go` falla si una herramienta y su documentación difieren. Cada agente recibe la lista completa; los permisos los aplica el handler.
 
 | Feature | Herramientas |
 | --- | --- |
 | `projects` | `create_project`, `list_projects`, `update_project`, `delete_project`, `change_project_status`, `change_product_version`, `list_project_status_changes`, `list_product_version_changes` |
-| `stages` | `create_stage`, `list_stages`, `update_stage`, `delete_stage`, `change_stage_status`, `add_stage`, `revise_stage`, `retire_stage`, `list_stage_changes`, `list_stage_status_changes`, `assign_stage_lead`, `add_stage_member`, `remove_stage_member` |
+| `stages` | `create_stage`, `list_stages`, `update_stage`, `delete_stage`, `change_stage_status`, `add_stage`, `revise_stage`, `retire_stage`, `list_stage_changes`, `list_stage_status_changes`, `assign_stage_lead`, `remove_stage_lead`, `add_stage_member`, `remove_stage_member` |
 | `tasks` | `create_task`, `list_tasks`, `update_task`, `delete_task`, `change_task_status`, `change_tasks_status`, `add_task`, `revise_task`, `retire_task`, `list_task_changes`, `list_task_status_changes`, `assign_task` |
 | `workflow` | `release_project`, `start_stage`, `get_project_progress` |
 | `bugs` | `create_bug`, `update_bug`, `change_bug_status`, `list_bugs`, `list_bug_status_changes` |
@@ -192,7 +192,7 @@ Para no buscarlo:
 
 - **Auditoría general** en `activity`: solo hay historiales de status, de cambios y de versión, y comentarios.
 - **`kernel.Transactor`:** cada `store` abre su propia transacción.
-- **Filtrado de herramientas MCP por perfil:** todos reciben las 59.
+- **Filtrado de herramientas MCP por perfil:** todos reciben las 60.
 - **`idempotency_key`:** un reintento repite la operación.
 - **Login del usuario humano:** el navegador entra sin token, como `saul`.
 - **Multi-tenencia:** una sola organización.

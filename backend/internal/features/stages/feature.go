@@ -14,6 +14,7 @@ import (
 	"pmt/internal/features/stages/commands/changestatus"
 	"pmt/internal/features/stages/commands/create"
 	"pmt/internal/features/stages/commands/delete"
+	"pmt/internal/features/stages/commands/removelead"
 	"pmt/internal/features/stages/commands/removemember"
 	"pmt/internal/features/stages/commands/retire"
 	"pmt/internal/features/stages/commands/revise"
@@ -86,6 +87,10 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	assignLead := assignlead.New(repo, agents)
 	assignLead.Register(mux)
 	assignLead.RegisterTool(tools)
+
+	removeLead := removelead.New(repo)
+	removeLead.Register(mux)
+	removeLead.RegisterTool(tools)
 
 	addMember := addmember.New(repo, agents)
 	addMember.Register(mux)

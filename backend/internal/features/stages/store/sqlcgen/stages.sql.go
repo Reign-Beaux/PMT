@@ -29,6 +29,20 @@ func (q *Queries) AddStageMember(ctx context.Context, arg AddStageMemberParams) 
 	return err
 }
 
+const clearStageLead = `-- name: ClearStageLead :execrows
+UPDATE stages
+SET lead = NULL, updated_at = now()
+WHERE id = $1 AND retired_at IS NULL
+`
+
+func (q *Queries) ClearStageLead(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, clearStageLead, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createStage = `-- name: CreateStage :one
 INSERT INTO stages (id, project_id, name, description, status, position, add_reason, add_requested_by)
 SELECT $1::uuid, $2::uuid, $3::text, $4::text, $5::text, COALESCE(MAX(position), 0) + 1, NULLIF($6::text, ''), NULLIF($7::text, '')

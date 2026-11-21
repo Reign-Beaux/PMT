@@ -309,6 +309,22 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+    delete:
+      summary: Quita el TL de una etapa
+      description: Solo PP y el usuario. Solo con la etapa en planning o stand_by y con TL asignado. El equipo no cambia.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Team"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/stages/{id}/members:
     parameters:
       - name: id

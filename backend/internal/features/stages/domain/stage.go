@@ -29,6 +29,12 @@ var (
 	ErrStageLeftPlanning = kernel.Conflict("la etapa ya salió de su planning propio")
 	// ErrAssignLeadForbidden indica que el perfil no puede asignar el TL.
 	ErrAssignLeadForbidden = kernel.Forbidden("tu perfil no puede asignar el TL de una etapa")
+	// ErrRemoveLeadForbidden indica que el perfil no puede quitar el TL.
+	ErrRemoveLeadForbidden = kernel.Forbidden("tu perfil no puede quitar el TL de una etapa")
+	// ErrLeadNotRemovable indica que la etapa ya inició y su TL no se quita.
+	ErrLeadNotRemovable = kernel.Conflict("solo se quita el TL de una etapa sin iniciar (planning o stand_by)")
+	// ErrStageWithoutLead indica que la etapa no tiene TL que quitar.
+	ErrStageWithoutLead = kernel.Conflict("la etapa no tiene TL")
 	// ErrAgentNotLead indica que el agente propuesto como responsable no es TL.
 	ErrAgentNotLead = kernel.Invalid("el agente no tiene perfil TL")
 	// ErrAgentNotDev indica que el agente propuesto para el equipo no es dev.
@@ -100,6 +106,26 @@ func (s Stage) EnsureLead(actor kernel.Actor) error {
 func EnsureCanAssignLead(actor kernel.Actor) error {
 	if actor.Profile != kernel.ProfilePP && actor.Profile != kernel.ProfileUser {
 		return ErrAssignLeadForbidden
+	}
+	return nil
+}
+
+// EnsureCanRemoveLead devuelve un error si el perfil no puede quitar el TL.
+func EnsureCanRemoveLead(actor kernel.Actor) error {
+	if actor.Profile != kernel.ProfilePP && actor.Profile != kernel.ProfileUser {
+		return ErrRemoveLeadForbidden
+	}
+	return nil
+}
+
+// EnsureLeadRemovable devuelve un error si la etapa no admite quedar sin TL: ya
+// inició (solo se quita en planning o stand_by) o no tiene TL.
+func (s Stage) EnsureLeadRemovable() error {
+	if s.Status != StatusPlanning && s.Status != StatusStandBy {
+		return ErrLeadNotRemovable
+	}
+	if s.Lead == "" {
+		return ErrStageWithoutLead
 	}
 	return nil
 }

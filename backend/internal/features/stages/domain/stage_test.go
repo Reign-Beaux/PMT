@@ -85,3 +85,25 @@ func TestStageDefinedInPlanningIsNotOwnPlanning(t *testing.T) {
 		t.Errorf("etapa = %+v", s)
 	}
 }
+
+func TestEnsureLeadRemovable(t *testing.T) {
+	tests := []struct {
+		status Status
+		lead   string
+		want   error
+	}{
+		{StatusPlanning, "tl", nil},
+		{StatusStandBy, "tl", nil},
+		{StatusPlanning, "", ErrStageWithoutLead},
+		{StatusInDev, "tl", ErrLeadNotRemovable},
+		{StatusStopped, "tl", ErrLeadNotRemovable},
+		{StatusDone, "tl", ErrLeadNotRemovable},
+		{StatusCancelled, "tl", ErrLeadNotRemovable},
+	}
+	for _, tt := range tests {
+		err := Stage{Status: tt.status, Lead: tt.lead}.EnsureLeadRemovable()
+		if !errors.Is(err, tt.want) {
+			t.Errorf("%s con lead %q: err = %v, quiero %v", tt.status, tt.lead, err, tt.want)
+		}
+	}
+}

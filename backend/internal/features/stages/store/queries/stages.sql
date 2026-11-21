@@ -83,6 +83,11 @@ UPDATE stages
 SET lead = $2, updated_at = now()
 WHERE id = $1 AND retired_at IS NULL;
 
+-- name: ClearStageLead :execrows
+UPDATE stages
+SET lead = NULL, updated_at = now()
+WHERE id = $1 AND retired_at IS NULL;
+
 -- name: AddStageMember :exec
 INSERT INTO stage_members (stage_id, agent, added_by)
 VALUES ($1, $2, $3);

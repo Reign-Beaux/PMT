@@ -146,6 +146,18 @@ func (s *Stages) UpdateLead(ctx context.Context, id uuid.UUID, lead string) erro
 	return nil
 }
 
+// ClearLead deja sin TL una etapa sin retirar.
+func (s *Stages) ClearLead(ctx context.Context, id uuid.UUID) error {
+	updated, err := s.queries.ClearStageLead(ctx, id)
+	if err != nil {
+		return fmt.Errorf("quitar TL de etapa: %w", err)
+	}
+	if updated == 0 {
+		return domain.ErrStageNotFound
+	}
+	return nil
+}
+
 // AddMember añade un dev al equipo de una etapa.
 func (s *Stages) AddMember(ctx context.Context, id uuid.UUID, agent, addedBy string) error {
 	err := s.queries.AddStageMember(ctx, sqlcgen.AddStageMemberParams{StageID: id, Agent: agent, AddedBy: addedBy})
