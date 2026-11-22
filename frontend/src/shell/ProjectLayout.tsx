@@ -1,4 +1,5 @@
-import { Link, NavLink, Outlet, useParams } from 'react-router'
+import { useEffect } from 'react'
+import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router'
 import { getProject, getProjectStages } from '../api/projects'
 import { getProjectProgress } from '../api/progress'
 import { getProjectBugs } from '../api/bugs'
@@ -13,6 +14,7 @@ import { summarize } from '../domain/summary'
 import { QueryState } from '../components/QueryState'
 import { ProjectMetrics } from '../components/Metrics'
 import { Icon } from '../components/Icon'
+import { RoleBadge } from '../components/members/RoleBadge'
 import { PageBreadcrumbs } from './PageBreadcrumbs'
 import type { ProjectContext } from './useProjectContext'
 import s from '../styles/App.module.scss'
@@ -30,6 +32,15 @@ export function ProjectLayout() {
   const breadcrumbs = [{ label: 'Projects', to: '/projects' }, { label: project.data?.name ?? 'Proyecto', to: stageId ? base : undefined }]
   if (stageId) breadcrumbs.push({ label: currentStage?.name ?? 'Etapa', to: undefined })
   const notFound = project.error?.status === 404
+  // Ya lo veía y un refresco responde 404: lo quitaron del proyecto (o se
+  // eliminó). Vuelve a la lista con un aviso en vez de dejar la pantalla vieja.
+  const lostAccess = notFound && project.data !== undefined
+  const lostName = project.data?.name
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!lostAccess) return
+    navigate('/projects', { replace: true, state: { notice: `Ya no tienes acceso al proyecto «${lostName}».` } })
+  }, [lostAccess, lostName, navigate])
   const context: ProjectContext | undefined = project.data ? { project: project.data, stages, bugs } : undefined
   const progress = stages.data?.progress
   const summary = progress ? summarize(progress) : undefined
@@ -41,12 +52,13 @@ export function ProjectLayout() {
       {notFound ? <section className={s.notFound}><h1>Proyecto no encontrado</h1><Link to="/projects">Volver a proyectos</Link></section> : <QueryState result={project} label="Cargando proyecto…" />}
       {context && !notFound && (stageId ? <Outlet context={context} /> : <>
         <header className={s['page-heading']}><div>
-          <div className={s['heading-line']}><h1>{context.project.name}</h1><Badge label={PROJECT_STATUS_LABELS[context.project.status]} tone={PROJECT_STATUS_TONES[context.project.status]} />{context.project.product_version && <span className={`${s.version} ${s.mono}`}>v{context.project.product_version}</span>}</div>
+          <div className={s['heading-line']}><h1>{context.project.name}</h1><Badge label={PROJECT_STATUS_LABELS[context.project.status]} tone={PROJECT_STATUS_TONES[context.project.status]} />{context.project.product_version && <span className={`${s.version} ${s.mono}`}>v{context.project.product_version}</span>}{context.project.role && <RoleBadge role={context.project.role} mine />}</div>
           {context.project.description && <p className={`${s['heading-subtitle']} ${s['project-heading-description']}`}>{context.project.description}</p>}
         </div></header>
         <nav className={s['project-tabs']} aria-label="Secciones del proyecto">
           <NavLink to={base} end><Icon name="layers" />Etapas{stages.data && <span className={s.count}>{stages.data.stages.length}</span>}</NavLink>
           <NavLink to={`${base}/bugs`}><Icon name="bug" />Bugs{bugs.data && <span className={s.count}>{bugs.data.length}</span>}</NavLink>
+          <NavLink to={`${base}/members`}><Icon name="user" />Miembros</NavLink>
         </nav>
         <QueryState result={stages} label="Cargando avance…" />
         {progress && <ProjectMetrics progress={progress} />}

@@ -8,7 +8,7 @@ security:
 paths:
   /api/projects:
     get:
-      summary: Lista los proyectos que ve quien consulta, del más reciente al más antiguo
+      summary: Lista los proyectos que ve quien consulta, del más reciente al más antiguo, con su rol en cada uno (role)
       description: Los que creó y los que le compartieron; con token, solo aquellos en que es owner o editor (los de viewer solo se consultan con la cookie del sitio web); con un token de agente, los del dueño de la instancia.
       responses:
         "401":
@@ -44,7 +44,7 @@ paths:
           type: string
           format: uuid
     get:
-      summary: Obtiene un proyecto
+      summary: Obtiene un proyecto, con el rol de quien consulta (role)
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -502,6 +502,10 @@ components:
         updated_at:
           type: string
           format: date-time
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+          description: Rol de quien consulta en el proyecto. Lo traen GET /api/projects y GET /api/projects/{id}; las demás respuestas no lo incluyen.
     ProjectStatus:
       type: string
       enum: [planning, stand_by, in_dev, working, stopped, cancelled]

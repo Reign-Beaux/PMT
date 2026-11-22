@@ -13,10 +13,10 @@ import (
 
 // Reader es la lectura que necesita la operación.
 type Reader interface {
-	List(ctx context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.Project, error)
+	List(ctx context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.MemberProject, error)
 }
 
-// Item es un proyecto de la lista.
+// Item es un proyecto de la lista, con el rol de quien consulta.
 type Item struct {
 	ID             uuid.UUID     `json:"id"`
 	Name           string        `json:"name"`
@@ -25,6 +25,7 @@ type Item struct {
 	ProductVersion string        `json:"product_version"`
 	CreatedAt      time.Time     `json:"created_at"`
 	UpdatedAt      time.Time     `json:"updated_at"`
+	Role           domain.Role   `json:"role"`
 }
 
 // Handler ejecuta la operación.
@@ -51,7 +52,16 @@ func (h *Handler) Handle(ctx context.Context, actor kernel.Actor) ([]Item, error
 
 	items := make([]Item, 0, len(projects))
 	for _, p := range projects {
-		items = append(items, Item(p))
+		items = append(items, Item{
+			ID:             p.ID,
+			Name:           p.Name,
+			Description:    p.Description,
+			Status:         p.Status,
+			ProductVersion: p.ProductVersion,
+			CreatedAt:      p.CreatedAt,
+			UpdatedAt:      p.UpdatedAt,
+			Role:           p.Role,
+		})
 	}
 	return items, nil
 }

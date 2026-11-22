@@ -68,8 +68,8 @@ func TestToolListsProjects(t *testing.T) {
 	id := uuid.New()
 	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	updated := created.Add(time.Hour)
-	reader := &fakeReader{projects: []domain.Project{
-		{ID: id, Name: "PMT", Description: "Gestor", Status: domain.StatusStopped, ProductVersion: "1.0.0", CreatedAt: created, UpdatedAt: updated},
+	reader := &fakeReader{projects: []domain.MemberProject{
+		{Project: domain.Project{ID: id, Name: "PMT", Description: "Gestor", Status: domain.StatusStopped, ProductVersion: "1.0.0", CreatedAt: created, UpdatedAt: updated}, Role: domain.RoleEditor},
 	}}
 
 	result := call(t, connect(t, reader))
@@ -89,6 +89,7 @@ func TestToolListsProjects(t *testing.T) {
 		ProductVersion: "1.0.0",
 		CreatedAt:      "2026-01-02T03:04:05Z",
 		UpdatedAt:      "2026-01-02T04:04:05Z",
+		Role:           "editor",
 	}
 	if len(output.Projects) != 1 || output.Projects[0] != want {
 		t.Errorf("proyectos = %+v", output.Projects)

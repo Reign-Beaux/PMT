@@ -62,6 +62,12 @@ type Member struct {
 	Role      Role
 }
 
+// MemberProject es un proyecto con el rol que tiene en él quien consulta.
+type MemberProject struct {
+	Project
+	Role Role
+}
+
 // Errores de miembros.
 var (
 	ErrMembersForbidden   = kernel.Forbidden("solo el usuario sin perfil declarado administra los miembros de un proyecto")

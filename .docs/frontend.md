@@ -1,6 +1,6 @@
 # Frontend
 
-Interfaz web para que el usuario siga los proyectos. **Sobre los proyectos solo consulta:** usa únicamente `GET` y no cambia nada; los cambios los hacen los agentes por MCP. Las únicas escrituras son las de la cuenta: login, invitaciones, tokens, contraseña y usuarios. En producción la sirve `pmt-server` en `http://127.0.0.1:8080`, y se actualiza sola en tiempo real.
+Interfaz web para que el usuario siga los proyectos. **Sobre el trabajo de los proyectos solo consulta:** etapas, tareas y bugs los cambian los agentes por MCP. Las únicas escrituras son las de la cuenta (login, invitaciones, tokens, contraseña y usuarios) y, solo para el owner de un proyecto, administrar sus miembros y liberar etapas o bugs tomados. Van con la cookie y sin perfil declarado (perfil `User`); los errores del backend se muestran con su mensaje. En producción la sirve `pmt-server` en `http://127.0.0.1:8080`, y se actualiza sola en tiempo real.
 
 Sin sesión, toda ruta lleva a `/login` y vuelve a la pedida al entrar. La sesión es la cookie `pmt_session` del backend; el frontend no guarda credenciales. Si la API responde 401 a media sesión, vuelve a `/login`.
 
@@ -22,27 +22,30 @@ Sin sesión, toda ruta lleva a `/login` y vuelve a la pedida al entrar. La sesi�
 | `/cuenta` | Mis tokens de API (crear, ver el token una sola vez, revocar), cambiar la contraseña y cerrar sesión. El dueño ve además Invitaciones (crear y copiar el enlace, lista con estado) y Usuarios (desactivar y reactivar) |
 | `/` | Redirige a `/projects` |
 | `/dashboard` | Indicadores calculados de proyectos, etapas, tareas y bugs |
-| `/projects` | Catálogo de proyectos |
-| `/projects/:projectId` | Descripción, indicadores, etapas y TL de la etapa activa |
-| `/projects/:projectId/bugs` | Misma cabecera y panel del proyecto, con la lista de bugs |
-| `/projects/:projectId/stages/:stageId` | Descripción y tabla de tareas |
-| `?task=<id>` o `?bug=<id>` | Abre el detalle en un diálogo, con pestañas de comentarios e historial de status. Se conserva al recargar |
+| `/projects` | Catálogo de proyectos, con mi rol en cada uno. Si perdí el acceso a uno mientras lo veía, llego aquí con un aviso |
+| `/projects/:projectId` | Descripción, mi rol, indicadores, etapas (con quién tiene tomada cada una y desde cuándo) y TL de la etapa activa |
+| `/projects/:projectId/bugs` | Misma cabecera y panel del proyecto, con la lista de bugs y quién tiene tomado cada uno |
+| `/projects/:projectId/members` | Miembros: `username`, nombre y rol, para todos. El owner agrega por `username` como `editor` o `viewer`, cambia el rol y quita (con confirmación) |
+| `/projects/:projectId/stages/:stageId` | Descripción, quién la tiene tomada y desde cuándo, y tabla de tareas. El owner ve «Liberar» en una etapa tomada |
+| `?task=<id>` o `?bug=<id>` | Abre el detalle en un diálogo, con pestañas de comentarios e historial de status. Se conserva al recargar. El de un bug dice quién lo tiene tomado y, al owner, le ofrece «Liberar» |
 | `/dev/componentes` | Vitrina de componentes, solo con `pnpm dev` |
 
 El avance de una etapa excluye las tareas canceladas. Los textos se muestran como texto plano, con sus saltos de línea.
+
+**Rol y permisos en pantalla.** El rol llega en `role` de `GET /api/projects` y `GET /api/projects/{id}`. Solo el owner ve el formulario y las acciones de miembros y el botón «Liberar»; un editor o un viewer ven las mismas pantallas sin ellos. «Liberar» pide el motivo, obligatorio, que queda en el historial de status, y no cambia el status. Las reglas las aplica el backend: la interfaz solo oculta lo que no se puede hacer.
 
 ## Estructura
 
 ```text
 frontend/
 ├── src/
-│   ├── api/          clientes por recurso sobre GET, POST y DELETE con timeout y validación; auth.ts para la cuenta
+│   ├── api/          clientes por recurso sobre GET, POST, PUT y DELETE con timeout y validación; auth.ts para la cuenta, members.ts para los miembros
 │   ├── realtime/     conexión WebSocket única y refresco por evento
 │   ├── routes/       rutas y selección del detalle por URL
 │   ├── shell/        marco de la app, migas, layout del proyecto, RequireAuth y la tarjeta de login
 │   ├── views/        una vista por pantalla, más los detalles de tarea y bug
-│   ├── components/   piezas reutilizables: tarjetas, avance, avatar, detalle, diálogo, estados
-│   ├── domain/       status, tonos, fechas y resúmenes
+│   ├── components/   piezas reutilizables: tarjetas, avance, avatar, detalle, diálogo, estados; members/ con el rol, «tomado por» y «Liberar»
+│   ├── domain/       status, tonos, roles, fechas y resúmenes
 │   ├── hooks/        useAsync
 │   └── styles/       tokens, reset, breakpoints y estilos globales
 ├── config/apiTarget.ts   valida el destino del proxy y la base de pruebas
@@ -56,7 +59,8 @@ frontend/
 ## Tiempo real
 
 - Una sola conexión a `/api/events` por pestaña ([arquitectura.md](arquitectura.md#tiempo-real)), abierta por `RequireAuth` solo con sesión; el WebSocket se autentica con la cookie. No hay sondeo periódico.
-- `invalidate` vuelve a consultar el recurso afectado; `resync` refresca todo lo visible.
+- `invalidate` vuelve a consultar el recurso afectado; `resync` refresca todo lo visible. Un cambio de miembros llega como `project` y refresca el proyecto (con mi rol) y la lista de miembros; tomar y liberar llegan como `stage` o `bug`.
+- **Pérdida de acceso.** Si el proyecto que estoy viendo responde 404 en un refresco (me quitaron o se eliminó), la pantalla vuelve a `/projects` con el aviso «Ya no tienes acceso al proyecto «…»». Un proyecto que nunca cargó sigue mostrando «Proyecto no encontrado».
 - Si se cae, reintenta con esperas de 1, 2, 4… hasta 30 s. Después de 30 s sin `resync` los datos se marcan viejos.
 - El encabezado lo indica: "En vivo", "Reconectando…" o "Sin conexión, datos de las HH:MM".
 
@@ -81,7 +85,9 @@ pnpm test:e2e     # Playwright contra 5173 y el backend de pruebas en 8090
 2. El propio servidor aplica las migraciones que falten y crea el dueño de pruebas (`e2e-dueno`) si la base no tiene usuarios.
 3. Entra con el dueño de pruebas, crea un proyecto centinela y lo lee por la API para confirmar que el 8090 usa la base de pruebas. Los proyectos que el harness crea por SQL quedan con el dueño de pruebas como owner (`project_members`), porque sin membresía la API no los muestra.
 4. Abre sesión por el proxy de Vite y cada página del navegador arranca con esa cookie (`storageState`).
-5. Crea sus datos con prefijo `e2e-<RUN_ID>-` y los borra al terminar, aunque falle, y comprueba por SQL que no queda nada.
+5. Crea sus datos con prefijo `e2e-<RUN_ID>-` y los borra al terminar, aunque falle, y comprueba por SQL que no queda nada. `createStage` y `createBug` aceptan `takenBy` (un `username`) para dejarlos tomados, y `createUser` crea un segundo usuario como en la app: el dueño lo invita, él acepta por la API y la prueba recibe su sesión (`storageState`) para abrirla en otro contexto del navegador. Al terminar borra esos usuarios, sus invitaciones y los registros de status de sus etapas y bugs (liberar escribe uno).
+
+`e2e/miembros.real.spec.ts` cubre la fase 1e: el owner comparte con un segundo usuario como viewer y como editor, éste ve el proyecto o deja de verlo en vivo, y el owner libera una etapa y un bug tomados con motivo.
 
 `PMT_BROWSER_PATH` permite usar un Chromium del sistema. Los recorridos de `e2e/ui/` simulan también `GET /api/auth/me`.
 

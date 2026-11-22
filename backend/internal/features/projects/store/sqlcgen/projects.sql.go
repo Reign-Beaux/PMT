@@ -100,7 +100,7 @@ func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error)
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.status, p.product_version FROM projects p
+SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.status, p.product_version, m.role FROM projects p
 JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
 WHERE m.role = ANY($2::text[])
 ORDER BY p.created_at DESC, p.id
@@ -111,16 +111,27 @@ type ListProjectsParams struct {
 	Roles  []string
 }
 
+type ListProjectsRow struct {
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Status         string
+	ProductVersion string
+	Role           string
+}
+
 // Los proyectos del usuario en los que tiene uno de los roles dados.
-func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error) {
+func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error) {
 	rows, err := q.db.Query(ctx, listProjects, arg.UserID, arg.Roles)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Project{}
+	items := []ListProjectsRow{}
 	for rows.Next() {
-		var i Project
+		var i ListProjectsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -129,6 +140,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]P
 			&i.UpdatedAt,
 			&i.Status,
 			&i.ProductVersion,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}

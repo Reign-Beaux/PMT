@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { getStageTasks } from '../api/tasks'
+import { releaseStage } from '../api/projects'
 import { useAsync } from '../hooks/useAsync'
 import { TASK_RESOURCES } from '../realtime/refreshResources'
 import { useDetailSelection } from '../routes/useDetailSelection'
@@ -13,6 +14,9 @@ import { Empty } from '../components/feedback'
 import { Badge } from '../components/card/Badge'
 import { Filters } from '../components/Filters'
 import { Icon } from '../components/Icon'
+import { TakenBy } from '../components/members/TakenBy'
+import { ReleaseControl } from '../components/members/ReleaseControl'
+import m from '../components/members/Members.module.scss'
 import { TaskTable } from './TaskTable'
 import { TaskDetailDialog } from './TaskDetail'
 import s from '../styles/App.module.scss'
@@ -36,6 +40,10 @@ export function StageView() {
         <header className={s['page-heading']}><div><p className={s.eyebrow}>Etapa {String(stage.position).padStart(2, '0')} / {project.name}</p><div className={s['heading-line']}><h1>{stage.name}</h1><Badge label={STAGE_STATUS_LABELS[stage.status]} tone={STAGE_STATUS_TONES[stage.status]} /></div>
           {stage.description && <p className={`${s['heading-subtitle']} ${s['project-heading-description']}`}>{stage.description}</p>}
           <p className={s['heading-subtitle']}>Responsable: {stage.lead || 'Sin asignar'}</p>
+          {stage.taken_by && <div className={m.holdLine}>
+            <TakenBy hold={stage} kind="stage" />
+            {project.role === 'owner' && <ReleaseControl key={`${stage.id}:${stage.taken_by}`} kind="stage" holder={stage.taken_by} onRelease={async reason => { await releaseStage(stage.id, reason); stages.retry() }} />}
+          </div>}
         </div></header>
         <div className={`${s.panel} ${s['stage-summary']}`}><div className={s['stage-summary-left']}><Icon name="layers" /><span><strong>{numbers.done} de {stageProgressDenominator(numbers)} tareas</strong> terminadas</span></div><div className={s['stage-summary-right']}><div className={`${s.track} ${s.purple}`} role="progressbar" aria-label="Avance de la etapa" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></div><strong>{percent}%</strong><span>de avance</span></div></div>
       </>}

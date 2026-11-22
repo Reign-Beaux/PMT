@@ -68,8 +68,8 @@ func (s *Projects) Lock(ctx context.Context, id uuid.UUID) (domain.Project, erro
 }
 
 // List devuelve los proyectos en los que el usuario tiene uno de los roles dados,
-// del más reciente al más antiguo.
-func (s *Projects) List(ctx context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.Project, error) {
+// con su rol, del más reciente al más antiguo.
+func (s *Projects) List(ctx context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.MemberProject, error) {
 	names := make([]string, 0, len(roles))
 	for _, role := range roles {
 		names = append(names, string(role))
@@ -78,9 +78,20 @@ func (s *Projects) List(ctx context.Context, userID uuid.UUID, roles []domain.Ro
 	if err != nil {
 		return nil, fmt.Errorf("listar proyectos: %w", err)
 	}
-	projects := make([]domain.Project, 0, len(rows))
+	projects := make([]domain.MemberProject, 0, len(rows))
 	for _, row := range rows {
-		projects = append(projects, toDomain(row))
+		projects = append(projects, domain.MemberProject{
+			Project: toDomain(sqlcgen.Project{
+				ID:             row.ID,
+				Name:           row.Name,
+				Description:    row.Description,
+				CreatedAt:      row.CreatedAt,
+				UpdatedAt:      row.UpdatedAt,
+				Status:         row.Status,
+				ProductVersion: row.ProductVersion,
+			}),
+			Role: domain.Role(row.Role),
+		})
 	}
 	return projects, nil
 }

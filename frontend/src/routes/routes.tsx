@@ -6,6 +6,7 @@ import { ProjectsView } from '../views/ProjectsView'
 import { StageList } from '../views/StageList'
 import { StageView } from '../views/StageView'
 import { BugsView } from '../views/BugsView'
+import { MembersView } from '../views/MembersView'
 import { NotFoundView } from '../views/NotFoundView'
 import { ComponentsDemoView } from '../views/ComponentsDemoView'
 import { RequireAuth } from '../shell/RequireAuth'
@@ -25,6 +26,7 @@ export const routes: RouteObject[] = [
     { path: '/projects/:projectId', element: <ProjectLayout />, children: [
       { index: true, element: <StageList /> },
       { path: 'bugs', element: <BugsView /> },
+      { path: 'members', element: <MembersView /> },
       { path: 'stages/:stageId', element: <StageView /> },
     ] },
     { path: '/cuenta', element: <AccountView /> },

@@ -16,12 +16,12 @@ import (
 )
 
 type fakeReader struct {
-	projects []domain.Project
+	projects []domain.MemberProject
 	users    []uuid.UUID
 	roles    []domain.Role
 }
 
-func (r *fakeReader) List(_ context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.Project, error) {
+func (r *fakeReader) List(_ context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.MemberProject, error) {
 	r.users = append(r.users, userID)
 	r.roles = roles
 	return r.projects, nil
@@ -30,7 +30,7 @@ func (r *fakeReader) List(_ context.Context, userID uuid.UUID, roles []domain.Ro
 var ana = kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserID: uuid.MustParse("00000000-0000-0000-0000-0000000000a1")}
 
 func TestHandleListsActorProjects(t *testing.T) {
-	reader := &fakeReader{projects: []domain.Project{{Name: "A"}}}
+	reader := &fakeReader{projects: []domain.MemberProject{{Project: domain.Project{Name: "A"}}}}
 
 	items, err := New(reader).Handle(context.Background(), ana)
 
@@ -61,7 +61,7 @@ func TestHandleRolesByChannel(t *testing.T) {
 }
 
 func TestHandleWithoutUserSeesNothing(t *testing.T) {
-	reader := &fakeReader{projects: []domain.Project{{Name: "A"}}}
+	reader := &fakeReader{projects: []domain.MemberProject{{Project: domain.Project{Name: "A"}}}}
 
 	items, err := New(reader).Handle(context.Background(), kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL})
 
@@ -83,15 +83,31 @@ func TestRESTReturnsEmptyArray(t *testing.T) {
 	}
 }
 
+func TestRESTIncludesRole(t *testing.T) {
+	mux := http.NewServeMux()
+	New(&fakeReader{projects: []domain.MemberProject{{Project: domain.Project{Name: "A"}, Role: domain.RoleEditor}}}).Register(mux)
+	rec := httptest.NewRecorder()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/projects", nil)
+	mux.ServeHTTP(rec, req.WithContext(rest.WithActor(req.Context(), ana)))
+
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"role":"editor"`) {
+		t.Errorf("status = %d, cuerpo = %s", rec.Code, rec.Body)
+	}
+}
+
 func TestHandleReturnsProjects(t *testing.T) {
-	reader := &fakeReader{projects: []domain.Project{{Name: "A"}, {Name: "B", Status: domain.StatusInDev, ProductVersion: "1.0.0"}}}
+	reader := &fakeReader{projects: []domain.MemberProject{
+		{Project: domain.Project{Name: "A"}, Role: domain.RoleOwner},
+		{Project: domain.Project{Name: "B", Status: domain.StatusInDev, ProductVersion: "1.0.0"}, Role: domain.RoleViewer},
+	}}
 
 	items, err := New(reader).Handle(context.Background(), ana)
 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 2 || items[1].Name != "B" || items[1].Status != domain.StatusInDev || items[1].ProductVersion != "1.0.0" {
+	if len(items) != 2 || items[1].Name != "B" || items[1].Status != domain.StatusInDev || items[1].ProductVersion != "1.0.0" || items[0].Role != domain.RoleOwner || items[1].Role != domain.RoleViewer {
 		t.Errorf("items = %+v", items)
 	}
 }

@@ -180,7 +180,7 @@ La comprobación vive en un solo lugar, `internal/app/membership.go`, y corre an
 
 **Quién puede trabajar.** `assign_stage_lead`, `add_stage_member` y `assign_task` preguntan a `projects.Workers` (slice `projects/queries/checkworker`) si el nombre es un usuario activo; si lo es y no es owner ni editor del proyecto de la etapa, responde `conflict`. Si no es usuario, siguen validándolo como agente. El proyecto de la tarea llega en `kernel.Team.ProjectID`.
 
-`list_projects` filtra en su consulta por miembro y por los roles que alcanzan con la credencial; `create_project` e `import_project` dejan al actor como owner en la misma sentencia o transacción. Al arrancar, después de crear al dueño, `projects.AdoptOrphans` lo deja como owner de los proyectos sin owner: los que existían cuando la migración `00027` no encontró usuarios.
+`list_projects` filtra en su consulta por miembro y por los roles que alcanzan con la credencial, y devuelve en cada proyecto `role`, el rol de quien consulta; `GET /api/projects/{id}` también lo trae (`projects.Members.Member`; sin usuario en el actor, como en las comprobaciones internas de otras features, queda vacío y se omite). Es lo que usa el frontend para mostrar el rol y ocultar al editor y al viewer las acciones del owner; `create_project` e `import_project` dejan al actor como owner en la misma sentencia o transacción. Al arrancar, después de crear al dueño, `projects.AdoptOrphans` lo deja como owner de los proyectos sin owner: los que existían cuando la migración `00027` no encontró usuarios.
 
 Un ID que no es UUID no se revisa: el handler lo rechaza como inválido.
 
@@ -286,7 +286,6 @@ Para no buscarlo:
 - **Filtrado de herramientas MCP por perfil:** todos reciben las 66.
 - **`idempotency_key`:** un reintento repite la operación.
 - **Envío de correos:** el dueño copia el enlace de invitación y lo manda él.
-- **Pantallas de miembros y bloqueos:** fase 1e del [plan](plan_produccion.md). El frontend ignora `taken_by` por ahora.
 - **Tomar o reasignar a mano** una etapa o un bug: el owner solo los libera.
 - **Transferir el owner** de un proyecto.
 - **Multi-tenencia:** una sola organización.

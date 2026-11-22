@@ -16,7 +16,7 @@ WHERE id = $1;
 
 -- name: ListProjects :many
 -- Los proyectos del usuario en los que tiene uno de los roles dados.
-SELECT p.* FROM projects p
+SELECT p.*, m.role FROM projects p
 JOIN project_members m ON m.project_id = p.id AND m.user_id = @user_id
 WHERE m.role = ANY(@roles::text[])
 ORDER BY p.created_at DESC, p.id;

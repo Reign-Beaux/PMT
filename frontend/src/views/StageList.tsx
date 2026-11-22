@@ -10,6 +10,7 @@ import { Avatar } from '../components/avatar/Avatar'
 import { Filters } from '../components/Filters'
 import { Empty } from '../components/feedback'
 import { Icon } from '../components/Icon'
+import { TakenBy } from '../components/members/TakenBy'
 import s from '../styles/App.module.scss'
 
 export function StageList() {
@@ -25,7 +26,7 @@ export function StageList() {
         const percent = stageProgressPercent(numbers)
         return <Link key={stage.id} className={`${s['stage-row']} ${stage.status === 'in_dev' ? s.current : ''}`} to={`/projects/${project.id}/stages/${stage.id}`}>
           <span className={s['stage-number']}>{String(stage.position).padStart(2, '0')}</span>
-          <span className={s['stage-name']}><strong>{stage.name}</strong></span>
+          <span className={s['stage-name']}><strong>{stage.name}</strong><TakenBy hold={stage} kind="stage" compact /></span>
           <Badge label={STAGE_STATUS_LABELS[stage.status]} tone={STAGE_STATUS_TONES[stage.status]} />
           <span className={s.stageLead}><Avatar name={stage.lead} /></span>
           <span className={s['stage-progress']}><span className={s.numbers}><span>{numbers.done}/{stageProgressDenominator(numbers)}</span><span>{percent}%</span></span><span className={`${s.track} ${stage.status === 'in_dev' ? s.purple : ''}`} role="progressbar" aria-label={`Avance de ${stage.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></span></span>

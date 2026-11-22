@@ -68,7 +68,12 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changes
 	deleteProject.Register(mux)
 	deleteProject.RegisterTool(tools)
 
-	get.New(repo).Register(mux)
+	members := store.NewMembers(db)
+
+	get.New(struct {
+		*store.Projects
+		*store.Members
+	}{repo, members}).Register(mux)
 
 	listProjects := list.New(repo)
 	listProjects.Register(mux)
@@ -81,8 +86,6 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changes
 	listVersionChanges := listproductversionchanges.New(versionChanges)
 	listVersionChanges.Register(mux)
 	listVersionChanges.RegisterTool(tools)
-
-	members := store.NewMembers(db)
 
 	listMembers := listmembers.New(members, users)
 	listMembers.Register(mux)
@@ -181,12 +184,16 @@ type Checker struct {
 // NewChecker crea el verificador sobre las queries checkplanning, checkworking, checkstatus y get.
 func NewChecker(db sqlcgen.DBTX) *Checker {
 	repo := store.NewProjects(db)
-	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo), checkStatus: checkstatus.New(repo), get: get.New(repo)}
+	reader := struct {
+		*store.Projects
+		*store.Members
+	}{repo, store.NewMembers(db)}
+	return &Checker{checkPlanning: checkplanning.New(repo), checkWorking: checkworking.New(repo), checkStatus: checkstatus.New(repo), get: get.New(reader)}
 }
 
 // Check devuelve un error de negocio si el proyecto no existe.
 func (c *Checker) Check(ctx context.Context, id uuid.UUID) error {
-	_, err := c.get.Handle(ctx, id)
+	_, err := c.get.Handle(ctx, kernel.Actor{}, id)
 	return err
 }
 

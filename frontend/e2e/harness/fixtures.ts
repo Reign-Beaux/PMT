@@ -13,14 +13,19 @@ export type HarnessTask = { id: string; title: string; stageId: string; status: 
 export type HarnessBug = { id: string; title: string; projectId: string; status: string }
 export type HarnessComment = { id: string; itemKind: string; itemId: string; body: string }
 export type HarnessStatusChange = { id: string }
+/** Usuario extra creado por invitación, con su sesión del navegador. */
+export type HarnessUser = { username: string; name: string; email: string; password: string; storageState: StorageState }
 export type Harness = {
   createProject: (options?: { status?: string; productVersion?: string }) => HarnessProject
-  createStage: (projectId: string, options: { position: number; status?: string }) => HarnessStage
+  /** takenBy: username de quien la tiene tomada (bloqueo de la fase 1d). */
+  createStage: (projectId: string, options: { position: number; status?: string; takenBy?: string }) => HarnessStage
   createTask: (stageId: string, options: { status: string }) => HarnessTask
   createBug: (
     projectId: string,
-    options: { status: string; productVersion?: string },
+    options: { status: string; productVersion?: string; takenBy?: string },
   ) => HarnessBug
+  /** Segundo usuario: el dueño lo invita y él acepta por la API, como en la app. */
+  createUser: (label: string) => Promise<HarnessUser>
   createComment: (itemKind: 'task' | 'bug', itemId: string, body: string) => HarnessComment
   createTaskStatusChange: (
     taskId: string,
@@ -50,10 +55,19 @@ function ownedByTestOwner(projectId: string): string {
 
 type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>
 
+// Columnas del bloqueo para quien tiene ese username; sin él, nadie.
+function holdColumns(takenBy: string | undefined): { cols: string; values: string } {
+  if (takenBy === undefined) return { cols: '', values: '' }
+  return {
+    cols: ', taken_by, taken_by_name, taken_at',
+    values: `, (select id from users where username = '${takenBy}'), '${takenBy}', now()`,
+  }
+}
+
 // Abre sesión con el dueño de pruebas; sin ella la API responde 401.
-async function login(ctx: APIRequestContext, baseURL: string) {
+async function login(ctx: APIRequestContext, baseURL: string, who: { email: string; password: string } = TEST_OWNER) {
   const res = await ctx.post(`${baseURL}/api/auth/login`, {
-    data: { email: TEST_OWNER.email, password: TEST_OWNER.password },
+    data: { email: who.email, password: who.password },
   })
   if (!res.ok()) {
     throw new Error(`No se pudo entrar con el dueño de pruebas (${res.status()}): ${await res.text()}`)
@@ -108,8 +122,9 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
     { scope: 'worker', auto: true },
   ],
 
-  harness: async ({ harnessTarget }, provide, testInfo) => {
+  harness: async ({ harnessTarget, playwright }, provide, testInfo) => {
     void harnessTarget // ordena el centinela antes que los datos de la prueba
+    const usuarios: HarnessUser[] = []
     const creados: HarnessProject[] = []
     const etapas: HarnessStage[] = []
     const tareas: HarnessTask[] = []
@@ -140,8 +155,9 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
             name: `e2e-${RUN_ID}-etapa-${etapas.length + 1}`,
           }
           const status = options.status ?? 'planning'
+          const hold = holdColumns(options.takenBy)
           psql(
-            `insert into stages (id, project_id, name, position, status) values ('${stage.id}', '${projectId}', '${stage.name}', ${stage.position}, '${status}')`,
+            `insert into stages (id, project_id, name, position, status${hold.cols}) values ('${stage.id}', '${projectId}', '${stage.name}', ${stage.position}, '${status}'${hold.values})`,
           )
           etapas.push(stage)
           return stage
@@ -167,11 +183,44 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
             title: `e2e-${RUN_ID}-bug-${bugs.length + 1}`,
           }
           const version = options.productVersion ?? '1.0.0'
+          const hold = holdColumns(options.takenBy)
           psql(
-            `insert into bugs (id, project_id, title, description, steps_to_reproduce, product_version, status) values ('${bug.id}', '${projectId}', '${bug.title}', 'descripcion del bug', 'pasos para reproducir', '${version}', '${bug.status}')`,
+            `insert into bugs (id, project_id, title, description, steps_to_reproduce, product_version, status${hold.cols}) values ('${bug.id}', '${projectId}', '${bug.title}', 'descripcion del bug', 'pasos para reproducir', '${version}', '${bug.status}'${hold.values})`,
           )
           bugs.push(bug)
           return bug
+        },
+        async createUser(label) {
+          const username = `e2e-${RUN_ID}-${label}`
+          const user = {
+            username,
+            name: `Prueba ${label}`,
+            email: `${username}@pmt.test`,
+            password: crypto.randomBytes(12).toString('hex'),
+          }
+          const owner = await playwright.request.newContext()
+          let token = ''
+          try {
+            await login(owner, 'http://localhost:5173')
+            const res = await owner.post('http://localhost:5173/api/invitations', { data: { email: user.email } })
+            if (!res.ok()) throw new Error(`No se pudo invitar a ${username} (${res.status()})`)
+            const url: string = (await res.json()).url
+            token = url.slice(url.lastIndexOf('/') + 1)
+          } finally {
+            await owner.dispose()
+          }
+          const ctx = await playwright.request.newContext()
+          try {
+            const res = await ctx.post(`http://localhost:5173/api/invitations/${token}/accept`, {
+              data: { name: user.name, username, password: user.password },
+            })
+            if (!res.ok()) throw new Error(`No se pudo aceptar la invitación de ${username} (${res.status()})`)
+            const created: HarnessUser = { ...user, storageState: await ctx.storageState() }
+            usuarios.push(created)
+            return created
+          } finally {
+            await ctx.dispose()
+          }
         },
         createComment(itemKind, itemId, body) {
           const comment: HarnessComment = { id: crypto.randomUUID(), itemKind, itemId, body }
@@ -201,9 +250,12 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
     } finally {
       // comments, task_status_changes y bug_status_changes son inmutables: el
       // trigger se desactiva solo durante el borrado y se reactiva al cerrar.
-      if (comentarios.length + cambiosTarea.length + cambiosBug.length > 0) {
+      // Liberar escribe un registro de status sin llave foránea: se borran los
+      // de las etapas y bugs de esta ejecución junto con los del harness.
+      const conHistorial = etapas.length + bugs.length > 0
+      if (comentarios.length + cambiosTarea.length + cambiosBug.length > 0 || conHistorial) {
         const ids = (filas: { id: string }[]) => filas.map((f) => `'${f.id}'`).join(', ')
-        const tablas = ['comments', 'task_status_changes', 'bug_status_changes']
+        const tablas = ['comments', 'task_status_changes', 'bug_status_changes', 'stage_status_changes']
         const desactivar = tablas.map(
           (t) => `ALTER TABLE ${t} DISABLE TRIGGER ${t}_immutable;`,
         ).join('\n')
@@ -217,6 +269,12 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
             : '',
           cambiosBug.length > 0
             ? `DELETE FROM bug_status_changes WHERE id IN (${ids(cambiosBug)});`
+            : '',
+          etapas.length > 0
+            ? `DELETE FROM stage_status_changes WHERE stage_id IN (${ids(etapas)});`
+            : '',
+          bugs.length > 0
+            ? `DELETE FROM bug_status_changes WHERE bug_id IN (${ids(bugs)});`
             : '',
         ].filter(Boolean).join('\n')
         psql(`BEGIN;\n${desactivar}\n${borrados}\n${activar}\nCOMMIT;`)
@@ -233,6 +291,10 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
       }
       for (const project of creados) {
         psql(`delete from projects where id = '${project.id}'`)
+      }
+      // Sesiones, tokens y membresías caen en cascada con el usuario.
+      for (const user of usuarios) {
+        psql(`delete from invitations where email = '${user.email}'; delete from users where username = '${user.username}'`)
       }
       // El centinela sigue vivo hasta el teardown del worker: se excluye del conteo.
       const filtro = sentinelId === '' ? '' : ` and id <> '${sentinelId}'`
@@ -256,14 +318,17 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
           (select count(*) from task_status_changes where actor_name like 'e2e-${RUN_ID}-%')
           + (select count(*) from bug_status_changes where actor_name like 'e2e-${RUN_ID}-%')`),
       )
+      const restoUsuarios = Number(
+        psql(`select (select count(*) from users where username like 'e2e-${RUN_ID}-%') + (select count(*) from invitations where email like 'e2e-${RUN_ID}-%')`),
+      )
       const restantes =
-        restoProjects + restoStages + restoTasks + restoBugs + restoComments + restoCambios
+        restoProjects + restoStages + restoTasks + restoBugs + restoComments + restoCambios + restoUsuarios
       if (restantes !== 0) {
         // Intencional: el teardown debe fallar la prueba si la limpieza queda
         // incompleta, aunque eso reemplace el error original del test.
         // eslint-disable-next-line no-unsafe-finally
         throw new Error(
-          `Limpieza incompleta: quedan ${restoProjects} projects, ${restoStages} stages, ${restoTasks} tasks, ${restoBugs} bugs, ${restoComments} comments y ${restoCambios} cambios e2e-${RUN_ID}-… en pmt_frontend_test`,
+          `Limpieza incompleta: quedan ${restoProjects} projects, ${restoStages} stages, ${restoTasks} tasks, ${restoBugs} bugs, ${restoComments} comments, ${restoCambios} cambios y ${restoUsuarios} usuarios o invitaciones e2e-${RUN_ID}-… en pmt_frontend_test`,
         )
       }
       const linea = `${TARGET_LINE} · creados ${creados.length} · restantes 0`
