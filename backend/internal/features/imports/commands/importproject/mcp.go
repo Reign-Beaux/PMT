@@ -2,16 +2,13 @@ package importproject
 
 import (
 	"context"
-	"path/filepath"
-
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"pmt/internal/kernel"
 	platformmcp "pmt/internal/platform/mcp"
 )
 
 type toolInput struct {
-	Path string `json:"path" jsonschema:"Ruta absoluta del fichero YAML, en la máquina donde corre pmt-server"`
+	Content string `json:"content" jsonschema:"Texto completo del YAML con raíz project, hasta 1 MiB"`
 }
 
 type toolOutput struct {
@@ -25,16 +22,12 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "import_project",
-		Description: "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Solo PP y el usuario. Quien importa queda como owner del proyecto; con un token de agente, el dueño de la instancia. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
+		Description: "Crea un proyecto nuevo con todas sus etapas y tareas desde el texto de un YAML, que se pasa en content (no una ruta). Solo PP y el usuario. Quien importa queda como owner del proyecto; con un token de agente, el dueño de la instancia. Es todo o nada: si el YAML tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo YAML crea dos proyectos.",
 	}, h.callTool)
 }
 
 func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input toolInput) (*sdk.CallToolResult, toolOutput, error) {
-	if !filepath.IsAbs(input.Path) {
-		return nil, toolOutput{}, platformmcp.ToolError(kernel.Invalid("path debe ser una ruta absoluta"))
-	}
-
-	result, err := h.Handle(ctx, Command{Path: input.Path, Actor: platformmcp.ActorFrom(req)})
+	result, err := h.Handle(ctx, Command{Content: input.Content, Actor: platformmcp.ActorFrom(req)})
 	if err != nil {
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}

@@ -42,7 +42,7 @@ func TestToolImportsStagesInWorking(t *testing.T) {
 	repo := &fakeRepo{status: projects.StatusWorking}
 
 	result := call(t, repo, map[string]any{
-		"project_id": uuid.New().String(), "path": writeFile(t, validFile), "reason": "Petición", "requested_by": "PM",
+		"project_id": uuid.New().String(), "content": validFile, "reason": "Petición", "requested_by": "PM",
 	})
 
 	if result.IsError {
@@ -67,7 +67,7 @@ func TestToolImportsStagesInPlanningWithoutReason(t *testing.T) {
 	repo := &fakeRepo{status: projects.StatusPlanning}
 
 	result := call(t, repo, map[string]any{
-		"project_id": uuid.New().String(), "path": writeFile(t, validFile),
+		"project_id": uuid.New().String(), "content": validFile,
 	})
 
 	if result.IsError {
@@ -89,16 +89,16 @@ func TestToolRejectsInvalidInput(t *testing.T) {
 	tests := []struct {
 		name      string
 		projectID string
-		path      string
+		content   string
 		want      string
 	}{
-		{"project_id", "x", "/tmp/a.yaml", "project_id inválido"},
-		{"ruta relativa", uuid.New().String(), "a.yaml", "ruta absoluta"},
+		{"project_id", "x", validFile, "project_id inválido"},
+		{"content vacío", uuid.New().String(), "", "el YAML está vacío"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := call(t, &fakeRepo{status: projects.StatusWorking}, map[string]any{
-				"project_id": tt.projectID, "path": tt.path, "reason": "M", "requested_by": "PM",
+				"project_id": tt.projectID, "content": tt.content, "reason": "M", "requested_by": "PM",
 			})
 
 			text := result.Content[0].(*sdk.TextContent).Text
@@ -106,5 +106,15 @@ func TestToolRejectsInvalidInput(t *testing.T) {
 				t.Errorf("resultado = %q", text)
 			}
 		})
+	}
+}
+
+func TestToolRejectsPathArgument(t *testing.T) {
+	repo := &fakeRepo{status: projects.StatusPlanning}
+
+	result := call(t, repo, map[string]any{"project_id": uuid.New().String(), "path": "/tmp/etapas.yaml"})
+
+	if !result.IsError || len(repo.saved) != 0 {
+		t.Errorf("resultado = %+v", result)
 	}
 }

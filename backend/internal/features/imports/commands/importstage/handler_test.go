@@ -3,8 +3,6 @@ package importstage
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -54,18 +52,9 @@ func (r *fakeRepo) SaveStages(_ context.Context, projectID uuid.UUID, plans []do
 	return nil
 }
 
-func writeFile(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "etapas.yaml")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
 func command(t *testing.T, content string) Command {
 	t.Helper()
-	return Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ProjectID: uuid.New(), Path: writeFile(t, content)}
+	return Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, ProjectID: uuid.New(), Content: content}
 }
 
 func TestHandlePlanningCreatesPlainStages(t *testing.T) {
@@ -187,7 +176,7 @@ func TestHandleRejectsInvalidFile(t *testing.T) {
 		{"sin etapas", "stages: []\n", "el fichero no tiene etapas"},
 		{"etapa 2 sin descripción", "stages:\n  - name: A\n    description: B\n  - name: C\n", "etapa 2: la descripción es obligatoria"},
 		{"tarea sin título", "stages:\n  - name: A\n    description: B\n    tasks:\n      - description: C\n", "etapa 1, tarea 1: el título de la tarea es obligatorio"},
-		{"vacío", "", "el fichero está vacío"},
+		{"vacío", "", "el YAML está vacío"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -231,13 +220,15 @@ func TestHandleReturnsRepositoryError(t *testing.T) {
 	}
 }
 
-func TestHandleReportsUnreadableFile(t *testing.T) {
-	cmd := command(t, validFile)
-	cmd.Path += ".falta"
+func TestHandleRejectsEmptyContent(t *testing.T) {
+	repo := &fakeRepo{status: projects.StatusPlanning}
 
-	_, err := New(&fakeRepo{status: projects.StatusPlanning}).Handle(context.Background(), cmd)
+	_, err := New(repo).Handle(context.Background(), command(t, ""))
 
-	if err == nil || !strings.HasPrefix(err.Error(), "no se pudo leer el fichero") {
+	if err == nil || !strings.HasPrefix(err.Error(), "el YAML está vacío") {
 		t.Errorf("err = %v", err)
+	}
+	if len(repo.saved) != 0 {
+		t.Errorf("guardadas = %d", len(repo.saved))
 	}
 }

@@ -1,11 +1,13 @@
 package file
 
 import (
-	"os"
-	"path/filepath"
+	"errors"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"pmt/internal/kernel"
 )
 
 func TestYAMLKeepsCommentInValueNode(t *testing.T) {
@@ -21,15 +23,6 @@ func TestYAMLKeepsCommentInValueNode(t *testing.T) {
 	}
 }
 
-func writeTemp(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "etapas.yaml")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
 func TestReadStagesOneStage(t *testing.T) {
 	content := `
 stages:
@@ -41,7 +34,7 @@ stages:
       - title: "Cobrar"
         description: "Con tarjeta."
 `
-	entries, err := ReadStages(writeTemp(t, content))
+	entries, err := ParseStages(content)
 
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +68,7 @@ stages:
       - title: "T3"
         description: "D3"
 `
-	entries, err := ReadStages(writeTemp(t, content))
+	entries, err := ParseStages(content)
 
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +104,7 @@ func TestReadStagesRejectsInvalidFiles(t *testing.T) {
 		},
 		{"stages vacía", "stages: []\n", "el fichero no tiene etapas"},
 		{"stages nula", "stages:\n", "el fichero no tiene etapas"},
-		{"fichero vacío", "", "el fichero está vacío"},
+		{"fichero vacío", "", "el YAML está vacío"},
 		{
 			"etapa 2 sin descripción",
 			"stages:\n  - name: A\n    description: B\n  - name: C\n",
@@ -161,7 +154,7 @@ func TestReadStagesRejectsInvalidFiles(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ReadStages(writeTemp(t, tt.content))
+			_, err := ParseStages(tt.content)
 
 			if err == nil || err.Error() != tt.want {
 				t.Errorf("err = %v, se esperaba %q", err, tt.want)
@@ -179,7 +172,7 @@ stages:
       - title: "Tarea 1"
         description: *desc
 `
-	entries, err := ReadStages(writeTemp(t, content))
+	entries, err := ParseStages(content)
 
 	if err != nil {
 		t.Fatal(err)
@@ -193,10 +186,47 @@ stages:
 	}
 }
 
-func TestReadStagesReportsUnreadableFile(t *testing.T) {
-	_, err := ReadStages(filepath.Join(t.TempDir(), "falta.yaml"))
+func TestParseRejectsEmptyContent(t *testing.T) {
+	for _, content := range []string{"", "   \n\t\n", "# solo un comentario\n"} {
+		_, projectErr := ParseProject(content)
+		_, stagesErr := ParseStages(content)
 
-	if err == nil || err.Error() == "" {
-		t.Errorf("err = %v", err)
+		for _, err := range []error{projectErr, stagesErr} {
+			assertInvalid(t, err, "el YAML está vacío")
+		}
+	}
+}
+
+func TestParseRejectsContentOverLimit(t *testing.T) {
+	head := "stages:\n  - name: \"A\"\n    description: |\n"
+	content := head + strings.Repeat("      texto de relleno\n", MaxContentBytes/20)
+
+	_, stagesErr := ParseStages(content)
+	_, projectErr := ParseProject(content)
+
+	for _, err := range []error{stagesErr, projectErr} {
+		assertInvalid(t, err, "el tope es 1 MiB")
+	}
+}
+
+func TestParseAcceptsContentAtLimit(t *testing.T) {
+	head := "stages:\n  - name: \"A\"\n    description: \"B\"\n"
+	content := head + strings.Repeat("#", MaxContentBytes-len(head))
+
+	entries, err := ParseStages(content)
+
+	if err != nil || len(entries) != 1 {
+		t.Errorf("etapas = %+v, err = %v", entries, err)
+	}
+}
+
+func assertInvalid(t *testing.T, err error, want string) {
+	t.Helper()
+	var businessErr *kernel.Error
+	if !errors.As(err, &businessErr) || businessErr.Kind != kernel.KindInvalid {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %q, se esperaba %q", err, want)
 	}
 }

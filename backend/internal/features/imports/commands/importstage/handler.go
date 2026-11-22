@@ -1,5 +1,5 @@
-// Package importstage crea una o varias etapas con sus tareas desde un fichero
-// YAML con raíz stages, en un proyecto en planning o en working.
+// Package importstage crea una o varias etapas con sus tareas desde un YAML
+// recibido como texto, con raíz stages, en un proyecto en planning o en working.
 package importstage
 
 import (
@@ -25,7 +25,7 @@ type Repository interface {
 // un proyecto en working.
 type Command struct {
 	ProjectID   uuid.UUID
-	Path        string
+	Content     string
 	Reason      string
 	RequestedBy string
 
@@ -60,7 +60,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureCanImport(cmd.Actor); err != nil {
 		return Result{}, err
 	}
-	entries, err := file.ReadStages(cmd.Path)
+	entries, err := file.ParseStages(cmd.Content)
 	if err != nil {
 		return Result{}, err
 	}

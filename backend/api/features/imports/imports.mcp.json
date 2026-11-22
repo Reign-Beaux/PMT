@@ -1,16 +1,16 @@
 [
   {
-    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Solo PP y el usuario. Quien importa queda como owner del proyecto; con un token de agente, el dueño de la instancia. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
+    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde el texto de un YAML, que se pasa en content (no una ruta). Solo PP y el usuario. Quien importa queda como owner del proyecto; con un token de agente, el dueño de la instancia. Es todo o nada: si el YAML tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo YAML crea dos proyectos.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "path": {
-          "description": "Ruta absoluta del fichero YAML, en la máquina donde corre pmt-server",
+        "content": {
+          "description": "Texto completo del YAML con raíz project, hasta 1 MiB",
           "type": "string"
         }
       },
       "required": [
-        "path"
+        "content"
       ],
       "type": "object"
     },
@@ -41,12 +41,12 @@
     }
   },
   {
-    "description": "Crea una o varias etapas con sus tareas desde un fichero YAML con raíz stages, en un proyecto en planning o en working. Solo PP y el usuario. En planning las crea como con create_stage y en working en su planning propio, como con add_stage, con reason y requested_by obligatorios. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo fichero crea las etapas dos veces.",
+    "description": "Crea una o varias etapas con sus tareas desde el texto de un YAML con raíz stages, que se pasa en content (no una ruta), en un proyecto en planning o en working. Solo PP y el usuario. En planning las crea como con create_stage y en working en su planning propio, como con add_stage, con reason y requested_by obligatorios. Es todo o nada: si el YAML tiene un error, no se crea nada y el mensaje indica su ubicación. Importar dos veces el mismo YAML crea las etapas dos veces.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "path": {
-          "description": "Ruta absoluta del fichero YAML, en la máquina donde corre pmt-server",
+        "content": {
+          "description": "Texto completo del YAML con raíz stages, hasta 1 MiB",
           "type": "string"
         },
         "project_id": {
@@ -64,7 +64,7 @@
       },
       "required": [
         "project_id",
-        "path"
+        "content"
       ],
       "type": "object"
     },

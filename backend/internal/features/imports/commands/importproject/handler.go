@@ -1,4 +1,4 @@
-// Package importproject crea un proyecto completo desde un fichero YAML.
+// Package importproject crea un proyecto completo desde un YAML recibido como texto.
 package importproject
 
 import (
@@ -21,7 +21,7 @@ type Repository interface {
 
 // Command contiene los datos de entrada.
 type Command struct {
-	Path string
+	Content string
 
 	Actor kernel.Actor
 }
@@ -54,7 +54,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	entry, err := file.ReadProject(cmd.Path)
+	entry, err := file.ParseProject(cmd.Content)
 	if err != nil {
 		return Result{}, err
 	}

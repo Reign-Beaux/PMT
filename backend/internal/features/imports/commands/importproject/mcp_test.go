@@ -11,7 +11,14 @@ import (
 	platformmcp "pmt/internal/platform/mcp"
 )
 
-func call(t *testing.T, repo Repository, path string) *sdk.CallToolResult {
+func call(t *testing.T, repo Repository, content string) *sdk.CallToolResult {
+	t.Helper()
+	return callWith(t, repo, map[string]any{"content": content})
+}
+
+// callWith llama a la herramienta con argumentos libres. Un argumento que el
+// esquema rechaza vuelve como resultado con IsError.
+func callWith(t *testing.T, repo Repository, args map[string]any) *sdk.CallToolResult {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
@@ -29,7 +36,7 @@ func call(t *testing.T, repo Repository, path string) *sdk.CallToolResult {
 	}
 	t.Cleanup(func() { session.Close() })
 
-	result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "import_project", Arguments: map[string]any{"path": path}})
+	result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "import_project", Arguments: args})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +46,7 @@ func call(t *testing.T, repo Repository, path string) *sdk.CallToolResult {
 func TestToolImportsProject(t *testing.T) {
 	repo := &fakeRepo{}
 
-	result := call(t, repo, writeFile(t, validFile))
+	result := call(t, repo, validFile)
 
 	if result.IsError {
 		t.Fatalf("resultado = %+v", result)
@@ -56,19 +63,30 @@ func TestToolImportsProject(t *testing.T) {
 	}
 }
 
-func TestToolRejectsRelativePath(t *testing.T) {
-	result := call(t, &fakeRepo{}, "proyecto.yaml")
+func TestToolRejectsPathArgument(t *testing.T) {
+	repo := &fakeRepo{}
+
+	result := callWith(t, repo, map[string]any{"path": "/tmp/proyecto.yaml"})
 
 	text := result.Content[0].(*sdk.TextContent).Text
-	if !result.IsError || !strings.Contains(text, "ruta absoluta") {
+	if !result.IsError || len(repo.saved) != 0 {
+		t.Errorf("resultado = %q", text)
+	}
+}
+
+func TestToolRejectsEmptyContent(t *testing.T) {
+	result := call(t, &fakeRepo{}, "")
+
+	text := result.Content[0].(*sdk.TextContent).Text
+	if !result.IsError || !strings.Contains(text, "el YAML está vacío") {
 		t.Errorf("resultado = %q", text)
 	}
 }
 
 func TestToolReportsErrorLocation(t *testing.T) {
-	path := writeFile(t, "project:\n  name: A\n  description: B\n  stages:\n    - name: C\n")
+	content := "project:\n  name: A\n  description: B\n  stages:\n    - name: C\n"
 
-	result := call(t, &fakeRepo{}, path)
+	result := call(t, &fakeRepo{}, content)
 
 	text := result.Content[0].(*sdk.TextContent).Text
 	if !result.IsError || !strings.Contains(text, "etapa 1: la descripción es obligatoria") {

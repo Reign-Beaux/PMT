@@ -1,13 +1,15 @@
 # Importar proyectos y etapas
 
-La herramienta MCP `import_project` crea un proyecto nuevo con todas sus etapas y tareas a partir de un fichero YAML. Sustituye las llamadas una por una a `create_project`, `create_stage` y `create_task`. La herramienta MCP `import_stage` agrega una o varias etapas a un proyecto existente; ver [Importar etapas](#importar-etapas).
+La herramienta MCP `import_project` crea un proyecto nuevo con todas sus etapas y tareas a partir del texto de un YAML. Sustituye las llamadas una por una a `create_project`, `create_stage` y `create_task`. La herramienta MCP `import_stage` agrega una o varias etapas a un proyecto existente; ver [Importar etapas](#importar-etapas).
 
 ## Flujo de uso
 
 1. El usuario platica el proyecto con PP.
-2. PP escribe el fichero YAML en la ubicación que indique el usuario.
+2. PP escribe el YAML en un archivo del proyecto, en la ubicación que indique el usuario. Queda como respaldo de lo planeado.
 3. El usuario lo revisa.
-4. PP llama a `import_project` con la ruta absoluta.
+4. PP llama a `import_project` con el contenido de ese archivo en `content`.
+
+El servidor no lee archivos: en producción corre en otra máquina y no ve el proyecto de quien importa.
 
 ## Formato
 
@@ -29,8 +31,8 @@ project:
       tasks: []
 ```
 
-- El fichero contiene un solo documento YAML.
-- El orden del fichero es el orden de las etapas y de las tareas.
+- El YAML contiene un solo documento.
+- El orden del YAML es el orden de las etapas y de las tareas.
 - `name` o `title` y `description` son obligatorios y no pueden estar vacíos en los tres niveles.
 - `stages` y `tasks` pueden faltar o ser listas vacías.
 - No hay campos de status ni de versión: el proyecto y las etapas nacen en `planning`, las tareas en `backlog` y `product_version` vacía.
@@ -56,16 +58,16 @@ Un comentario junto a `name`, `title` o `description` se rechaza, porque YAML lo
 
 | Aspecto | Regla |
 | --- | --- |
-| Entrada | `path`, ruta absoluta. La lee `pmt-server`, en la máquina donde corre. |
-| Alcance | Solo crea proyectos nuevos. Importar dos veces el mismo fichero crea dos proyectos. |
-| Atomicidad | Valida el fichero completo y guarda en una sola transacción. Si algo falla, no se crea nada y el fichero se puede corregir y volver a cargar. |
+| Entrada | `content`, el texto completo del YAML, hasta 1 MiB (1 048 576 bytes). Vacío o de solo espacios o comentarios responde `el YAML está vacío`; si pasa el tope, `el YAML pesa N bytes y el tope es 1 MiB (1048576 bytes)`. Ya no hay `path`: pasarlo es un error. |
+| Alcance | Solo crea proyectos nuevos. Importar dos veces el mismo YAML crea dos proyectos. |
+| Atomicidad | Valida el YAML completo y guarda en una sola transacción. Si algo falla, no se crea nada y el YAML se puede corregir y volver a cargar. |
 | Salida | `project_id`, `project_name`, `stage_count` y `task_count`. |
 | Interfaz | Solo MCP, sin ruta REST. |
 | Permisos | Solo PP y el usuario. |
 
 ## Importar etapas
 
-La herramienta MCP `import_stage` crea una o varias etapas con sus tareas, desde un fichero con raíz `stages`, en un proyecto en `planning` o en `working`. En `planning` crea etapas normales, como `create_stage`; en `working` las crea en su planning propio, como `add_stage`: sus tareas no generan registros y su registro `add` se escribe al salir de `planning`. A diferencia de `import_project`, que crea un proyecto nuevo, `import_stage` agrega etapas a uno existente.
+La herramienta MCP `import_stage` crea una o varias etapas con sus tareas, desde un YAML con raíz `stages`, en un proyecto en `planning` o en `working`. En `planning` crea etapas normales, como `create_stage`; en `working` las crea en su planning propio, como `add_stage`: sus tareas no generan registros y su registro `add` se escribe al salir de `planning`. A diferencia de `import_project`, que crea un proyecto nuevo, `import_stage` agrega etapas a uno existente.
 
 ```yaml
 stages:
@@ -85,18 +87,18 @@ stages:
 
 | Aspecto | Regla |
 | --- | --- |
-| Entrada | `project_id` y `path`. `reason` y `requested_by` son obligatorios solo en `working`; en `planning` se ignoran. |
+| Entrada | `project_id` y `content`, con el mismo tope y los mismos errores de vacío y tamaño que `import_project`. `reason` y `requested_by` son obligatorios solo en `working`; en `planning` se ignoran. |
 | Proyecto | Debe estar en `planning` o en `working`; si no, responde `el proyecto debe estar en planning o en working`. |
-| Atomicidad | Valida el fichero completo y guarda en una sola transacción. Si algo falla, no se crea nada. Importar dos veces crea las etapas dos veces. |
-| Salida | `project_id` y `stages`: una lista con `stage_id`, `stage_name` y `task_count` por etapa, en el orden del fichero. |
+| Atomicidad | Valida el YAML completo y guarda en una sola transacción. Si algo falla, no se crea nada. Importar dos veces crea las etapas dos veces. |
+| Salida | `project_id` y `stages`: una lista con `stage_id`, `stage_name` y `task_count` por etapa, en el orden del YAML. |
 | Interfaz | Solo MCP, sin ruta REST. |
 | Permisos | Solo PP y el usuario. |
 
-En `working`, un `reason` ausente o de solo espacios responde `el motivo del cambio es obligatorio`, y lo mismo `requested_by` con `quién pidió el cambio es obligatorio`. Los errores del fichero indican su ubicación como `etapa 2: ...` y `etapa 2, tarea 3: ...`, con números desde 1.
+En `working`, un `reason` ausente o de solo espacios responde `el motivo del cambio es obligatorio`, y lo mismo `requested_by` con `quién pidió el cambio es obligatorio`. Los errores del YAML indican su ubicación como `etapa 2: ...` y `etapa 2, tarea 3: ...`, con números desde 1.
 
 ## Errores
 
-Los errores del fichero son `kernel.Invalid` e indican su ubicación:
+Los errores del YAML son `kernel.Invalid` e indican su ubicación:
 
 | Caso | Ejemplo |
 | --- | --- |
@@ -109,6 +111,9 @@ Los errores del fichero son `kernel.Invalid` e indican su ubicación:
 | Tabulador o carácter no válido | `línea 2: el fichero tiene un tabulador o carácter no válido; usa espacios` |
 | Clave desconocida | `línea 4: clave desconocida "nombre"` |
 | Otro error de YAML | `línea 4: el YAML no es válido` |
-| Fichero ilegible | `no se pudo leer el fichero: open /ruta/proyecto.yaml: no such file or directory` |
+| YAML vacío | `el YAML está vacío` |
+| YAML de más de 1 MiB | `el YAML pesa 1200000 bytes y el tope es 1 MiB (1048576 bytes)` |
+
+Algunos mensajes siguen diciendo «el fichero»: se refieren al YAML recibido en `content`.
 
 La línea es la que informa `yaml.v3` y no siempre es la del error. En los casos de indentación y de tabulador puede señalar el inicio del bloque que contiene el problema o la línea anterior, así que hay que revisar desde ahí hacia abajo. Si un error no tiene línea, el mensaje la omite.

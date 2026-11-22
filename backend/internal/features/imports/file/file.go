@@ -1,5 +1,6 @@
-// Package file lee los ficheros YAML de la feature imports. Lo comparten las
-// slices, que no se importan entre sí.
+// Package file revisa el YAML que reciben las herramientas de la feature
+// imports, como texto: el servidor no lee ficheros de su disco. Lo comparten
+// las slices, que no se importan entre sí.
 package file
 
 import (
@@ -7,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 
@@ -20,6 +20,9 @@ import (
 )
 
 const (
+	// MaxContentBytes es el tope de tamaño del YAML: 1 MiB.
+	MaxContentBytes = 1 << 20
+
 	// DescriptionRequired es el mensaje de una descripción vacía.
 	DescriptionRequired = "la descripción es obligatoria"
 
@@ -70,9 +73,9 @@ type stagesFile struct {
 	Stages []Stage `yaml:"stages"`
 }
 
-// ReadProject lee y revisa un fichero con raíz project.
-func ReadProject(path string) (Project, error) {
-	raw, err := read(path)
+// ParseProject revisa un YAML con raíz project.
+func ParseProject(content string) (Project, error) {
+	raw, err := checkContent(content)
 	if err != nil {
 		return Project{}, err
 	}
@@ -86,9 +89,9 @@ func ReadProject(path string) (Project, error) {
 	return parsed.Project, nil
 }
 
-// ReadStages lee y revisa un fichero con raíz stages, una lista de etapas.
-func ReadStages(path string) ([]Stage, error) {
-	raw, err := read(path)
+// ParseStages revisa un YAML con raíz stages, una lista de etapas.
+func ParseStages(content string) ([]Stage, error) {
+	raw, err := checkContent(content)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +170,15 @@ func Located(where, message string) error {
 	return kernel.Invalid(where + ": " + message)
 }
 
-func read(path string) ([]byte, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, kernel.Invalid(fmt.Sprintf("no se pudo leer el fichero: %v", err))
+// checkContent rechaza el contenido vacío o mayor que MaxContentBytes.
+func checkContent(content string) ([]byte, error) {
+	if Blank(content) {
+		return nil, kernel.Invalid("el YAML está vacío")
 	}
-	return raw, nil
+	if len(content) > MaxContentBytes {
+		return nil, kernel.Invalid(fmt.Sprintf("el YAML pesa %d bytes y el tope es 1 MiB (%d bytes)", len(content), MaxContentBytes))
+	}
+	return []byte(content), nil
 }
 
 func decode(raw []byte, target any) error {
@@ -181,7 +187,7 @@ func decode(raw []byte, target any) error {
 
 	if err := decoder.Decode(target); err != nil {
 		if errors.Is(err, io.EOF) {
-			return kernel.Invalid("el fichero está vacío")
+			return kernel.Invalid("el YAML está vacío")
 		}
 		return invalidYAML(err)
 	}
