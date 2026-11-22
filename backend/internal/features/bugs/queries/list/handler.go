@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/bugs/domain"
+	"pmt/internal/kernel"
 )
 
 // Reader es la lectura que necesita la operación.
@@ -33,6 +34,8 @@ type Item struct {
 	ReportedBy       string        `json:"reported_by,omitempty"`
 	CreatedAt        time.Time     `json:"created_at"`
 	UpdatedAt        time.Time     `json:"updated_at"`
+
+	kernel.Hold
 }
 
 // Handler ejecuta la operación.

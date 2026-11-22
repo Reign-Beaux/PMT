@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -30,6 +31,10 @@ import (
 //   solo consulta desde el sitio web, con la cookie.
 // - Un viewer con la cookie que escribe recibe forbidden. Escribe toda
 //   herramienta que no empiece con list_ ni get_, y toda ruta que no sea GET.
+// - Una escritura sobre una etapa tomada por otra persona, o sobre algo suyo
+//   (tareas, planes, hallazgos, comentarios), o sobre un bug tomado por otra
+//   persona, responde conflict con el username de quien la tiene. Solo se salvan
+//   release_stage y release_bug, con las que el owner la libera.
 // - Después, cada operación aplica sus reglas de perfil como siempre.
 
 // Tipos de elemento que resuelve projects.Membership.
@@ -89,10 +94,31 @@ func readOnly(name string) bool {
 	return strings.HasPrefix(name, "list_") || strings.HasPrefix(name, "get_")
 }
 
-// membership da el rol de un usuario en el proyecto de un elemento. La cumple
-// projects.Membership.
+// releases son las herramientas y rutas con las que el owner libera una etapa o
+// un bug tomados: no pueden rechazarse por estar tomados.
+var releases = []string{"release_stage", "release_bug", "POST /api/stages/{id}/release", "POST /api/bugs/{id}/release"}
+
+// takenBy es el conflict de cada tipo de bloqueo, con el username de quien lo tiene.
+var takenBy = map[string]func(username string) error{
+	kindStage: stages.ErrTakenBy,
+	kindBug:   bugs.ErrTakenBy,
+}
+
+// membership da el rol de un usuario en el proyecto de un elemento y quién tiene
+// tomada la etapa o el bug que lo contiene. La cumple projects.Membership.
 type membership interface {
 	RoleOf(ctx context.Context, userID uuid.UUID, kind string, id uuid.UUID) (projects.Role, bool, error)
+	HoldOf(ctx context.Context, kind string, id uuid.UUID) (holderKind string, hold kernel.Hold, err error)
+}
+
+// access es lo que hace una operación: si escribe y si respeta los bloqueos.
+type access struct {
+	write     bool
+	checkHold bool
+}
+
+func accessOf(write bool, name string) access {
+	return access{write: write, checkHold: write && !slices.Contains(releases, name)}
 }
 
 // guard comprueba la membresía de las herramientas, las rutas y los eventos.
@@ -112,18 +138,28 @@ func (g guard) tool(ctx context.Context, actor kernel.Actor, name string, argume
 	if len(arguments) > 0 && json.Unmarshal(arguments, &fields) != nil {
 		return nil
 	}
-	planKind := ""
+	return g.verify(ctx, actor, accessOf(!readOnly(name), name), targetsOf(fields, toolPlanKind(name)))
+}
+
+// toolPlanKind dice de qué tipo es el plan_id de una herramienta.
+func toolPlanKind(name string) string {
 	switch {
 	case strings.Contains(name, "test_plan"):
-		planKind = kindTestPlan
+		return kindTestPlan
 	case strings.Contains(name, "dev_plan"):
-		planKind = kindDevPlan
+		return kindDevPlan
 	}
-	return g.verify(ctx, actor, !readOnly(name), targetsOf(fields, planKind))
+	return ""
 }
 
 // route revisa una petición REST: los IDs de su ruta, de su query y de su cuerpo.
 func (g guard) route(r *http.Request, pattern string) error {
+	write, targets := routeTargets(r, pattern)
+	return g.verify(r.Context(), rest.ActorFrom(r.Context()), accessOf(write, pattern), targets)
+}
+
+// routeTargets dice si una petición REST escribe y qué elementos recibe.
+func routeTargets(r *http.Request, pattern string) (bool, []target) {
 	_, path, _ := strings.Cut(pattern, " ")
 	segments := strings.Split(strings.Trim(path, "/"), "/")
 	resource := ""
@@ -168,7 +204,7 @@ func (g guard) route(r *http.Request, pattern string) error {
 	if write {
 		targets = append(targets, targetsOf(rest.PeekJSON(r), planKind)...)
 	}
-	return g.verify(r.Context(), rest.ActorFrom(r.Context()), write, targets)
+	return write, targets
 }
 
 // visible indica si el actor ve un proyecto: lo usan los eventos. Un viewer con
@@ -183,7 +219,9 @@ func (g guard) visible(ctx context.Context, actor kernel.Actor, projectID uuid.U
 
 // verify exige que el actor sea miembro del proyecto de cada elemento, que su rol
 // le deje llegar con su credencial y que no sea viewer si la operación escribe.
-func (g guard) verify(ctx context.Context, actor kernel.Actor, write bool, targets []target) error {
+// Después, si escribe, que ninguna etapa ni bug de los elementos lo tenga tomado
+// otra persona.
+func (g guard) verify(ctx context.Context, actor kernel.Actor, op access, targets []target) error {
 	for _, t := range targets {
 		if actor.UserID == uuid.Nil {
 			return notFound[t.kind]
@@ -198,8 +236,23 @@ func (g guard) verify(ctx context.Context, actor kernel.Actor, write bool, targe
 		if !role.Reaches(actor) {
 			return projects.ErrViewerOnlyWeb
 		}
-		if write && !role.CanWrite() {
+		if op.write && !role.CanWrite() {
 			return projects.ErrViewerCannotWrite
+		}
+	}
+	if !op.checkHold {
+		return nil
+	}
+	for _, t := range targets {
+		if t.kind == kindProject {
+			continue
+		}
+		holderKind, hold, err := g.members.HoldOf(ctx, t.kind, t.id)
+		if err != nil {
+			return err
+		}
+		if conflict, ok := takenBy[holderKind]; ok && hold.HeldByOther(actor) {
+			return conflict(hold.TakenBy)
 		}
 	}
 	return nil

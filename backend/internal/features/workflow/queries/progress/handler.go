@@ -12,6 +12,7 @@ import (
 	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
 	tasks "pmt/internal/features/tasks/domain"
+	"pmt/internal/kernel"
 )
 
 // Códigos de las señales.
@@ -56,6 +57,8 @@ type Stage struct {
 	Members []string       `json:"members"`
 	Counts  map[string]int `json:"counts"`
 	Tasks   []Task         `json:"tasks"`
+
+	kernel.Hold
 }
 
 // Bug es un bug abierto del proyecto.
@@ -64,6 +67,8 @@ type Bug struct {
 	Title     string      `json:"title"`
 	Status    bugs.Status `json:"status"`
 	UpdatedAt time.Time   `json:"updated_at"`
+
+	kernel.Hold
 }
 
 // OpenBugs son los bugs que no están en done ni rejected, por fecha de creación.
@@ -128,6 +133,7 @@ func (h *Handler) Handle(ctx context.Context, projectID uuid.UUID) (Result, erro
 			Members: append([]string{}, s.Members...),
 			Counts:  map[string]int{},
 			Tasks:   []Task{},
+			Hold:    s.Hold,
 		}
 		result.Project.LastChangeAt = latest(result.Project.LastChangeAt, s.UpdatedAt)
 
@@ -158,7 +164,7 @@ func openBugs(list []bugs.Bug) OpenBugs {
 		if !b.Status.IsOpen() {
 			continue
 		}
-		open.Items = append(open.Items, Bug{ID: b.ID, Title: b.Title, Status: b.Status, UpdatedAt: b.UpdatedAt})
+		open.Items = append(open.Items, Bug{ID: b.ID, Title: b.Title, Status: b.Status, UpdatedAt: b.UpdatedAt, Hold: b.Hold})
 		open.Counts[string(b.Status)]++
 	}
 	return open

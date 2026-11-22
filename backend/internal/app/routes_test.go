@@ -40,14 +40,14 @@ var (
 	saulID  = uuid.MustParse("00000000-0000-0000-0000-00000000000a")
 	ana     = kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserID: anaID}
 	agente  = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL}
-	agenteC = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL, UserID: saulID}
+	agenteC = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL, UserID: saulID, UserName: "saul"}
 )
 
 // duenoDeLaInstancia es saul: los tokens de agente actúan con su membresía.
 type duenoDeLaInstancia struct{}
 
-func (duenoDeLaInstancia) InstanceOwnerID(context.Context) (uuid.UUID, error) {
-	return saulID, nil
+func (duenoDeLaInstancia) InstanceOwner(context.Context) (kernel.UserRef, error) {
+	return kernel.UserRef{ID: saulID, Username: "saul", Active: true}, nil
 }
 
 // usuarios simula la feature auth: la sesión y el token de un usuario

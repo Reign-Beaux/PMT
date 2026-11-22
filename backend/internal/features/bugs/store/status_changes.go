@@ -10,6 +10,7 @@ import (
 
 	"pmt/internal/features/bugs/domain"
 	"pmt/internal/features/bugs/store/sqlcgen"
+	"pmt/internal/kernel"
 )
 
 // DB es la base de datos de la feature: consultas y transacciones. pgxpool.Pool la implementa.
@@ -102,4 +103,43 @@ func insertStatusChange(ctx context.Context, queries *sqlcgen.Queries, change do
 		return fmt.Errorf("guardar cambio de status: %w", err)
 	}
 	return nil
+}
+
+// Release deja sin tomar el bug y guarda el registro de la liberación en una
+// transacción. holder es quien lo tenía al leerlo: si otra operación lo tomó, lo
+// liberó o le cambió el status entretanto, responde que cambió.
+func (s *StatusChanges) Release(ctx context.Context, bug domain.Bug, holder uuid.UUID, change domain.StatusChange) (domain.Bug, error) {
+	var updated domain.Bug
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		queries := sqlcgen.New(tx)
+		if err := ensureStatus(ctx, queries, change); err != nil {
+			return err
+		}
+		row, err := queries.ReleaseBug(ctx, sqlcgen.ReleaseBugParams{ID: bug.ID, TakenBy: holder})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrBugHoldChanged
+		}
+		if err != nil {
+			return fmt.Errorf("liberar bug: %w", err)
+		}
+		if err := insertStatusChange(ctx, queries, change); err != nil {
+			return err
+		}
+		updated = toDomain(row)
+		return nil
+	})
+	if err != nil {
+		return domain.Bug{}, err
+	}
+	return updated, nil
+}
+
+// AdoptHolds deja tomados por el usuario los bugs en corrección que nadie tiene
+// y devuelve cuántos.
+func (s *StatusChanges) AdoptHolds(ctx context.Context, owner kernel.UserRef) (int64, error) {
+	adopted, err := sqlcgen.New(s.db).AdoptBugHolds(ctx, sqlcgen.AdoptBugHoldsParams{UserID: owner.ID, Username: owner.Username})
+	if err != nil {
+		return 0, fmt.Errorf("tomar bugs en corrección: %w", err)
+	}
+	return adopted, nil
 }

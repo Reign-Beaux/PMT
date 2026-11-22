@@ -160,7 +160,7 @@ func TestEnsureUsernameFree(t *testing.T) {
 }
 
 func TestUserActor(t *testing.T) {
-	if got := (User{Username: "ana", Name: "Ana López"}).Actor(); got != (kernel.Actor{Name: "ana", Profile: kernel.ProfileUser}) {
+	if got := (User{Username: "ana", Name: "Ana López"}).Actor(); got != (kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserName: "ana"}) {
 		t.Errorf("actor = %+v", got)
 	}
 }

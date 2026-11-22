@@ -53,6 +53,9 @@
         "project_id": {
           "type": "string"
         },
+        "reported_by": {
+          "type": "string"
+        },
         "status": {
           "type": "string"
         },
@@ -63,9 +66,6 @@
           "type": "string"
         },
         "updated_at": {
-          "type": "string"
-        },
-        "reported_by": {
           "type": "string"
         }
       },
@@ -137,6 +137,9 @@
         "project_id": {
           "type": "string"
         },
+        "reported_by": {
+          "type": "string"
+        },
         "status": {
           "type": "string"
         },
@@ -147,9 +150,6 @@
           "type": "string"
         },
         "updated_at": {
-          "type": "string"
-        },
-        "reported_by": {
           "type": "string"
         }
       },
@@ -168,7 +168,7 @@
     }
   },
   {
-    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Una corrección vuelve de changes_requested a in_dev. Solo QA rechaza, y solo un bug reported que no reproduce; desde otro status no se rechaza. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Usa list_bugs para obtener el ID del bug y su status actual.",
+    "description": "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Una corrección vuelve de changes_requested a in_dev. Solo QA rechaza, y solo un bug reported que no reproduce; desde otro status no se rechaza. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Pasar a in_dev deja el bug tomado por tu persona hasta done o rejected; mientras, solo sus agentes escriben en él. Usa list_bugs para obtener el ID del bug y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -210,19 +210,27 @@
         "project_id": {
           "type": "string"
         },
+        "reported_by": {
+          "type": "string"
+        },
         "status": {
           "type": "string"
         },
         "steps_to_reproduce": {
           "type": "string"
         },
+        "taken_at": {
+          "description": "desde cuándo lo tiene tomado (RFC 3339)",
+          "type": "string"
+        },
+        "taken_by": {
+          "description": "username de la persona que lo tiene tomado; vacío si nadie",
+          "type": "string"
+        },
         "title": {
           "type": "string"
         },
         "updated_at": {
-          "type": "string"
-        },
-        "reported_by": {
           "type": "string"
         }
       },
@@ -241,7 +249,7 @@
     }
   },
   {
-    "description": "Lista los bugs de un proyecto de PMT por fecha de creación. Funciona con cualquier status del proyecto. Para obtener project_id usa list_projects.",
+    "description": "Lista los bugs de un proyecto de PMT por fecha de creación. Funciona con cualquier status del proyecto. Cada bug trae quién lo tiene tomado (taken_by, taken_at): uno tomado por otra persona solo se lee. Para obtener project_id usa list_projects.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -278,19 +286,27 @@
               "project_id": {
                 "type": "string"
               },
+              "reported_by": {
+                "type": "string"
+              },
               "status": {
                 "type": "string"
               },
               "steps_to_reproduce": {
                 "type": "string"
               },
+              "taken_at": {
+                "description": "desde cuándo lo tiene tomado (RFC 3339)",
+                "type": "string"
+              },
+              "taken_by": {
+                "description": "username de la persona que lo tiene tomado; vacío si nadie",
+                "type": "string"
+              },
               "title": {
                 "type": "string"
               },
               "updated_at": {
-                "type": "string"
-              },
-              "reported_by": {
                 "type": "string"
               }
             },
@@ -387,6 +403,56 @@
       },
       "required": [
         "changes"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Libera un bug de PMT tomado por una persona: lo deja sin tomar, sin cambiar su status, y registra el motivo en su historial de status (list_bug_status_changes). Solo el owner del proyecto, con perfil User o PP. Quien escriba después no lo toma: solo lo toma quien lo pase a in_dev. Usa list_bugs para ver el ID del bug y quién lo tiene (taken_by).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bug_id": {
+          "description": "UUID del bug",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Motivo de la liberación; obligatorio, queda en el historial de status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bug_id",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "release_bug",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "title",
+        "status",
+        "updated_at"
       ],
       "type": "object"
     }

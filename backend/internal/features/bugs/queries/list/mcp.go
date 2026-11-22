@@ -26,6 +26,9 @@ type toolBug struct {
 	ReportedBy       string `json:"reported_by,omitempty"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
+
+	TakenBy string `json:"taken_by,omitempty" jsonschema:"username de la persona que lo tiene tomado; vacío si nadie"`
+	TakenAt string `json:"taken_at,omitempty" jsonschema:"desde cuándo lo tiene tomado (RFC 3339)"`
 }
 
 type toolOutput struct {
@@ -36,7 +39,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "list_bugs",
-		Description: "Lista los bugs de un proyecto de PMT por fecha de creación. Funciona con cualquier status del proyecto. Para obtener project_id usa list_projects.",
+		Description: "Lista los bugs de un proyecto de PMT por fecha de creación. Funciona con cualquier status del proyecto. Cada bug trae quién lo tiene tomado (taken_by, taken_at): uno tomado por otra persona solo se lee. Para obtener project_id usa list_projects.",
 	}, h.callTool)
 }
 
@@ -53,6 +56,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 
 	bugs := make([]toolBug, 0, len(items))
 	for _, item := range items {
+		takenBy, takenAt := platformmcp.HoldFields(item.Hold)
 		bugs = append(bugs, toolBug{
 			ID:               item.ID.String(),
 			ProjectID:        item.ProjectID.String(),
@@ -64,6 +68,8 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 			ReportedBy:       item.ReportedBy,
 			CreatedAt:        item.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:        item.UpdatedAt.Format(time.RFC3339),
+			TakenBy:          takenBy,
+			TakenAt:          takenAt,
 		})
 	}
 	return nil, toolOutput{Bugs: bugs}, nil

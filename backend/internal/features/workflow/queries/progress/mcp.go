@@ -38,6 +38,9 @@ type toolStage struct {
 	Members []string       `json:"members"`
 	Counts  map[string]int `json:"counts"`
 	Tasks   []toolTask     `json:"tasks"`
+
+	TakenBy string `json:"taken_by,omitempty" jsonschema:"username de la persona que la tiene tomada; vacío si nadie"`
+	TakenAt string `json:"taken_at,omitempty" jsonschema:"desde cuándo la tiene tomada (RFC 3339)"`
 }
 
 type toolBug struct {
@@ -45,6 +48,9 @@ type toolBug struct {
 	Title     string `json:"title"`
 	Status    string `json:"status"`
 	UpdatedAt string `json:"updated_at"`
+
+	TakenBy string `json:"taken_by,omitempty" jsonschema:"username de la persona que lo tiene tomado; vacío si nadie"`
+	TakenAt string `json:"taken_at,omitempty" jsonschema:"desde cuándo lo tiene tomado (RFC 3339)"`
 }
 
 type toolOpenBugs struct {
@@ -96,15 +102,19 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 		Signals:  make([]toolSignal, 0, len(result.Signals)),
 	}
 	for _, b := range result.OpenBugs.Items {
+		takenBy, takenAt := platformmcp.HoldFields(b.Hold)
 		output.OpenBugs.Items = append(output.OpenBugs.Items, toolBug{
 			ID: b.ID.String(), Title: b.Title, Status: string(b.Status), UpdatedAt: b.UpdatedAt.Format(time.RFC3339),
+			TakenBy: takenBy, TakenAt: takenAt,
 		})
 	}
 	for _, s := range result.Stages {
+		takenBy, takenAt := platformmcp.HoldFields(s.Hold)
 		stage := toolStage{
 			ID: s.ID.String(), Name: s.Name, Status: string(s.Status), Lead: s.Lead,
 			Members: s.Members, Counts: s.Counts,
-			Tasks: make([]toolTask, 0, len(s.Tasks)),
+			Tasks:   make([]toolTask, 0, len(s.Tasks)),
+			TakenBy: takenBy, TakenAt: takenAt,
 		}
 		for _, t := range s.Tasks {
 			stage.Tasks = append(stage.Tasks, toolTask{

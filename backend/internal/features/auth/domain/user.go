@@ -58,7 +58,7 @@ type User struct {
 // User, con su ID para la membresía de los proyectos. El perfil que declare la
 // sesión de un token lo aplica kernel.AsUser.
 func (u User) Actor() kernel.Actor {
-	return kernel.Actor{Name: u.Username, Profile: kernel.ProfileUser, UserID: u.ID}
+	return kernel.Actor{Name: u.Username, Profile: kernel.ProfileUser, UserID: u.ID, UserName: u.Username}
 }
 
 // Ref devuelve el usuario como lo ven otras features.

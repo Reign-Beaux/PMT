@@ -6,7 +6,7 @@ WHERE project_id = @project_id::uuid
 RETURNING *;
 
 -- name: GetStage :one
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -22,7 +22,7 @@ WHERE id = $1 AND retired_at IS NULL
 FOR UPDATE;
 
 -- name: ListStages :many
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -49,13 +49,23 @@ WHERE id = $1
 RETURNING *;
 
 -- name: UpdateStageStatus :one
+-- Guarda el status y quién tiene tomada la etapa. taken_at solo cambia cuando la
+-- toma otra persona.
 WITH updated AS (
     UPDATE stages
-    SET status = $2, updated_at = now()
-    WHERE stages.id = $1
+    SET status = @status::text,
+        taken_by = sqlc.narg(taken_by)::uuid,
+        taken_by_name = sqlc.narg(taken_by_name)::text,
+        taken_at = CASE
+            WHEN sqlc.narg(taken_by)::uuid IS NULL THEN NULL
+            WHEN stages.taken_by IS NOT DISTINCT FROM sqlc.narg(taken_by)::uuid THEN stages.taken_at
+            ELSE now()
+        END,
+        updated_at = now()
+    WHERE stages.id = @id::uuid
     RETURNING *
 )
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at
 FROM updated s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -75,8 +85,29 @@ WHERE id = $1;
 
 -- name: LeaveStagePlanning :exec
 UPDATE stages
-SET status = $2, add_reason = NULL, add_requested_by = NULL, updated_at = now()
-WHERE id = $1;
+SET status = @status::text, add_reason = NULL, add_requested_by = NULL,
+    taken_by = sqlc.narg(taken_by)::uuid,
+    taken_by_name = sqlc.narg(taken_by_name)::text,
+    taken_at = CASE
+        WHEN sqlc.narg(taken_by)::uuid IS NULL THEN NULL
+        WHEN stages.taken_by IS NOT DISTINCT FROM sqlc.narg(taken_by)::uuid THEN stages.taken_at
+        ELSE now()
+    END,
+    updated_at = now()
+WHERE id = @id::uuid;
+
+-- name: ReleaseStage :execrows
+-- Deja sin tomar una etapa que sigue en manos de quien se esperaba.
+UPDATE stages
+SET taken_by = NULL, taken_by_name = NULL, taken_at = NULL, updated_at = now()
+WHERE id = @id::uuid AND taken_by = @taken_by::uuid AND retired_at IS NULL;
+
+-- name: AdoptStageHolds :execrows
+-- Deja tomadas por el usuario las etapas iniciadas que nadie tiene: las que
+-- existían cuando la migración de bloqueos no encontró usuarios.
+UPDATE stages
+SET taken_by = @user_id::uuid, taken_by_name = @username::text, taken_at = now()
+WHERE taken_by IS NULL AND retired_at IS NULL AND status IN ('in_dev', 'stopped');
 
 -- name: UpdateStageLead :execrows
 UPDATE stages

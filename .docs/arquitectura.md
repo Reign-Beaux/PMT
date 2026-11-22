@@ -12,7 +12,7 @@ Agentes ───── MCP /mcp (token) ─┘                       ▲
                       listener de eventos ◄─────────────┘
 ```
 
-REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se duplican. Todo pide credenciales salvo las sondas de salud, el login, las invitaciones y los archivos del frontend ([Identidad](#identidad)), y cada operación comprueba antes la membresía del proyecto ([Membresía](#membresía)).
+REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se duplican. Todo pide credenciales salvo las sondas de salud, el login, las invitaciones y los archivos del frontend ([Identidad](#identidad)), y cada operación comprueba antes la membresía del proyecto ([Membresía](#membresía)) y, si escribe, los bloqueos por persona ([Bloqueos](#bloqueos)).
 
 | Necesidad | Elección |
 | --- | --- |
@@ -26,7 +26,7 @@ REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se du
 | WebSocket | `github.com/coder/websocket` |
 | YAML de importación | `gopkg.in/yaml.v3` |
 | Contraseñas | argon2id (`golang.org/x/crypto/argon2`) |
-| Pruebas | `testing` estándar: 220 archivos y unas 690 pruebas |
+| Pruebas | `testing` estándar: 231 archivos y unas 740 pruebas |
 
 ## Estructura
 
@@ -97,22 +97,22 @@ Cada slice es un paquete con `handler.go` (la operación, su autorización y las
 
 ## Herramientas MCP
 
-Hay 64 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`. La prueba `internal/app/contracts_test.go` falla si una herramienta y su documentación difieren. Cada agente recibe la lista completa; la membresía la comprueba `app` y los permisos de perfil, el handler.
+Hay 66 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`. La prueba `internal/app/contracts_test.go` falla si una herramienta y su documentación difieren. Cada agente recibe la lista completa; la membresía la comprueba `app` y los permisos de perfil, el handler.
 
 | Feature | Herramientas |
 | --- | --- |
 | `projects` | `create_project`, `list_projects`, `update_project`, `delete_project`, `change_project_status`, `change_product_version`, `list_project_status_changes`, `list_product_version_changes`, `list_project_members`, `add_project_member`, `update_project_member`, `remove_project_member` |
-| `stages` | `create_stage`, `list_stages`, `update_stage`, `delete_stage`, `change_stage_status`, `add_stage`, `revise_stage`, `retire_stage`, `list_stage_changes`, `list_stage_status_changes`, `assign_stage_lead`, `remove_stage_lead`, `add_stage_member`, `remove_stage_member` |
+| `stages` | `create_stage`, `list_stages`, `update_stage`, `delete_stage`, `change_stage_status`, `add_stage`, `revise_stage`, `retire_stage`, `list_stage_changes`, `list_stage_status_changes`, `assign_stage_lead`, `remove_stage_lead`, `add_stage_member`, `remove_stage_member`, `release_stage` |
 | `tasks` | `create_task`, `list_tasks`, `update_task`, `delete_task`, `change_task_status`, `change_tasks_status`, `add_task`, `revise_task`, `retire_task`, `list_task_changes`, `list_task_status_changes`, `assign_task` |
 | `workflow` | `release_project`, `start_stage`, `get_project_progress` |
-| `bugs` | `create_bug`, `update_bug`, `change_bug_status`, `list_bugs`, `list_bug_status_changes` |
+| `bugs` | `create_bug`, `update_bug`, `change_bug_status`, `list_bugs`, `list_bug_status_changes`, `release_bug` |
 | `reviews` | `create_finding`, `close_finding`, `list_findings` |
 | `qa` | `create_test_plan`, `revise_test_plan`, `submit_test_plan`, `approve_test_plan`, `return_test_plan`, `list_test_plans`, `list_test_plan_versions` |
 | `devplans` | `create_dev_plan`, `revise_dev_plan`, `list_dev_plans`, `list_dev_plan_versions` |
 | `activity` | `add_comment`, `list_comments` |
 | `imports` | `import_project`, `import_stage` |
 
-**REST** expone lo mismo bajo `/api/`, salvo `imports`, que es solo MCP. Los miembros están en `/api/projects/{id}/members` y `/api/projects/{id}/members/{username}`. La fuente de verdad son los `*.openapi.yaml`. Además hay `GET` de un proyecto, una etapa y una tarea por su ID, y las rutas de `auth` ([auth.openapi.yaml](../backend/api/features/auth/auth.openapi.yaml)):
+**REST** expone lo mismo bajo `/api/`, salvo `imports`, que es solo MCP. Los miembros están en `/api/projects/{id}/members` y `/api/projects/{id}/members/{username}`; liberar, en `POST /api/stages/{id}/release` y `POST /api/bugs/{id}/release`. La fuente de verdad son los `*.openapi.yaml`. Además hay `GET` de un proyecto, una etapa y una tarea por su ID, y las rutas de `auth` ([auth.openapi.yaml](../backend/api/features/auth/auth.openapi.yaml)):
 
 | Ruta | Quién |
 | --- | --- |
@@ -129,7 +129,7 @@ Hay dos clases de actor ([dominio.md](dominio.md#conceptos)):
 - **Usuario:** una persona con correo, nombre, contraseña y `username`. Actúa como `Actor{Name: username, Profile: <perfil de la sesión>}`: con la cookie, siempre `User`; con su token, el perfil que declare la sesión, o `User` si no declara ninguno. Puede usar cualquier perfil; las reglas de permisos son las mismas que para un agente de ese perfil.
 - **Agente:** fila de `agents` con nombre y perfil fijo, administrada con `pmt-server agent`. Sigue igual que antes: si la sesión declara un perfil, debe ser el suyo. Actúa con la membresía del dueño de la instancia.
 
-El actor lleva también `UserID`, el usuario cuya membresía usa: lo pone `auth` para la cookie y el token de usuario, y `app.credentials` pone el del dueño de la instancia (`auth.Feature.InstanceOwnerID`) para un token de agente. Se eligió agregarlo al `Actor` en vez de resolverlo por `username` en cada operación porque los agentes no tienen usuario propio: así la membresía se consulta igual para los dos, sin otra búsqueda por petición.
+El actor lleva también `UserID`, el usuario cuya membresía usa, y `UserName`, su `username` (el nombre con que toma una etapa o un bug): lo pone `auth` para la cookie y el token de usuario, y `app.credentials` pone el del dueño de la instancia (`auth.Feature.InstanceOwnerID`) para un token de agente. Se eligió agregarlo al `Actor` en vez de resolverlo por `username` en cada operación porque los agentes no tienen usuario propio: así la membresía se consulta igual para los dos, sin otra búsqueda por petición.
 
 Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni al revés: lo validan `auth` (al aceptar una invitación y al crear el dueño) y `pmt-server agent create`, cada uno con el `Checker` de la otra feature.
 
@@ -182,7 +182,18 @@ La comprobación vive en un solo lugar, `internal/app/membership.go`, y corre an
 
 `list_projects` filtra en su consulta por miembro y por los roles que alcanzan con la credencial; `create_project` e `import_project` dejan al actor como owner en la misma sentencia o transacción. Al arrancar, después de crear al dueño, `projects.AdoptOrphans` lo deja como owner de los proyectos sin owner: los que existían cuando la migración `00027` no encontró usuarios.
 
-Un ID que no es UUID no se revisa: el handler lo rechaza como inválido. Por eso la comprobación de perfil del handler ya no es lo primero: un no miembro recibe `not_found` aunque su perfil tampoco pudiera.
+Un ID que no es UUID no se revisa: el handler lo rechaza como inválido.
+
+## Bloqueos
+
+Las reglas están en [dominio.md](dominio.md#bloqueos-por-persona). Se reparten así:
+
+- **Datos.** `stages` y `bugs` tienen `taken_by` (ID del usuario), `taken_by_name` (su `username`, copiado porque no cambia, para mostrarlo sin leer la tabla de `auth`) y `taken_at`, los tres nulos o los tres con valor (migración `00028`). En el dominio son `kernel.Hold`, embebido en `Stage` y `Bug` y en sus `Result`, que lo publican como `taken_by` y `taken_at`; `platform/postgres.HoldOf` y `HoldParams` lo traducen a columnas.
+- **Tomar y soltar.** `Stage.ChangeStatus` y `Bug.ChangeStatus` (dominio) ajustan el `Hold` según el status destino; como `start_stage`, el cierre de `workflow` y `change_*_status` pasan por ellos, el `UPDATE` del status guarda el bloqueo en la misma sentencia. `taken_at` solo cambia cuando lo toma otra persona. Los triggers de `stages` y `bugs` emiten el aviso de cambio de siempre.
+- **Escrituras.** `internal/app/membership.go`, después de la membresía y solo si la operación escribe, pregunta por cada ID a `projects.Membership.HoldOf`, que usa la función SQL `pmt_hold_of` (la etapa de una etapa, tarea, plan QAP, plan de desarrollo o hallazgo de tarea; el bug de un bug, plan o hallazgo de bug). Si la tiene otra persona, responde `stages.ErrTakenBy` o `bugs.ErrTakenBy`. Solo se salvan `release_stage`, `release_bug` y sus rutas. Los IDs de proyecto no se revisan.
+- **Liberar.** Slices `stages/commands/release` y `bugs/commands/release`; el owner lo confirman con `projects.Owners` (`projects/queries/checkowner`). El `store` bloquea la fila, exige que siga en manos de quien la tenía al leerla y escribe el registro de status con el mismo status.
+- **Arranque.** Si la `00028` no encontró usuarios, `app.adoptOrphans`, en el mismo arranque en que adopta los proyectos sin owner, deja tomadas por el dueño las etapas y los bugs en curso (`stages.AdoptHolds`, `bugs.AdoptHolds`).
+- **Concurrencia.** La comprobación corre antes del handler, fuera de su transacción: una escritura que llega justo mientras otra persona toma la etapa puede pasar. Tomar sí es seguro, porque los cambios de status bloquean la fila y comparan el status de origen. Por eso la comprobación de perfil del handler ya no es lo primero: un no miembro recibe `not_found` aunque su perfil tampoco pudiera.
 
 ## Errores
 
@@ -194,7 +205,7 @@ Un ID que no es UUID no se revisa: el handler lo rechaza como inválido. Por eso
 
 ## Datos
 
-- 27 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00027_create_project_members`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`; `00026` quita las llaves foráneas de TL, equipo y dueño de tarea hacia `agents`. `00027` crea `project_members`, deja al dueño de la instancia como owner de los proyectos existentes, crea `pmt_project_of` y agrega el proyecto a los avisos de cambios. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
+- 28 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00028_add_holds`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`; `00026` quita las llaves foráneas de TL, equipo y dueño de tarea hacia `agents`. `00027` crea `project_members`, deja al dueño de la instancia como owner de los proyectos existentes, crea `pmt_project_of` y agrega el proyecto a los avisos de cambios. `00028` agrega los bloqueos a `stages` y `bugs`, deja lo que ya se trabajaba tomado por el dueño de la instancia y crea `pmt_hold_of`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
 - `sqlc.yaml` tiene una entrada por feature con consultas, todas sobre el esquema de las migraciones. Tras cambiar migraciones o consultas: `go tool sqlc generate`. El código de `sqlcgen/` no se edita a mano.
 - **Transacciones:** las operaciones que escriben varias filas usan `pgx.BeginFunc` en su `store`, y `imports` y `workflow` comparten una `pgx.Tx`. Los cambios de status bloquean con `FOR UPDATE` y comparan el status de origen; si cambió entre leer y guardar, responden `el status cambió, vuelve a consultar`. Los lotes bloquean por orden de ID.
 - **Concurrencia:** los agregados no tienen control de versión. Fuera de los casos anteriores, gana la última escritura.
@@ -257,6 +268,7 @@ El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` co
 - `internal/app/contracts_test.go`: las herramientas registradas coinciden con su documentación `.mcp.json`.
 - `internal/app/permissions_test.go`: toda herramienta que no empiece con `list_` ni `get_` rechaza a PC y al actor vacío sin tocar la base. Una herramienta nueva de solo lectura debe seguir esa convención de nombre.
 - `internal/app/membership_test.go`: recorre toda herramienta registrada y toda ruta que registran los `rest.go` de las features (leídas del código), con los IDs que aceptan según su esquema o su `*.openapi.yaml`, y exige `not_found` a quien no es miembro y `forbidden` a un viewer con token, sin llegar al handler; solo se salvan `create_project`, `import_project`, `list_projects` y `GET`/`POST /api/projects`. También exige que contrato y código tengan las mismas rutas, que el viewer con cookie solo lea, y prueba owner, editor, viewer por token y por cookie, no miembro, token de agente y la visibilidad de los eventos.
+- `internal/app/holds_test.go`: recorre toda herramienta y ruta de escritura sobre una etapa tomada y un bug tomado por otra persona y exige `conflict` con su nombre sin llegar al handler; solo se salvan `release_*` y las escrituras que solo reciben el proyecto, que deben ser exactamente las de su lista. También prueba la misma persona con otro perfil o con un token de agente, una etapa libre, lecturas y que la membresía va primero.
 - `internal/app/routes_test.go`: 401 sin credenciales, cookie y token de usuario, token de agente, usuario desactivado, rutas públicas y reparto de rutas.
 - `internal/features/auth/feature_test.go`: el recorrido de login, tokens, invitación, desactivación y cambio de contraseña por HTTP, sobre el repositorio en memoria de `auth/authtest`.
 - Las pruebas de adaptadores REST y MCP de otras features actúan como usuario con `asUser` (`usuario_test.go`) o `platformmcp.ActAs`.
@@ -271,10 +283,11 @@ Para no buscarlo:
 
 - **Auditoría general** en `activity`: solo hay historiales de status, de cambios y de versión, y comentarios.
 - **`kernel.Transactor`:** cada `store` abre su propia transacción.
-- **Filtrado de herramientas MCP por perfil:** todos reciben las 64.
+- **Filtrado de herramientas MCP por perfil:** todos reciben las 66.
 - **`idempotency_key`:** un reintento repite la operación.
 - **Envío de correos:** el dueño copia el enlace de invitación y lo manda él.
-- **Bloqueos por persona y pantallas de miembros:** fases 1d y 1e del [plan](plan_produccion.md).
+- **Pantallas de miembros y bloqueos:** fase 1e del [plan](plan_produccion.md). El frontend ignora `taken_by` por ahora.
+- **Tomar o reasignar a mano** una etapa o un bug: el owner solo los libera.
 - **Transferir el owner** de un proyecto.
 - **Multi-tenencia:** una sola organización.
 

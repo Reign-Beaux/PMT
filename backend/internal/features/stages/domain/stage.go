@@ -65,6 +65,8 @@ type Stage struct {
 
 	Lead    string
 	Members []string
+
+	kernel.Hold
 }
 
 // NewStage crea una etapa válida en su estado inicial. La posición se asigna al guardarla.

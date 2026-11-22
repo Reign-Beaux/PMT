@@ -342,7 +342,7 @@ func TestTokenConPerfilConservaElUsuario(t *testing.T) {
 
 	actor, err := f.AuthenticateToken(ctx, token, kernel.ProfileTL)
 
-	if err != nil || actor != (kernel.Actor{Name: "ana", Profile: kernel.ProfileTL, UserID: ana.ID}) {
+	if err != nil || actor != (kernel.Actor{Name: "ana", Profile: kernel.ProfileTL, UserID: ana.ID, UserName: "ana"}) {
 		t.Fatalf("actor = %+v, err = %v", actor, err)
 	}
 	if id, err := f.InstanceOwnerID(ctx); err != nil || id != dueno.ID {

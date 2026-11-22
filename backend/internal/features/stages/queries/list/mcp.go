@@ -30,6 +30,9 @@ type toolStage struct {
 
 	Lead    string   `json:"lead,omitempty"`
 	Members []string `json:"members,omitempty"`
+
+	TakenBy string `json:"taken_by,omitempty" jsonschema:"username de la persona que la tiene tomada; vacío si nadie"`
+	TakenAt string `json:"taken_at,omitempty" jsonschema:"desde cuándo la tiene tomada (RFC 3339)"`
 }
 
 type toolOutput struct {
@@ -40,7 +43,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "list_stages",
-		Description: "Lista las etapas de un proyecto de PMT, ordenadas por posición, con su TL y su equipo. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
+		Description: "Lista las etapas de un proyecto de PMT, ordenadas por posición, con su TL, su equipo y quién la tiene tomada (taken_by, taken_at): una etapa tomada por otra persona solo se lee. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
 	}, h.callTool)
 }
 
@@ -57,6 +60,7 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 
 	stages := make([]toolStage, 0, len(items))
 	for _, item := range items {
+		takenBy, takenAt := platformmcp.HoldFields(item.Hold)
 		stages = append(stages, toolStage{
 			ID:          item.ID.String(),
 			ProjectID:   item.ProjectID.String(),
@@ -72,6 +76,9 @@ func (h *Handler) callTool(ctx context.Context, _ *sdk.CallToolRequest, input to
 
 			Lead:    item.Lead,
 			Members: item.Members,
+
+			TakenBy: takenBy,
+			TakenAt: takenAt,
 		})
 	}
 	return nil, toolOutput{Stages: stages}, nil

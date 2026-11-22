@@ -21,13 +21,14 @@ func (r fakeReader) InstanceOwner(context.Context) (domain.User, error) {
 
 func TestHandle(t *testing.T) {
 	id := uuid.New()
-	if got, err := New(fakeReader{user: domain.User{ID: id}}).Handle(context.Background()); err != nil || got != id {
-		t.Fatalf("id = %v, err = %v", got, err)
+	got, err := New(fakeReader{user: domain.User{ID: id, Username: "saul"}}).Handle(context.Background())
+	if err != nil || got.ID != id || got.Username != "saul" {
+		t.Fatalf("owner = %+v, err = %v", got, err)
 	}
 }
 
 func TestHandleWithoutOwner(t *testing.T) {
-	if got, err := New(fakeReader{err: domain.ErrUserNotFound}).Handle(context.Background()); err != nil || got != uuid.Nil {
+	if got, err := New(fakeReader{err: domain.ErrUserNotFound}).Handle(context.Background()); err != nil || got.ID != uuid.Nil {
 		t.Fatalf("id = %v, err = %v", got, err)
 	}
 }

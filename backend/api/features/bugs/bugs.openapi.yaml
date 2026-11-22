@@ -115,6 +115,41 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/bugs/{id}/release:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Libera un bug tomado
+      description: Solo el owner del proyecto, con perfil PP o User. Lo deja sin tomar, sin cambiar su status, y registra el motivo en su historial de status (mismo status de origen y destino). Quien escriba después no lo toma; solo lo toma quien lo pase a in_dev. Responde conflict si no está tomado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Bug"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/bugs/{id}/status-changes:
     parameters:
       - name: id
@@ -243,6 +278,13 @@ components:
         reported_by:
           type: string
           description: Quien registró el bug. Falta en los bugs anteriores a este campo.
+        taken_by:
+          type: string
+          description: Username de la persona que lo tiene tomado. Ausente si nadie. Mientras otra persona lo tenga, cualquier escritura sobre el bug responde conflict.
+        taken_at:
+          type: string
+          format: date-time
+          description: Desde cuándo lo tiene tomado. Ausente si nadie.
         created_at:
           type: string
           format: date-time

@@ -10,12 +10,14 @@ import (
 
 	"pmt/internal/features/bugs/commands/changestatus"
 	"pmt/internal/features/bugs/commands/create"
+	"pmt/internal/features/bugs/commands/release"
 	"pmt/internal/features/bugs/commands/update"
 	"pmt/internal/features/bugs/queries/get"
 	"pmt/internal/features/bugs/queries/list"
 	"pmt/internal/features/bugs/queries/liststatuschanges"
 	"pmt/internal/features/bugs/store"
 	"pmt/internal/features/bugs/store/sqlcgen"
+	"pmt/internal/kernel"
 )
 
 // ProjectChecker reúne lo que las slices piden a la feature projects.
@@ -25,8 +27,8 @@ type ProjectChecker interface {
 }
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// projects lo aporta la feature projects, conectada en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects ProjectChecker) {
+// projects y owners los aporta la feature projects, conectada en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects ProjectChecker, owners release.Owners) {
 	repo := store.NewBugs(db)
 	statusChanges := store.NewStatusChanges(db)
 
@@ -52,6 +54,20 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, projects Proje
 	listStatusChanges := liststatuschanges.New(statusChanges)
 	listStatusChanges.Register(mux)
 	listStatusChanges.RegisterTool(tools)
+
+	releaseBug := release.New(struct {
+		*store.Bugs
+		*store.StatusChanges
+	}{repo, statusChanges}, owners)
+	releaseBug.Register(mux)
+	releaseBug.RegisterTool(tools)
+}
+
+// AdoptHolds deja tomados por el usuario los bugs en corrección que nadie tiene y
+// devuelve cuántos. Se llama al arrancar, con el dueño de la instancia, solo
+// cuando la migración de bloqueos no encontró usuarios.
+func AdoptHolds(ctx context.Context, db store.DB, owner kernel.UserRef) (int64, error) {
+	return store.NewStatusChanges(db).AdoptHolds(ctx, owner)
 }
 
 // Checker permite a otras features confirmar que un bug existe.

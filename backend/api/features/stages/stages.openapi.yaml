@@ -325,6 +325,41 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/stages/{id}/release:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      summary: Libera una etapa tomada
+      description: Solo el owner del proyecto, con perfil PP o User. La deja sin tomar, sin cambiar su status, y registra el motivo en su historial de status (mismo status de origen y destino). Quien escriba después no la toma; solo la toman start_stage o pasarla de nuevo a in_dev. Responde conflict si no está tomada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          $ref: "#/components/responses/Stage"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/stages/{id}/members:
     parameters:
       - name: id
@@ -614,6 +649,13 @@ components:
         add_requested_by:
           type: string
           description: Quién pidió la etapa, mientras esté en su planning propio.
+        taken_by:
+          type: string
+          description: Username de la persona que la tiene tomada. Ausente si nadie. Mientras otra persona la tenga, cualquier escritura sobre la etapa o sus tareas responde conflict.
+        taken_at:
+          type: string
+          format: date-time
+          description: Desde cuándo la tiene tomada. Ausente si nadie.
         created_at:
           type: string
           format: date-time

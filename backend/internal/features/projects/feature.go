@@ -18,11 +18,13 @@ import (
 	"pmt/internal/features/projects/commands/update"
 	"pmt/internal/features/projects/commands/updatemember"
 	"pmt/internal/features/projects/domain"
+	"pmt/internal/features/projects/queries/checkowner"
 	"pmt/internal/features/projects/queries/checkplanning"
 	"pmt/internal/features/projects/queries/checkstatus"
 	"pmt/internal/features/projects/queries/checkworker"
 	"pmt/internal/features/projects/queries/checkworking"
 	"pmt/internal/features/projects/queries/get"
+	"pmt/internal/features/projects/queries/holdof"
 	"pmt/internal/features/projects/queries/list"
 	"pmt/internal/features/projects/queries/listmembers"
 	"pmt/internal/features/projects/queries/listproductversionchanges"
@@ -30,6 +32,7 @@ import (
 	"pmt/internal/features/projects/queries/roleof"
 	"pmt/internal/features/projects/store"
 	"pmt/internal/features/projects/store/sqlcgen"
+	"pmt/internal/kernel"
 )
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
@@ -102,11 +105,21 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changes
 // un usuario. La usan la comprobación de membresía de app y los eventos.
 type Membership struct {
 	roleOf *roleof.Handler
+	holdOf *holdof.Handler
 }
 
 // NewMembership crea la consulta de membresía.
 func NewMembership(db sqlcgen.DBTX) *Membership {
-	return &Membership{roleOf: roleof.New(store.NewMembers(db))}
+	members := store.NewMembers(db)
+	return &Membership{roleOf: roleof.New(members), holdOf: holdof.New(members)}
+}
+
+// HoldOf devuelve qué contiene al elemento, stage o bug (vacío si no pertenece a
+// ninguno, como un proyecto), y quién lo tiene tomado. Lo usa app para rechazar
+// las escrituras sobre una etapa o un bug que tiene otra persona.
+func (m *Membership) HoldOf(ctx context.Context, kind string, id uuid.UUID) (string, kernel.Hold, error) {
+	result, err := m.holdOf.Handle(ctx, kind, id)
+	return result.HolderKind, result.Hold, err
 }
 
 // RoleOf devuelve el rol del usuario en el proyecto del elemento, vacío si no es
@@ -133,6 +146,22 @@ func NewWorkers(db sqlcgen.DBTX, users checkworker.Users) *Workers {
 // false: quien pregunta lo valida como agente.
 func (w *Workers) Worker(ctx context.Context, projectID uuid.UUID, username string) (bool, error) {
 	return w.check.Handle(ctx, projectID, username)
+}
+
+// Owners permite a otras features saber si un usuario es el owner de un
+// proyecto: solo él libera una etapa o un bug tomados.
+type Owners struct {
+	check *checkowner.Handler
+}
+
+// NewOwners crea el verificador.
+func NewOwners(db sqlcgen.DBTX) *Owners {
+	return &Owners{check: checkowner.New(store.NewMembers(db))}
+}
+
+// IsOwner indica si el usuario es el owner del proyecto.
+func (o *Owners) IsOwner(ctx context.Context, projectID, userID uuid.UUID) (bool, error) {
+	return o.check.Handle(ctx, projectID, userID)
 }
 
 // AdoptOrphans deja al usuario como owner de los proyectos sin owner y devuelve

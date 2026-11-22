@@ -112,9 +112,12 @@ func (s *Changes) LeavePlanning(ctx context.Context, stage domain.Stage, change 
 		if err := insertStatusChange(ctx, queries, statusChange); err != nil {
 			return err
 		}
+		holder, name := postgres.HoldParams(stage.Hold)
 		err := queries.LeaveStagePlanning(ctx, sqlcgen.LeaveStagePlanningParams{
-			ID:     stage.ID,
-			Status: string(stage.Status),
+			ID:          stage.ID,
+			Status:      string(stage.Status),
+			TakenBy:     holder,
+			TakenByName: name,
 		})
 		if err != nil {
 			return fmt.Errorf("salir de planning propio: %w", err)

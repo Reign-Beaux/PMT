@@ -29,6 +29,27 @@ func (q *Queries) AddStageMember(ctx context.Context, arg AddStageMemberParams) 
 	return err
 }
 
+const adoptStageHolds = `-- name: AdoptStageHolds :execrows
+UPDATE stages
+SET taken_by = $1::uuid, taken_by_name = $2::text, taken_at = now()
+WHERE taken_by IS NULL AND retired_at IS NULL AND status IN ('in_dev', 'stopped')
+`
+
+type AdoptStageHoldsParams struct {
+	UserID   uuid.UUID
+	Username string
+}
+
+// Deja tomadas por el usuario las etapas iniciadas que nadie tiene: las que
+// existían cuando la migración de bloqueos no encontró usuarios.
+func (q *Queries) AdoptStageHolds(ctx context.Context, arg AdoptStageHoldsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, adoptStageHolds, arg.UserID, arg.Username)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const clearStageLead = `-- name: ClearStageLead :execrows
 UPDATE stages
 SET lead = NULL, updated_at = now()
@@ -48,7 +69,7 @@ INSERT INTO stages (id, project_id, name, description, status, position, add_rea
 SELECT $1::uuid, $2::uuid, $3::text, $4::text, $5::text, COALESCE(MAX(position), 0) + 1, NULLIF($6::text, ''), NULLIF($7::text, '')
 FROM stages
 WHERE project_id = $2::uuid
-RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead
+RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead, taken_by, taken_by_name, taken_at
 `
 
 type CreateStageParams struct {
@@ -85,6 +106,9 @@ func (q *Queries) CreateStage(ctx context.Context, arg CreateStageParams) (Stage
 		&i.AddReason,
 		&i.AddRequestedBy,
 		&i.Lead,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
@@ -103,7 +127,7 @@ func (q *Queries) DeleteStage(ctx context.Context, id uuid.UUID) (int64, error) 
 }
 
 const getStage = `-- name: GetStage :one
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -127,6 +151,9 @@ type GetStageRow struct {
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
 	Lead           pgtype.Text
+	TakenBy        pgtype.UUID
+	TakenByName    pgtype.Text
+	TakenAt        pgtype.Timestamptz
 }
 
 func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (GetStageRow, error) {
@@ -145,23 +172,41 @@ func (q *Queries) GetStage(ctx context.Context, id uuid.UUID) (GetStageRow, erro
 		&i.AddReason,
 		&i.AddRequestedBy,
 		&i.Lead,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
 
 const leaveStagePlanning = `-- name: LeaveStagePlanning :exec
 UPDATE stages
-SET status = $2, add_reason = NULL, add_requested_by = NULL, updated_at = now()
-WHERE id = $1
+SET status = $1::text, add_reason = NULL, add_requested_by = NULL,
+    taken_by = $2::uuid,
+    taken_by_name = $3::text,
+    taken_at = CASE
+        WHEN $2::uuid IS NULL THEN NULL
+        WHEN stages.taken_by IS NOT DISTINCT FROM $2::uuid THEN stages.taken_at
+        ELSE now()
+    END,
+    updated_at = now()
+WHERE id = $4::uuid
 `
 
 type LeaveStagePlanningParams struct {
-	ID     uuid.UUID
-	Status string
+	Status      string
+	TakenBy     pgtype.UUID
+	TakenByName pgtype.Text
+	ID          uuid.UUID
 }
 
 func (q *Queries) LeaveStagePlanning(ctx context.Context, arg LeaveStagePlanningParams) error {
-	_, err := q.db.Exec(ctx, leaveStagePlanning, arg.ID, arg.Status)
+	_, err := q.db.Exec(ctx, leaveStagePlanning,
+		arg.Status,
+		arg.TakenBy,
+		arg.TakenByName,
+		arg.ID,
+	)
 	return err
 }
 
@@ -225,7 +270,7 @@ func (q *Queries) ListStageMembers(ctx context.Context, stageID uuid.UUID) ([]st
 }
 
 const listStages = `-- name: ListStages :many
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at
 FROM stages s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -250,6 +295,9 @@ type ListStagesRow struct {
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
 	Lead           pgtype.Text
+	TakenBy        pgtype.UUID
+	TakenByName    pgtype.Text
+	TakenAt        pgtype.Timestamptz
 }
 
 func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListStagesRow, error) {
@@ -274,6 +322,9 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListSt
 			&i.AddReason,
 			&i.AddRequestedBy,
 			&i.Lead,
+			&i.TakenBy,
+			&i.TakenByName,
+			&i.TakenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -286,7 +337,7 @@ func (q *Queries) ListStages(ctx context.Context, projectID uuid.UUID) ([]ListSt
 }
 
 const listVersionOneStages = `-- name: ListVersionOneStages :many
-SELECT s.id, s.project_id, s.name, s.description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead FROM stages s
+SELECT s.id, s.project_id, s.name, s.description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at FROM stages s
 WHERE s.project_id = $1 AND s.retired_at IS NULL AND s.add_reason IS NULL
   AND NOT EXISTS (
       SELECT 1 FROM stage_changes c
@@ -317,6 +368,9 @@ func (q *Queries) ListVersionOneStages(ctx context.Context, projectID uuid.UUID)
 			&i.AddReason,
 			&i.AddRequestedBy,
 			&i.Lead,
+			&i.TakenBy,
+			&i.TakenByName,
+			&i.TakenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -329,7 +383,7 @@ func (q *Queries) ListVersionOneStages(ctx context.Context, projectID uuid.UUID)
 }
 
 const lockStage = `-- name: LockStage :one
-SELECT id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead FROM stages
+SELECT id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead, taken_by, taken_by_name, taken_at FROM stages
 WHERE id = $1 AND retired_at IS NULL
 FOR UPDATE
 `
@@ -350,8 +404,31 @@ func (q *Queries) LockStage(ctx context.Context, id uuid.UUID) (Stage, error) {
 		&i.AddReason,
 		&i.AddRequestedBy,
 		&i.Lead,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
+}
+
+const releaseStage = `-- name: ReleaseStage :execrows
+UPDATE stages
+SET taken_by = NULL, taken_by_name = NULL, taken_at = NULL, updated_at = now()
+WHERE id = $1::uuid AND taken_by = $2::uuid AND retired_at IS NULL
+`
+
+type ReleaseStageParams struct {
+	ID      uuid.UUID
+	TakenBy uuid.UUID
+}
+
+// Deja sin tomar una etapa que sigue en manos de quien se esperaba.
+func (q *Queries) ReleaseStage(ctx context.Context, arg ReleaseStageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseStage, arg.ID, arg.TakenBy)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const removeStageMember = `-- name: RemoveStageMember :execrows
@@ -387,7 +464,7 @@ const updateStage = `-- name: UpdateStage :one
 UPDATE stages
 SET name = $2, description = $3, updated_at = now()
 WHERE id = $1
-RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead
+RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead, taken_by, taken_by_name, taken_at
 `
 
 type UpdateStageParams struct {
@@ -412,6 +489,9 @@ func (q *Queries) UpdateStage(ctx context.Context, arg UpdateStageParams) (Stage
 		&i.AddReason,
 		&i.AddRequestedBy,
 		&i.Lead,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
@@ -438,11 +518,19 @@ func (q *Queries) UpdateStageLead(ctx context.Context, arg UpdateStageLeadParams
 const updateStageStatus = `-- name: UpdateStageStatus :one
 WITH updated AS (
     UPDATE stages
-    SET status = $2, updated_at = now()
-    WHERE stages.id = $1
-    RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead
+    SET status = $1::text,
+        taken_by = $2::uuid,
+        taken_by_name = $3::text,
+        taken_at = CASE
+            WHEN $2::uuid IS NULL THEN NULL
+            WHEN stages.taken_by IS NOT DISTINCT FROM $2::uuid THEN stages.taken_at
+            ELSE now()
+        END,
+        updated_at = now()
+    WHERE stages.id = $4::uuid
+    RETURNING id, project_id, name, description, position, created_at, updated_at, status, retired_at, add_reason, add_requested_by, lead, taken_by, taken_by_name, taken_at
 )
-SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead
+SELECT s.id, s.project_id, COALESCE(c.name, s.name)::text AS name, COALESCE(c.description, s.description)::text AS description, s.position, s.created_at, s.updated_at, s.status, s.retired_at, s.add_reason, s.add_requested_by, s.lead, s.taken_by, s.taken_by_name, s.taken_at
 FROM updated s
 LEFT JOIN LATERAL (
     SELECT name, description FROM stage_changes
@@ -453,8 +541,10 @@ LEFT JOIN LATERAL (
 `
 
 type UpdateStageStatusParams struct {
-	ID     uuid.UUID
-	Status string
+	Status      string
+	TakenBy     pgtype.UUID
+	TakenByName pgtype.Text
+	ID          uuid.UUID
 }
 
 type UpdateStageStatusRow struct {
@@ -470,10 +560,20 @@ type UpdateStageStatusRow struct {
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
 	Lead           pgtype.Text
+	TakenBy        pgtype.UUID
+	TakenByName    pgtype.Text
+	TakenAt        pgtype.Timestamptz
 }
 
+// Guarda el status y quién tiene tomada la etapa. taken_at solo cambia cuando la
+// toma otra persona.
 func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) (UpdateStageStatusRow, error) {
-	row := q.db.QueryRow(ctx, updateStageStatus, arg.ID, arg.Status)
+	row := q.db.QueryRow(ctx, updateStageStatus,
+		arg.Status,
+		arg.TakenBy,
+		arg.TakenByName,
+		arg.ID,
+	)
 	var i UpdateStageStatusRow
 	err := row.Scan(
 		&i.ID,
@@ -488,6 +588,9 @@ func (q *Queries) UpdateStageStatus(ctx context.Context, arg UpdateStageStatusPa
 		&i.AddReason,
 		&i.AddRequestedBy,
 		&i.Lead,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }

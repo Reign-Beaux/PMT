@@ -10,6 +10,7 @@ import (
 
 	"pmt/internal/features/stages/domain"
 	"pmt/internal/features/stages/store/sqlcgen"
+	"pmt/internal/kernel"
 )
 
 // StatusChanges guarda los cambios de status y su registro inmutable.
@@ -96,4 +97,43 @@ func insertStatusChange(ctx context.Context, queries *sqlcgen.Queries, change do
 		return fmt.Errorf("guardar cambio de status: %w", err)
 	}
 	return nil
+}
+
+// Release deja sin tomar la etapa y guarda el registro de la liberación en una
+// transacción. holder es quien la tenía al leerla: si otra operación la tomó, la
+// liberó o le cambió el status entretanto, responde que cambió.
+func (s *StatusChanges) Release(ctx context.Context, stage domain.Stage, holder uuid.UUID, change domain.StatusChange) (domain.Stage, error) {
+	var updated domain.Stage
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		queries := sqlcgen.New(tx)
+		if err := ensureStatus(ctx, queries, change); err != nil {
+			return err
+		}
+		released, err := queries.ReleaseStage(ctx, sqlcgen.ReleaseStageParams{ID: stage.ID, TakenBy: holder})
+		if err != nil {
+			return fmt.Errorf("liberar etapa: %w", err)
+		}
+		if released == 0 {
+			return domain.ErrStageHoldChanged
+		}
+		if err := insertStatusChange(ctx, queries, change); err != nil {
+			return err
+		}
+		updated, err = NewStages(tx).Get(ctx, stage.ID)
+		return err
+	})
+	if err != nil {
+		return domain.Stage{}, err
+	}
+	return updated, nil
+}
+
+// AdoptHolds deja tomadas por el usuario las etapas iniciadas que nadie tiene y
+// devuelve cuántas.
+func (s *StatusChanges) AdoptHolds(ctx context.Context, owner kernel.UserRef) (int64, error) {
+	adopted, err := sqlcgen.New(s.db).AdoptStageHolds(ctx, sqlcgen.AdoptStageHoldsParams{UserID: owner.ID, Username: owner.Username})
+	if err != nil {
+		return 0, fmt.Errorf("tomar etapas iniciadas: %w", err)
+	}
+	return adopted, nil
 }

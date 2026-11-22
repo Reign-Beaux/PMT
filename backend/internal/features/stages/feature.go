@@ -14,6 +14,7 @@ import (
 	"pmt/internal/features/stages/commands/changestatus"
 	"pmt/internal/features/stages/commands/create"
 	"pmt/internal/features/stages/commands/delete"
+	"pmt/internal/features/stages/commands/release"
 	"pmt/internal/features/stages/commands/removelead"
 	"pmt/internal/features/stages/commands/removemember"
 	"pmt/internal/features/stages/commands/retire"
@@ -68,8 +69,8 @@ type StageCloser interface {
 }
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// tasks, projects, agents, users y closer los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker, users UserChecker, closer StageCloser) {
+// tasks, projects, agents, users, closer y owners los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker, users UserChecker, closer StageCloser, owners release.Owners) {
 	repo := store.NewStages(db)
 	changes := store.NewChanges(db)
 	statusChanges := store.NewStatusChanges(db)
@@ -145,6 +146,20 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	listChanges := listchanges.New(changes)
 	listChanges.Register(mux)
 	listChanges.RegisterTool(tools)
+
+	releaseStage := release.New(struct {
+		*store.Stages
+		*store.StatusChanges
+	}{repo, statusChanges}, owners)
+	releaseStage.Register(mux)
+	releaseStage.RegisterTool(tools)
+}
+
+// AdoptHolds deja tomadas por el usuario las etapas iniciadas que nadie tiene y
+// devuelve cuántas. Se llama al arrancar, con el dueño de la instancia, solo
+// cuando la migración de bloqueos no encontró usuarios.
+func AdoptHolds(ctx context.Context, db store.DB, owner kernel.UserRef) (int64, error) {
+	return store.NewStatusChanges(db).AdoptHolds(ctx, owner)
 }
 
 // Checker permite a otras features confirmar que una etapa existe y qué

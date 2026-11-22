@@ -117,12 +117,20 @@ func (f *Feature) AuthenticateToken(ctx context.Context, token string, declared 
 	}
 	declaredActor := kernel.AsUser(actor.Name, declared)
 	declaredActor.UserID = actor.UserID
+	declaredActor.UserName = actor.UserName
 	return declaredActor, nil
 }
 
 // InstanceOwnerID devuelve el ID del dueño de la instancia, o uuid.Nil si
 // todavía no existe. Los tokens de agente actúan con su membresía.
 func (f *Feature) InstanceOwnerID(ctx context.Context) (uuid.UUID, error) {
+	owner, err := f.InstanceOwner(ctx)
+	return owner.ID, err
+}
+
+// InstanceOwner devuelve al dueño de la instancia, o un UserRef vacío si todavía
+// no existe. Los tokens de agente actúan con su membresía y toman a su nombre.
+func (f *Feature) InstanceOwner(ctx context.Context) (kernel.UserRef, error) {
 	return instanceowner.New(f.repo).Handle(ctx)
 }
 

@@ -41,11 +41,19 @@ func (ningunaMembresia) RoleOf(context.Context, uuid.UUID, string, uuid.UUID) (p
 	return "", true, nil
 }
 
+func (ningunaMembresia) HoldOf(context.Context, string, uuid.UUID) (string, kernel.Hold, error) {
+	return "", kernel.Hold{}, nil
+}
+
 // soloViewer: todo elemento existe y el actor es viewer de su proyecto.
 type soloViewer struct{}
 
 func (soloViewer) RoleOf(context.Context, uuid.UUID, string, uuid.UUID) (projects.Role, bool, error) {
 	return projects.RoleViewer, true, nil
+}
+
+func (soloViewer) HoldOf(context.Context, string, uuid.UUID) (string, kernel.Hold, error) {
+	return "", kernel.Hold{}, nil
 }
 
 var (
@@ -440,6 +448,10 @@ func (membresiasDePrueba) RoleOf(_ context.Context, userID uuid.UUID, _ string, 
 		return "", false, nil
 	}
 	return roles[project][userID], true, nil
+}
+
+func (membresiasDePrueba) HoldOf(context.Context, string, uuid.UUID) (string, kernel.Hold, error) {
+	return "", kernel.Hold{}, nil
 }
 
 // personasConToken autentica el token pmt_<nombre> de cada persona como usuario,

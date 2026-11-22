@@ -207,6 +207,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProgressTask"
+        taken_by:
+          type: string
+          description: Username de la persona que la tiene tomada. Ausente si nadie.
+        taken_at:
+          type: string
+          format: date-time
+          description: Desde cuándo la tiene tomada. Ausente si nadie.
     ProgressTask:
       type: object
       required: [id, title, status, updated_at]
@@ -251,6 +258,13 @@ components:
         updated_at:
           type: string
           format: date-time
+        taken_by:
+          type: string
+          description: Username de la persona que lo tiene tomado. Ausente si nadie.
+        taken_at:
+          type: string
+          format: date-time
+          description: Desde cuándo lo tiene tomado. Ausente si nadie.
     ProgressSignal:
       type: object
       required: [code, stage_id, stage_name]

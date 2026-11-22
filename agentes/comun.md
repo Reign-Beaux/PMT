@@ -12,6 +12,7 @@ Reglas:
   `{{KIT}}/avisar.sh <agente> "mensaje"`. Hazlo siempre: responder en tu turno no le llega a nadie.
 - Mensajes cortos: de qué tarea o bug hablas y qué sigue. El detalle vive en PMT; un aviso no se guarda, así que lo que deba quedar registrado va en PMT.
 - Si un comando de PMT rechaza algo, lee el error y corrige. No busques rodeos.
+- Si una escritura responde `conflict: la etapa la está trabajando <usuario>` (o `el bug lo está trabajando`), la etapa o el bug son de otra persona: no reintentes ni busques otro camino. Avisa al TL, que lo anota en `{{AGENTES_DIR}}/para-usuario.md` para que el usuario hable con esa persona o con el owner del proyecto, el único que la libera (`release_stage`, `release_bug`).
 - Carga el esquema de una herramienta de PMT antes de llamarla por primera vez. Copia los ID de la salida de PMT, no los escribas de memoria.
 - No esperes ni sondees con `sleep`. Al terminar tu parte, termina tu turno: el aviso te despertará.
 - Quien levanta un proceso lo baja antes de avisar que terminó. El aviso es lo último de tu turno: antes deja todo en PMT y baja tus procesos.

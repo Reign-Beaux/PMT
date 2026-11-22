@@ -91,9 +91,12 @@ func (s *Bugs) Update(ctx context.Context, bug domain.Bug) (domain.Bug, error) {
 
 // UpdateStatus guarda el status de un bug.
 func (s *Bugs) UpdateStatus(ctx context.Context, bug domain.Bug) (domain.Bug, error) {
+	holder, name := postgres.HoldParams(bug.Hold)
 	row, err := s.queries.UpdateBugStatus(ctx, sqlcgen.UpdateBugStatusParams{
-		ID:     bug.ID,
-		Status: string(bug.Status),
+		ID:          bug.ID,
+		Status:      string(bug.Status),
+		TakenBy:     holder,
+		TakenByName: name,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Bug{}, domain.ErrBugNotFound
@@ -116,5 +119,6 @@ func toDomain(row sqlcgen.Bug) domain.Bug {
 		ReportedBy:       row.ReportedBy.String,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
+		Hold:             postgres.HoldOf(row.TakenBy, row.TakenByName, row.TakenAt),
 	}
 }

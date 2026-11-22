@@ -30,13 +30,16 @@ type toolOutput struct {
 
 	AddReason      string `json:"add_reason,omitempty"`
 	AddRequestedBy string `json:"add_requested_by,omitempty"`
+
+	TakenBy string `json:"taken_by,omitempty" jsonschema:"username de la persona que la tiene tomada; vacío si nadie"`
+	TakenAt string `json:"taken_at,omitempty" jsonschema:"desde cuándo la tiene tomada (RFC 3339)"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_stage_status",
-		Description: "Cambia el status de una etapa de PMT. Deja un registro inmutable, consultable con list_stage_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende del proyecto y de las tareas: con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working, y planning → stand_by, al menos una tarea activa. Una etapa solo pasa a done si sus tareas están en done o cancelled, con al menos una en done; si no tiene ninguna en done, cancélala. Al cerrar o cancelar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done; si todas quedan canceladas, no cambia. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Usa list_stages para obtener el ID de la etapa y su status actual.",
+		Description: "Cambia el status de una etapa de PMT. Deja un registro inmutable, consultable con list_stage_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende del proyecto y de las tareas: con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working, y planning → stand_by, al menos una tarea activa. Una etapa solo pasa a done si sus tareas están en done o cancelled, con al menos una en done; si no tiene ninguna en done, cancélala. Al cerrar o cancelar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done; si todas quedan canceladas, no cambia. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Pasar a in_dev (reanudarla o reabrirla) deja la etapa tomada por tu persona; done, cancelled, planning y stand_by la liberan; stopped la mantiene tomada. Usa list_stages para obtener el ID de la etapa y su status actual.",
 	}, h.callTool)
 }
 
@@ -51,6 +54,7 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}
 
+	takenBy, takenAt := platformmcp.HoldFields(result.Hold)
 	return nil, toolOutput{
 		ID:          result.ID.String(),
 		ProjectID:   result.ProjectID.String(),
@@ -63,5 +67,8 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 
 		AddReason:      result.AddReason,
 		AddRequestedBy: result.AddRequestedBy,
+
+		TakenBy: takenBy,
+		TakenAt: takenAt,
 	}, nil
 }

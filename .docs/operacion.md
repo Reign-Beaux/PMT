@@ -120,6 +120,25 @@ Solo el owner y los editores trabajan en un proyecto con agentes. Un `viewer` so
 
 Los tokens de agente (`pmt-server agent`) actúan con la membresía del dueño de la instancia: ven y tocan sus proyectos y los que le compartieron, y lo que crean queda suyo.
 
+### Etapas y bugs tomados
+
+En un proyecto compartido, la etapa que alguien inicia (o el bug que pasa a `in_dev`) queda tomada por esa persona hasta cerrarla o cancelarla ([dominio.md](dominio.md#bloqueos-por-persona)). Los agentes de otra persona la leen, pero al escribir reciben `conflict`: «la etapa la está trabajando ana». `list_stages`, `list_bugs` y `get_project_progress` muestran quién la tiene en `taken_by` y desde cuándo en `taken_at`.
+
+Si quien la tiene no puede seguir, el owner del proyecto la libera, sin perfil declarado o con perfil PP, con un motivo que queda en el historial de status:
+
+| Libera | MCP | REST |
+| --- | --- | --- |
+| Una etapa | `release_stage` (`stage_id`, `reason`) | `POST /api/stages/{id}/release` `{"reason"}` |
+| Un bug | `release_bug` (`bug_id`, `reason`) | `POST /api/bugs/{id}/release` `{"reason"}` |
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/stages/<id>/release \
+  -H "Authorization: Bearer $PMT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"reason":"ana no puede seguir"}'
+```
+
+El status no cambia y queda sin tomar: escribir en ella no la toma. La toma de nuevo quien la inicie con `start_stage`, la pase otra vez a `in_dev` (reanudar o reabrir) o, en un bug, quien lo pase a `in_dev`.
+
 ## Agentes y tokens
 
 Los tokens de agente solo se administran por línea de comandos, para que ningún agente pueda emitirlos. Actúan con la membresía del dueño de la instancia ([Compartir un proyecto](#compartir-un-proyecto)). Por lo demás siguen funcionando igual que antes de los usuarios: su perfil es fijo, así que `?profile=` o `X-PMT-Profile` solo se aceptan si coinciden con él (si no, 400). `create` y `rotate` imprimen únicamente el token. `create` rechaza un nombre que ya sea `username` de un usuario.

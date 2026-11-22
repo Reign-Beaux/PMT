@@ -38,6 +38,8 @@ type Bug struct {
 	ReportedBy       string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+
+	kernel.Hold
 }
 
 // NewBug crea un bug válido en su estado inicial. reportedBy es quien lo registra;

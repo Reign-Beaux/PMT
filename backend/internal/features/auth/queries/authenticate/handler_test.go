@@ -34,7 +34,7 @@ func TestSesionYTokenActuanComoUsuario(t *testing.T) {
 	repo.CreateSession(ctx, domain.HashToken("sesion"), u.ID, time.Now().Add(domain.SessionTTL))
 	token, _ := domain.NewAPIToken()
 	repo.CreateAPIToken(ctx, u.ID, u.ID, "x", domain.HashToken(token))
-	want := kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserID: u.ID}
+	want := kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserID: u.ID, UserName: "ana"}
 
 	if got, err := New(repo).Session(ctx, "sesion"); err != nil || got != want {
 		t.Errorf("sesión: %+v %v", got, err)

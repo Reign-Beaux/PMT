@@ -29,13 +29,16 @@ type toolOutput struct {
 	ReportedBy       string `json:"reported_by,omitempty"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
+
+	TakenBy string `json:"taken_by,omitempty" jsonschema:"username de la persona que lo tiene tomado; vacío si nadie"`
+	TakenAt string `json:"taken_at,omitempty" jsonschema:"desde cuándo lo tiene tomado (RFC 3339)"`
 }
 
 // RegisterTool registra la herramienta MCP de la operación.
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "change_bug_status",
-		Description: "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Una corrección vuelve de changes_requested a in_dev. Solo QA rechaza, y solo un bug reported que no reproduce; desde otro status no se rechaza. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Usa list_bugs para obtener el ID del bug y su status actual.",
+		Description: "Cambia el status de un bug de PMT y devuelve el bug completo. Deja un registro inmutable, consultable con list_bug_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Exige el proyecto en working. Una corrección vuelve de changes_requested a in_dev. Solo QA rechaza, y solo un bug reported que no reproduce; desde otro status no se rechaza. QA aprueba a pending_close y el TL cierra en done. Rechazar, reabrir, in_review → pending_close, in_qa → pending_close y pending_close → in_review o in_qa exigen reason. Pasar a in_dev deja el bug tomado por tu persona hasta done o rejected; mientras, solo sus agentes escriben en él. Usa list_bugs para obtener el ID del bug y su status actual.",
 	}, h.callTool)
 }
 
@@ -50,6 +53,7 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 		return nil, toolOutput{}, platformmcp.ToolError(err)
 	}
 
+	takenBy, takenAt := platformmcp.HoldFields(result.Hold)
 	return nil, toolOutput{
 		ID:               result.ID.String(),
 		ProjectID:        result.ProjectID.String(),
@@ -61,5 +65,7 @@ func (h *Handler) callTool(ctx context.Context, req *sdk.CallToolRequest, input 
 		ReportedBy:       result.ReportedBy,
 		CreatedAt:        result.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:        result.UpdatedAt.Format(time.RFC3339),
+		TakenBy:          takenBy,
+		TakenAt:          takenAt,
 	}, nil
 }

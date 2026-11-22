@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -96,17 +95,31 @@ func Run(cfg config.Config) error {
 
 // adoptOrphans deja al dueño de la instancia como owner de los proyectos sin
 // owner: los que existían cuando la migración de miembros no encontró usuarios.
+// En ese caso tampoco había quién tomara lo que ya se trabajaba, así que también
+// toma las etapas iniciadas y los bugs en corrección que nadie tiene.
 func adoptOrphans(ctx context.Context, users *auth.Feature, pool *pgxpool.Pool) error {
-	owner, err := users.InstanceOwnerID(ctx)
+	owner, err := users.InstanceOwner(ctx)
 	if err != nil {
 		return fmt.Errorf("buscar dueño de la instancia: %w", err)
 	}
-	adopted, err := projects.AdoptOrphans(ctx, pool, owner)
+	adopted, err := projects.AdoptOrphans(ctx, pool, owner.ID)
 	if err != nil {
 		return err
 	}
-	if adopted > 0 {
-		slog.Info("el dueño de la instancia quedó como owner de los proyectos sin owner", "proyectos", adopted)
+	if adopted == 0 {
+		return nil
+	}
+	slog.Info("el dueño de la instancia quedó como owner de los proyectos sin owner", "proyectos", adopted)
+	takenStages, err := stages.AdoptHolds(ctx, pool, owner)
+	if err != nil {
+		return err
+	}
+	takenBugs, err := bugs.AdoptHolds(ctx, pool, owner)
+	if err != nil {
+		return err
+	}
+	if takenStages > 0 || takenBugs > 0 {
+		slog.Info("el dueño de la instancia tomó lo que ya se trabajaba", "etapas", takenStages, "bugs", takenBugs)
 	}
 	return nil
 }
@@ -124,7 +137,7 @@ type credentials struct {
 		Authenticate(ctx context.Context, token string) (kernel.Actor, error)
 	}
 	owner interface {
-		InstanceOwnerID(ctx context.Context) (uuid.UUID, error)
+		InstanceOwner(ctx context.Context) (kernel.UserRef, error)
 	}
 }
 
@@ -144,9 +157,11 @@ func (c credentials) AuthenticateToken(ctx context.Context, token string, declar
 	if err != nil {
 		return kernel.Actor{}, err
 	}
-	if actor.UserID, err = c.owner.InstanceOwnerID(ctx); err != nil {
+	owner, err := c.owner.InstanceOwner(ctx)
+	if err != nil {
 		return kernel.Actor{}, err
 	}
+	actor.UserID, actor.UserName = owner.ID, owner.Username
 	return actor, nil
 }
 
@@ -181,12 +196,13 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	projects.Register(mux, tools, pool, stages.NewProgress(pool), userChecker)
 	taskChecker := tasks.NewChecker(pool)
 	workers := projects.NewWorkers(pool, userChecker)
-	stages.Register(mux, tools, pool, taskChecker, projectChecker, agentChecker, workers, workflow.NewCloser(pool))
+	owners := projects.NewOwners(pool)
+	stages.Register(mux, tools, pool, taskChecker, projectChecker, agentChecker, workers, workflow.NewCloser(pool), owners)
 	stageChecker := stages.NewChecker(pool, projectChecker)
 	tasks.Register(mux, tools, pool, stageChecker, agentChecker, workers)
 	imports.Register(tools, pool)
 	workflow.Register(mux, tools, pool, taskChecker)
-	bugs.Register(mux, tools, pool, projectChecker)
+	bugs.Register(mux, tools, pool, projectChecker, owners)
 	bugChecker := bugs.NewChecker(pool)
 	reviews.Register(mux, tools, pool, taskChecker, bugChecker, stageChecker)
 	qa.Register(mux, tools, pool, taskChecker, stageChecker)

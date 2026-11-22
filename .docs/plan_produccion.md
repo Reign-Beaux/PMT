@@ -35,7 +35,7 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 - **Liberación:** al cerrarla (`done`) o cancelarla. Detenida (`stopped`) sigue tomada. El owner del proyecto puede liberarla a mano.
 - **Bugs:** quien lo pasa a `in_dev` lo toma, con las mismas reglas.
 - **Etapas nuevas:** se pueden agregar aunque otra persona trabaje otra etapa.
-- **Registro del proyecto:** nombre y descripción no se editan mientras el proyecto tenga etapas o tareas sin terminar (terminada es `done` o `cancelled`). Versión de producto y status siguen sus reglas actuales.
+- Registro del proyecto: nombre y descripción se editan en cualquier momento, como antes (decisión del 22 de noviembre de 2026).
 
 ### Datos
 - Al montar la Raspberry se copian los dos proyectos actuales, DBP y PMT, con todo su historial. El usuario queda como owner de ambos.
@@ -50,7 +50,7 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 - Perfil por sesión en el MCP (por ejemplo `/mcp?profile=pp`) y en REST.
 - Quitar el acceso sin token y el comando `pmt-server agent`. Las cuentas se administran desde la interfaz.
 - Miembros de proyecto con roles owner, editor y viewer, y filtrado de todas las lecturas por membresía.
-- Bloqueo de etapas y bugs por persona, y bloqueo de nombre y descripción del proyecto con trabajo sin terminar.
+- Bloqueo de etapas y bugs por persona.
 - Frontend: login, invitación, administración de miembros y tokens.
 
 ### Fase 2. Perfiles servidos por PMT

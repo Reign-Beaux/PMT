@@ -33,13 +33,17 @@ const (
 // usuario o, con un token de agente, el dueño de la instancia. Vacío, el actor no
 // es miembro de ningún proyecto.
 //
+// UserName es el username de UserID: el mismo Name para un usuario, el del dueño
+// de la instancia para un agente. Es el nombre de quien toma una etapa o un bug.
+//
 // Channel es la credencial con la que llegó: la cookie del sitio web o un token
 // de API. Lo fija quien la autentica (rest.Authenticate, mcp.Authenticate).
 type Actor struct {
-	Name    string
-	Profile Profile
-	UserID  uuid.UUID
-	Channel Channel
+	Name     string
+	Profile  Profile
+	UserID   uuid.UUID
+	UserName string
+	Channel  Channel
 }
 
 // Channel es la credencial con la que llega una petición.

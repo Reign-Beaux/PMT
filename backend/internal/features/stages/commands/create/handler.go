@@ -47,6 +47,8 @@ type Result struct {
 
 	Lead    string   `json:"lead,omitempty"`
 	Members []string `json:"members,omitempty"`
+
+	kernel.Hold
 }
 
 // Handler ejecuta la operación.

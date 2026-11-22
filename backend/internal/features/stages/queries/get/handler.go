@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/stages/domain"
+	"pmt/internal/kernel"
 )
 
 // Reader es la lectura que necesita la operación.
@@ -31,6 +32,8 @@ type Result struct {
 
 	Lead    string   `json:"lead,omitempty"`
 	Members []string `json:"members,omitempty"`
+
+	kernel.Hold
 }
 
 // Handler ejecuta la operación.

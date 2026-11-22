@@ -41,6 +41,9 @@ type Bug struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	ReportedBy       pgtype.Text
+	TakenBy          pgtype.UUID
+	TakenByName      pgtype.Text
+	TakenAt          pgtype.Timestamptz
 }
 
 type BugStatusChange struct {
@@ -176,6 +179,9 @@ type Stage struct {
 	AddReason      pgtype.Text
 	AddRequestedBy pgtype.Text
 	Lead           pgtype.Text
+	TakenBy        pgtype.UUID
+	TakenByName    pgtype.Text
+	TakenAt        pgtype.Timestamptz
 }
 
 type StageChange struct {

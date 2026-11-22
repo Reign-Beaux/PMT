@@ -1,6 +1,6 @@
 [
   {
-    "description": "Cambia el status de una etapa de PMT. Deja un registro inmutable, consultable con list_stage_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende del proyecto y de las tareas: con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working, y planning → stand_by, al menos una tarea activa. Una etapa solo pasa a done si sus tareas están en done o cancelled, con al menos una en done; si no tiene ninguna en done, cancélala. Al cerrar o cancelar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done; si todas quedan canceladas, no cambia. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Usa list_stages para obtener el ID de la etapa y su status actual.",
+    "description": "Cambia el status de una etapa de PMT. Deja un registro inmutable, consultable con list_stage_status_changes. Solo admite las transiciones permitidas; cualquier otra, incluida la del status a sí mismo, se rechaza. Depende del proyecto y de las tareas: con el proyecto en stopped o cancelled solo se detiene o se cancela; pasar a in_dev exige proyecto en in_dev o working, y planning → stand_by, al menos una tarea activa. Una etapa solo pasa a done si sus tareas están en done o cancelled, con al menos una en done; si no tiene ninguna en done, cancélala. Al cerrar o cancelar la última etapa abierta de la versión 1, las que no tienen registro add, el proyecto pasa solo de in_dev a working si al menos una quedó en done; si todas quedan canceladas, no cambia. Salir de planning cierra el planning propio de una etapa: escribe su registro add y desde entonces solo admite add_*, revise_* y retire_*. Pasar a in_dev (reanudarla o reabrirla) deja la etapa tomada por tu persona; done, cancelled, planning y stand_by la liberan; stopped la mantiene tomada. Usa list_stages para obtener el ID de la etapa y su status actual.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -52,6 +52,14 @@
           "type": "string"
         },
         "status": {
+          "type": "string"
+        },
+        "taken_at": {
+          "description": "desde cuándo la tiene tomada (RFC 3339)",
+          "type": "string"
+        },
+        "taken_by": {
+          "description": "username de la persona que la tiene tomada; vacío si nadie",
           "type": "string"
         },
         "updated_at": {
@@ -139,7 +147,7 @@
     }
   },
   {
-    "description": "Lista las etapas de un proyecto de PMT, ordenadas por posición, con su TL y su equipo. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
+    "description": "Lista las etapas de un proyecto de PMT, ordenadas por posición, con su TL, su equipo y quién la tiene tomada (taken_by, taken_at): una etapa tomada por otra persona solo se lee. Úsala para obtener el ID de una etapa a partir de su nombre, por ejemplo antes de usar create_task o list_tasks. Para obtener project_id usa list_projects.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -198,6 +206,14 @@
                 "type": "string"
               },
               "status": {
+                "type": "string"
+              },
+              "taken_at": {
+                "description": "desde cuándo la tiene tomada (RFC 3339)",
+                "type": "string"
+              },
+              "taken_by": {
+                "description": "username de la persona que la tiene tomada; vacío si nadie",
                 "type": "string"
               },
               "updated_at": {
@@ -912,6 +928,56 @@
         "id",
         "lead",
         "members"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Libera una etapa de PMT tomada por una persona: la deja sin tomar, sin cambiar su status, y registra el motivo en su historial de status (list_stage_status_changes). Solo el owner del proyecto, con perfil User o PP. Quien escriba después no la toma: solo la toman start_stage o pasarla de nuevo a in_dev. Usa list_stages para ver el ID de la etapa y quién la tiene (taken_by).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Motivo de la liberación; obligatorio, queda en el historial de status",
+          "type": "string"
+        },
+        "stage_id": {
+          "description": "UUID de la etapa",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "release_stage",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "name",
+        "status",
+        "updated_at"
       ],
       "type": "object"
     }

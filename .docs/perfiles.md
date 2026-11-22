@@ -106,6 +106,7 @@ Al subir un dígito, los de su derecha vuelven a 0. Las etapas de la versión 1 
 - **Detener.** El usuario puede detener una etapa o el proyecto en cualquier momento; el TL, solo su etapa.
 - **Limpieza.** Quien levanta un proceso lo baja antes de avisar. El aviso es lo último del turno.
 - **Herramientas de prueba.** Nadie crea las suyas: se usan las que se instalaron al configurar el proyecto.
+- **Etapa tomada.** Si una escritura responde `conflict: la etapa la está trabajando <usuario>` (o `el bug lo está trabajando`), la etapa o el bug son de otra persona: el agente no reintenta ni busca otro camino. Avisa al TL, que lo anota en `para-usuario.md` para que el usuario hable con esa persona o con el owner del proyecto, el único que la libera (`release_stage`, `release_bug`).
 - **IDs.** Un agente carga el esquema de una herramienta de PMT antes de usarla por primera vez y copia los ID de la salida, sin escribirlos de memoria.
 
 ## Sesiones

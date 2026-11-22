@@ -9,7 +9,7 @@ Conceptos que PMT guarda y reglas que aplica. La documentación usa el término 
 | **Proyecto** | `Project` | Trabajo que se gestiona en PMT y se divide en etapas. Tiene status y versión de producto. |
 | **Etapa** | `Stage` | Parte de un proyecto con un orden (`position`), un TL responsable y un equipo de devs, agentes o usuarios. Agrupa tareas. |
 | **Tarea** | `Task` | Unidad de trabajo de una etapa, con un dueño (`assignee`) cuando un dev la toma. |
-| **Bug** | `Bug` | Fallo de un proyecto en `working`, hallado en pruebas de rutina o en el uso. Pertenece al proyecto, no a una etapa, y no tiene dueño. Guarda pasos para reproducirlo, la versión donde apareció y quién lo reportó. |
+| **Bug** | `Bug` | Fallo de un proyecto en `working`, hallado en pruebas de rutina o en el uso. Pertenece al proyecto, no a una etapa, y no tiene dueño (sí puede estar tomado: [Bloqueos](#bloqueos-por-persona)). Guarda pasos para reproducirlo, la versión donde apareció y quién lo reportó. |
 | **Cambio** | `Change` | Registro inmutable de tipo `add`, `edit` o `retire` sobre una etapa o tarea, con contenido completo, motivo, quién lo pidió y fecha. |
 | **Historial de status** | `StatusChange` | Registro inmutable de cada cambio de status de un proyecto, etapa, tarea o bug: desde, hacia, actor, perfil, fecha y motivo. |
 | **Cambio de versión** | `ProductVersionChange` | Registro inmutable de cada subida de la versión de producto en `working`. |
@@ -20,9 +20,10 @@ Conceptos que PMT guarda y reglas que aplica. La documentación usa el término 
 | **Usuario** | `User` (feature `auth`) | Persona que entra a PMT con correo y contraseña, por invitación del dueño de la instancia. Tiene nombre y un `username` en minúsculas, números y guiones que no cambia y no coincide con ningún agente. Crea sus propios tokens de API para sus agentes. Se desactiva, no se borra. |
 | **Dueño de la instancia** | `IsInstanceOwner` | El primer usuario, creado al arrancar desde la configuración. Invita y desactiva o reactiva usuarios. No se puede desactivar. |
 | **Miembro** | `Member` | Usuario con un rol en un proyecto: `owner`, `editor` o `viewer` ([Miembros y roles](#miembros-y-roles)). |
+| **Bloqueo** | `Hold` (`kernel`) | Qué persona tiene tomada una etapa iniciada o un bug en corrección: solo sus agentes escriben en él ([Bloqueos](#bloqueos-por-persona)). |
 | **Agente** | `Agent` | Trabajador de IA con nombre, perfil y token propio, creado con `pmt-server agent`. No se borra: se revoca. |
 | **Perfil** | `Profile` | PP, PC, TL, DP, DevFrontend, DevBackend, CR, QAP, QA o `User`, el usuario humano. |
-| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username`: desde el navegador, siempre con el perfil `User`; con su token, con el perfil que declara la sesión (cualquiera), o `User` si no declara ninguno. Un agente actúa con su nombre y su perfil fijo. Nombre y perfil son lo que queda en historiales (`saul` + `TL`, por ejemplo), comentarios y hallazgos. Lleva además el usuario cuya membresía usa (`UserID`): el propio usuario o, con un token de agente, el dueño de la instancia; y el canal de su credencial (`Channel`): la cookie del sitio web o un token. |
+| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username`: desde el navegador, siempre con el perfil `User`; con su token, con el perfil que declara la sesión (cualquiera), o `User` si no declara ninguno. Un agente actúa con su nombre y su perfil fijo. Nombre y perfil son lo que queda en historiales (`saul` + `TL`, por ejemplo), comentarios y hallazgos. Lleva además el usuario cuya membresía usa (`UserID`) y su `username` (`UserName`): el propio usuario o, con un token de agente, el dueño de la instancia; y el canal de su credencial (`Channel`): la cookie del sitio web o un token. |
 
 **Cancelar o retirar.** `cancelled` es un status reversible, para trabajo iniciado o que puede volver. Retirar (`retire`) es definitivo, para lo que nunca debió estar: deja un cambio y saca el elemento de las consultas, sin borrar nada.
 
@@ -50,6 +51,22 @@ Solo el owner y los editores trabajan en un proyecto con agentes.
 - **Administrar miembros.** Solo el owner, sin perfil declarado (perfil `User`): agrega por `username` a un usuario activo como `editor` o `viewer`, cambia su rol entre esos dos y lo quita. Cualquier miembro lista los miembros.
 - **Usuario desactivado.** Conserva sus membresías, pero ya no entra.
 - **Tokens de agente.** Actúan con la membresía del dueño de la instancia; lo que crean queda suyo.
+
+## Bloqueos por persona
+
+Dos personas que comparten un proyecto no se pisan: la etapa o el bug que una trabaja queda tomado por ella. El bloqueo es por **persona** (el usuario del actor), no por perfil: sus agentes, con cualquier perfil y también los tokens de agente del dueño de la instancia, que cuentan como él, trabajan en lo suyo.
+
+| Elemento | Lo toma | Se libera |
+| --- | --- | --- |
+| Etapa | Quien la pasa a `in_dev`: al iniciarla con `start_stage`, al reanudarla desde `stopped` o al reabrirla desde `done` | Al pasar a `done` o `cancelled`, y al volver a `planning` o `stand_by` (una etapa sin iniciar no está tomada). En `stopped` sigue tomada |
+| Bug | Quien lo pasa a `in_dev`, también al retomarlo desde `changes_requested` | Al pasar a `done` o `rejected`. De `in_dev` a `pending_close` sigue tomado |
+
+- **Escrituras.** Mientras otra persona la tenga, cualquier escritura sobre la etapa o algo suyo (status, `revise_*`, `retire_*`, TL y equipo, tareas, comentarios, hallazgos, planes de desarrollo y de pruebas), o sobre el bug, sus comentarios, hallazgos y planes, responde `conflict` con el `username` de quien la tiene: «la etapa la está trabajando ana», «el bug lo está trabajando ana». Leer no se bloquea.
+- **Lo que no se bloquea.** Agregar etapas (`add_stage`, `import_stage`) aunque otra persona trabaje otra, y lo que solo toca el proyecto (status, versión, miembros, crear bugs).
+- **Liberar a mano.** El owner del proyecto, con perfil `User` o `PP`, libera una etapa o un bug tomados con `release_stage` o `release_bug` y motivo obligatorio. El status no cambia; el historial de status guarda un registro con el mismo status de origen y destino y el motivo («liberada por el owner (la tenía ana): …»). Queda sin tomar: quien escriba después no la toma, solo `start_stage`, pasarla de nuevo a `in_dev` o pasar el bug a `in_dev`.
+- **Lecturas.** `list_stages`, `GET /api/stages/{id}`, `list_bugs`, `get_project_progress` y los resultados de cambiar status traen `taken_by` (username) y `taken_at`; sin ellos, nadie lo tiene.
+- **Orden.** La membresía se revisa primero y el bloqueo después, antes del handler: quien no es miembro sigue recibiendo `not_found`, y un perfil sin permiso sobre una etapa tomada por otra persona recibe `conflict` antes que `forbidden`.
+- **Datos anteriores.** La migración `00028` dejó tomadas por el dueño de la instancia las etapas en `in_dev` o `stopped` y los bugs entre `in_dev` y `pending_close`.
 
 ## Proyectos
 
@@ -201,8 +218,9 @@ Detener o cancelar un padre congela lo de abajo, sin cambiar su status.
 
 - **Toda petición se identifica.** Sin cookie ni token válidos, PMT responde 401 ([arquitectura.md](arquitectura.md#identidad)).
 - **Membresía primero.** Antes de cada operación se comprueba que quien actúa sea miembro del proyecto de los IDs que recibe, que, si es viewer, llegue con la cookie del sitio web, y que no sea viewer si escribe ([Miembros y roles](#miembros-y-roles)).
+- **Después, los bloqueos.** Una escritura sobre una etapa o un bug tomados por otra persona responde `conflict` ([Bloqueos](#bloqueos-por-persona)).
 - **Todo comando de escritura exige perfil.** Uno sin permiso recibe `forbidden` antes de que se lea el elemento.
-- **Planeación** (`create_*`, `update_*`, `delete_*`, `add_*`, `retire_*` de proyectos, etapas y tareas, `revise_task`, `import_*`, `change_product_version`, `release_project`, `assign_stage_lead`, `remove_stage_lead`): solo PP y `User`. `revise_stage` también el TL de esa etapa.
+- **Planeación** (`create_*`, `update_*`, `delete_*`, `add_*`, `retire_*` de proyectos, etapas y tareas, `revise_task`, `import_*`, `change_product_version`, `release_project`, `assign_stage_lead`, `remove_stage_lead`): solo PP y `User`. `release_stage` y `release_bug`: PP y `User`, y solo el owner del proyecto. `revise_stage` también el TL de esa etapa.
 - **PC** solo lee: no escribe nada, ni comentarios.
 - **`User`** tiene lo de PP, pero no aprueba como CR, QA ni TL, ni gestiona hallazgos o planes.
 - **Un TL** solo actúa sobre su etapa y sus tareas.

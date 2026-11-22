@@ -120,3 +120,16 @@ func TestHandleRejects(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleTakesStageForThePerson(t *testing.T) {
+	repo := newRepo(projects.StatusInDev, stages.StatusStandBy)
+	person := uuid.New()
+	actor := kernel.Actor{Name: "tl", Profile: kernel.ProfileTL, UserID: person, UserName: "ana"}
+
+	if _, err := New(repo).Handle(context.Background(), Command{ID: repo.stage.ID, Actor: actor}); err != nil {
+		t.Fatal(err)
+	}
+	if hold := repo.plan.Stage.Stage.Hold; hold.HolderID != person || hold.TakenBy != "ana" {
+		t.Fatalf("hold = %+v", hold)
+	}
+}

@@ -6,9 +6,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
-
 	"pmt/internal/features/auth/domain"
+	"pmt/internal/kernel"
 )
 
 // Reader es la lectura que necesita la operación.
@@ -26,15 +25,15 @@ func New(reader Reader) *Handler {
 	return &Handler{reader: reader}
 }
 
-// Handle devuelve el ID del dueño de la instancia, o uuid.Nil si todavía no
+// Handle devuelve al dueño de la instancia, o un UserRef vacío si todavía no
 // existe.
-func (h *Handler) Handle(ctx context.Context) (uuid.UUID, error) {
+func (h *Handler) Handle(ctx context.Context) (kernel.UserRef, error) {
 	owner, err := h.reader.InstanceOwner(ctx)
 	if errors.Is(err, domain.ErrUserNotFound) {
-		return uuid.Nil, nil
+		return kernel.UserRef{}, nil
 	}
 	if err != nil {
-		return uuid.Nil, err
+		return kernel.UserRef{}, err
 	}
-	return owner.ID, nil
+	return owner.Ref(), nil
 }

@@ -70,5 +70,6 @@ func (b *Bug) ChangeStatus(status Status, actor kernel.Actor, reason string) err
 		return err
 	}
 	b.Status = status
+	b.applyHold(actor)
 	return nil
 }

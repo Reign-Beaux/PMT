@@ -12,10 +12,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adoptBugHolds = `-- name: AdoptBugHolds :execrows
+UPDATE bugs
+SET taken_by = $1::uuid, taken_by_name = $2::text, taken_at = clock_timestamp()
+WHERE taken_by IS NULL AND status IN ('in_dev', 'in_review', 'changes_requested', 'in_qa', 'pending_close')
+`
+
+type AdoptBugHoldsParams struct {
+	UserID   uuid.UUID
+	Username string
+}
+
+// Deja tomados por el usuario los bugs en corrección que nadie tiene: los que
+// existían cuando la migración de bloqueos no encontró usuarios.
+func (q *Queries) AdoptBugHolds(ctx context.Context, arg AdoptBugHoldsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, adoptBugHolds, arg.UserID, arg.Username)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createBug = `-- name: CreateBug :one
 INSERT INTO bugs (id, project_id, title, description, steps_to_reproduce, product_version, status, reported_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at
 `
 
 type CreateBugParams struct {
@@ -52,12 +73,15 @@ func (q *Queries) CreateBug(ctx context.Context, arg CreateBugParams) (Bug, erro
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReportedBy,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
 
 const getBug = `-- name: GetBug :one
-SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by FROM bugs
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at FROM bugs
 WHERE id = $1
 `
 
@@ -75,12 +99,15 @@ func (q *Queries) GetBug(ctx context.Context, id uuid.UUID) (Bug, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReportedBy,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
 
 const listBugs = `-- name: ListBugs :many
-SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by FROM bugs
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at FROM bugs
 WHERE project_id = $1
 ORDER BY created_at, id
 `
@@ -105,6 +132,9 @@ func (q *Queries) ListBugs(ctx context.Context, projectID uuid.UUID) ([]Bug, err
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ReportedBy,
+			&i.TakenBy,
+			&i.TakenByName,
+			&i.TakenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -117,7 +147,7 @@ func (q *Queries) ListBugs(ctx context.Context, projectID uuid.UUID) ([]Bug, err
 }
 
 const lockBug = `-- name: LockBug :one
-SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by FROM bugs
+SELECT id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at FROM bugs
 WHERE id = $1
 FOR UPDATE
 `
@@ -136,6 +166,43 @@ func (q *Queries) LockBug(ctx context.Context, id uuid.UUID) (Bug, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReportedBy,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
+	)
+	return i, err
+}
+
+const releaseBug = `-- name: ReleaseBug :one
+UPDATE bugs
+SET taken_by = NULL, taken_by_name = NULL, taken_at = NULL, updated_at = clock_timestamp()
+WHERE id = $1::uuid AND taken_by = $2::uuid
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at
+`
+
+type ReleaseBugParams struct {
+	ID      uuid.UUID
+	TakenBy uuid.UUID
+}
+
+// Deja sin tomar un bug que sigue en manos de quien se esperaba.
+func (q *Queries) ReleaseBug(ctx context.Context, arg ReleaseBugParams) (Bug, error) {
+	row := q.db.QueryRow(ctx, releaseBug, arg.ID, arg.TakenBy)
+	var i Bug
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Description,
+		&i.StepsToReproduce,
+		&i.ProductVersion,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ReportedBy,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
@@ -144,7 +211,7 @@ const updateBug = `-- name: UpdateBug :one
 UPDATE bugs
 SET title = $2, description = $3, steps_to_reproduce = $4, product_version = $5, updated_at = clock_timestamp()
 WHERE id = $1
-RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at
 `
 
 type UpdateBugParams struct {
@@ -175,24 +242,44 @@ func (q *Queries) UpdateBug(ctx context.Context, arg UpdateBugParams) (Bug, erro
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReportedBy,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }
 
 const updateBugStatus = `-- name: UpdateBugStatus :one
 UPDATE bugs
-SET status = $2, updated_at = clock_timestamp()
-WHERE id = $1
-RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by
+SET status = $1::text,
+    taken_by = $2::uuid,
+    taken_by_name = $3::text,
+    taken_at = CASE
+        WHEN $2::uuid IS NULL THEN NULL
+        WHEN bugs.taken_by IS NOT DISTINCT FROM $2::uuid THEN bugs.taken_at
+        ELSE clock_timestamp()
+    END,
+    updated_at = clock_timestamp()
+WHERE id = $4::uuid
+RETURNING id, project_id, title, description, steps_to_reproduce, product_version, status, created_at, updated_at, reported_by, taken_by, taken_by_name, taken_at
 `
 
 type UpdateBugStatusParams struct {
-	ID     uuid.UUID
-	Status string
+	Status      string
+	TakenBy     pgtype.UUID
+	TakenByName pgtype.Text
+	ID          uuid.UUID
 }
 
+// Guarda el status y quién tiene tomado el bug. taken_at solo cambia cuando lo
+// toma otra persona.
 func (q *Queries) UpdateBugStatus(ctx context.Context, arg UpdateBugStatusParams) (Bug, error) {
-	row := q.db.QueryRow(ctx, updateBugStatus, arg.ID, arg.Status)
+	row := q.db.QueryRow(ctx, updateBugStatus,
+		arg.Status,
+		arg.TakenBy,
+		arg.TakenByName,
+		arg.ID,
+	)
 	var i Bug
 	err := row.Scan(
 		&i.ID,
@@ -205,6 +292,9 @@ func (q *Queries) UpdateBugStatus(ctx context.Context, arg UpdateBugStatusParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReportedBy,
+		&i.TakenBy,
+		&i.TakenByName,
+		&i.TakenAt,
 	)
 	return i, err
 }

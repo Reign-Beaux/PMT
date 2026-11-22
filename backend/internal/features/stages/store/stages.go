@@ -118,9 +118,12 @@ func (s *Stages) Update(ctx context.Context, stage domain.Stage) (domain.Stage, 
 
 // UpdateStatus guarda el status de una etapa y devuelve su última versión.
 func (s *Stages) UpdateStatus(ctx context.Context, stage domain.Stage) (domain.Stage, error) {
+	holder, name := postgres.HoldParams(stage.Hold)
 	row, err := s.queries.UpdateStageStatus(ctx, sqlcgen.UpdateStageStatusParams{
-		ID:     stage.ID,
-		Status: string(stage.Status),
+		ID:          stage.ID,
+		Status:      string(stage.Status),
+		TakenBy:     holder,
+		TakenByName: name,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Stage{}, domain.ErrStageNotFound
@@ -228,5 +231,6 @@ func toDomain(row sqlcgen.Stage) domain.Stage {
 		AddReason:      row.AddReason.String,
 		AddRequestedBy: row.AddRequestedBy.String,
 		Lead:           row.Lead.String,
+		Hold:           postgres.HoldOf(row.TakenBy, row.TakenByName, row.TakenAt),
 	}
 }

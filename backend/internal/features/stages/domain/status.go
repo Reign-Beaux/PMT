@@ -159,5 +159,6 @@ func (s *Stage) ChangeStatus(status Status, actor kernel.Actor, reason string) e
 		return err
 	}
 	s.Status = status
+	s.applyHold(actor)
 	return nil
 }

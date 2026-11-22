@@ -10,6 +10,7 @@ import (
 
 	"pmt/internal/features/projects/domain"
 	"pmt/internal/features/projects/store/sqlcgen"
+	"pmt/internal/kernel"
 	"pmt/internal/platform/postgres"
 )
 
@@ -98,6 +99,20 @@ func (s *Members) RemoveMember(ctx context.Context, projectID, userID uuid.UUID)
 		return domain.ErrMemberNotFound
 	}
 	return nil
+}
+
+// HoldOf devuelve qué contiene al elemento, stage o bug (vacío si no pertenece a
+// ninguno), y quién lo tiene tomado.
+func (s *Members) HoldOf(ctx context.Context, kind string, id uuid.UUID) (string, kernel.Hold, error) {
+	rows, err := s.queries.HoldOf(ctx, sqlcgen.HoldOfParams{Kind: kind, ItemID: id})
+	if err != nil {
+		return "", kernel.Hold{}, fmt.Errorf("consultar bloqueo: %w", err)
+	}
+	if len(rows) == 0 {
+		return "", kernel.Hold{}, nil
+	}
+	row := rows[0]
+	return row.HolderKind, kernel.Hold{HolderID: row.TakenBy, TakenBy: row.TakenByName}, nil
 }
 
 // AdoptOrphans deja al usuario como owner de los proyectos sin owner y devuelve
