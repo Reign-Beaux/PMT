@@ -18,6 +18,10 @@ WHERE username = $1;
 SELECT * FROM users
 WHERE id = $1;
 
+-- name: GetInstanceOwner :one
+SELECT * FROM users
+WHERE is_instance_owner;
+
 -- name: ListUsers :many
 SELECT * FROM users
 ORDER BY username;

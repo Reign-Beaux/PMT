@@ -93,11 +93,36 @@ y se lanza con `PMT_TOKEN=$(cat ~/.config/pmt/tokens/<usuario>) claude --strict-
 
 Para que un usuario trabaje como TL o dev de una etapa, PP lo asigna por su `username` con `assign_stage_lead` o el TL con `add_stage_member`, igual que a un agente. Las operaciones de cuenta (tokens, invitaciones, usuarios) solo se usan sin perfil declarado.
 
-**Usuarios.** El dueño los ve en `/cuenta` y los desactiva o reactiva. Desactivar cierra sus sesiones y revoca sus tokens; al reactivarlo, crea tokens nuevos.
+**Usuarios.** El dueño los ve en `/cuenta` y los desactiva o reactiva. Desactivar cierra sus sesiones y revoca sus tokens; al reactivarlo, crea tokens nuevos. Un usuario desactivado conserva sus membresías de proyecto.
+
+## Compartir un proyecto
+
+Cada proyecto tiene miembros ([dominio.md](dominio.md#miembros-y-roles)). Quien lo crea es su owner; un proyecto que no le compartieron no existe para nadie más: no sale en `list_projects` y cualquier ID suyo responde 404 o `not_found`. Los proyectos que existían antes de los miembros quedaron del dueño de la instancia.
+
+Lo comparte el owner, sin perfil declarado: con la cookie, con su token sin `X-PMT-Profile`, o por MCP sin `?profile=` (o con `profile=user`). Todavía no hay pantalla (fase 1e del [plan](plan_produccion.md)):
+
+| Operación | MCP | REST |
+| --- | --- | --- |
+| Ver miembros (cualquier miembro) | `list_project_members` | `GET /api/projects/{id}/members` |
+| Compartir como `editor` o `viewer` | `add_project_member` (`project_id`, `username`, `role`) | `POST /api/projects/{id}/members` `{"username","role"}` |
+| Cambiar entre `editor` y `viewer` | `update_project_member` | `PUT /api/projects/{id}/members/{username}` `{"role"}` |
+| Dejar de compartir | `remove_project_member` | `DELETE /api/projects/{id}/members/{username}` |
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/projects/<id>/members \
+  -H "Authorization: Bearer $PMT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"username":"ana","role":"editor"}'
+```
+
+El usuario debe existir y estar activo (primero se le invita). El owner no se quita ni cambia de rol, y no se transfiere.
+
+Solo el owner y los editores trabajan en un proyecto con agentes. Un `viewer` solo lo consulta desde el sitio web: con su token (MCP o REST) el proyecto no sale en `list_projects` y cualquier operación sobre él responde `forbidden` («eres viewer de este proyecto: solo puedes consultarlo en el sitio web»). Para que alguien sea TL, dev o dueño de una tarea, compártelo antes como `editor`: con un viewer o un no miembro, `assign_stage_lead`, `add_stage_member` y `assign_task` responden `conflict`.
+
+Los tokens de agente (`pmt-server agent`) actúan con la membresía del dueño de la instancia: ven y tocan sus proyectos y los que le compartieron, y lo que crean queda suyo.
 
 ## Agentes y tokens
 
-Los tokens de agente solo se administran por línea de comandos, para que ningún agente pueda emitirlos. Siguen funcionando igual que antes de los usuarios: su perfil es fijo, así que `?profile=` o `X-PMT-Profile` solo se aceptan si coinciden con él (si no, 400). `create` y `rotate` imprimen únicamente el token. `create` rechaza un nombre que ya sea `username` de un usuario.
+Los tokens de agente solo se administran por línea de comandos, para que ningún agente pueda emitirlos. Actúan con la membresía del dueño de la instancia ([Compartir un proyecto](#compartir-un-proyecto)). Por lo demás siguen funcionando igual que antes de los usuarios: su perfil es fijo, así que `?profile=` o `X-PMT-Profile` solo se aceptan si coinciden con él (si no, 400). `create` y `rotate` imprimen únicamente el token. `create` rechaza un nombre que ya sea `username` de un usuario.
 
 ```bash
 cd backend

@@ -17,7 +17,7 @@ type fakeRepo struct {
 }
 
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
-	return domain.Stage{ID: id, Lead: "tl", Members: []string{"dev"}}, nil
+	return domain.Stage{ID: id, ProjectID: project, Lead: "tl", Members: []string{"dev"}}, nil
 }
 
 func (r *fakeRepo) AddMember(_ context.Context, _ uuid.UUID, agent, _ string) error {
@@ -36,11 +36,21 @@ func (a fakeAgents) Profile(context.Context, string) (kernel.Profile, error) {
 	return a.profile, nil
 }
 
-// fakeUsers son los usernames de usuarios activos.
-type fakeUsers map[string]bool
+// fakeUsers son los usernames de usuarios activos, con el error que da cada uno
+// según su rol en el proyecto: nil si es owner o editor.
+type fakeUsers map[string]error
 
-func (u fakeUsers) Active(_ context.Context, name string) (bool, error) {
-	return u[name], nil
+var (
+	project    = uuid.MustParse("00000000-0000-0000-0000-000000000100")
+	errNotWork = kernel.Conflict("el usuario es viewer del proyecto")
+)
+
+func (u fakeUsers) Worker(_ context.Context, projectID uuid.UUID, name string) (bool, error) {
+	err, ok := u[name]
+	if ok && projectID != project {
+		return true, errors.New("consultó otro proyecto")
+	}
+	return ok, err
 }
 
 func TestHandle(t *testing.T) {
@@ -58,8 +68,9 @@ func TestHandle(t *testing.T) {
 		{"PP", kernel.Actor{Name: "tl", Profile: kernel.ProfilePP}, kernel.ProfileDevBackend, nil, kernel.ErrNotStageLead},
 		{"usuario", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, kernel.ProfileDevBackend, nil, kernel.ErrNotStageLead},
 		{"no es dev", tl, kernel.ProfileCR, nil, domain.ErrAgentNotDev},
-		{"usuario activo, sin revisar perfil", tl, "", fakeUsers{"dev2": true}, nil},
-		{"ni agente ni usuario activo", tl, "", fakeUsers{"dev2": false}, errAgentMissing},
+		{"usuario owner o editor, sin revisar perfil", tl, "", fakeUsers{"dev2": nil}, nil},
+		{"usuario viewer o no miembro", tl, kernel.ProfileDevBackend, fakeUsers{"dev2": errNotWork}, errNotWork},
+		{"ni agente ni usuario activo", tl, "", fakeUsers{}, errAgentMissing},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

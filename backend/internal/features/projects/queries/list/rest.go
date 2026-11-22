@@ -12,7 +12,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
-	items, err := h.Handle(r.Context())
+	items, err := h.Handle(r.Context(), rest.ActorFrom(r.Context()))
 	if err != nil {
 		rest.WriteError(w, err)
 		return

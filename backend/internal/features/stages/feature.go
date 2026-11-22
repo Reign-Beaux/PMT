@@ -53,7 +53,8 @@ type AgentChecker interface {
 	addmember.AgentChecker
 }
 
-// UserChecker reúne lo que las slices piden a la feature auth.
+// UserChecker reúne lo que las slices piden sobre usuarios: lo implementa la
+// feature projects con los miembros de cada proyecto.
 type UserChecker interface {
 	assignlead.UserChecker
 	addmember.UserChecker

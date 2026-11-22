@@ -22,9 +22,11 @@ type AgentChecker interface {
 	Profile(ctx context.Context, name string) (kernel.Profile, error)
 }
 
-// UserChecker indica si un nombre es un usuario activo. Lo implementa la feature auth.
+// UserChecker indica si un nombre es un usuario activo y, si lo es, exige que
+// sea owner o editor del proyecto (conflict si no). Lo implementa la feature
+// projects.
 type UserChecker interface {
-	Active(ctx context.Context, username string) (bool, error)
+	Worker(ctx context.Context, projectID uuid.UUID, username string) (bool, error)
 }
 
 // Command contiene los datos de entrada.
@@ -54,7 +56,8 @@ func New(repo Repository, agents AgentChecker, users UserChecker) *Handler {
 }
 
 // Handle añade al dev. Solo lo hace el TL de la etapa. El dev es un agente con
-// perfil de dev o un usuario activo, cuyo perfil se comprueba cuando actúa.
+// perfil de dev o un usuario activo owner o editor del proyecto, cuyo perfil se
+// comprueba cuando actúa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureLeadProfile(cmd.Actor); err != nil {
 		return Result{}, err
@@ -66,7 +69,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := s.EnsureLead(cmd.Actor); err != nil {
 		return Result{}, err
 	}
-	if err := h.ensureDev(ctx, cmd.Agent); err != nil {
+	if err := h.ensureDev(ctx, s.ProjectID, cmd.Agent); err != nil {
 		return Result{}, err
 	}
 	if err := h.repo.AddMember(ctx, s.ID, cmd.Agent, cmd.Actor.Name); err != nil {
@@ -75,8 +78,8 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	return Result{ID: s.ID, Lead: s.Lead, Members: slices.Concat(s.Members, []string{cmd.Agent})}, nil
 }
 
-func (h *Handler) ensureDev(ctx context.Context, name string) error {
-	isUser, err := h.users.Active(ctx, name)
+func (h *Handler) ensureDev(ctx context.Context, projectID uuid.UUID, name string) error {
+	isUser, err := h.users.Worker(ctx, projectID, name)
 	if err != nil || isUser {
 		return err
 	}

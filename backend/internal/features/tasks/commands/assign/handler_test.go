@@ -32,7 +32,7 @@ func (r *fakeRepo) UpdateAssignee(_ context.Context, task domain.Task) (domain.T
 type fakeStages struct{}
 
 func (fakeStages) Team(context.Context, uuid.UUID) (kernel.Team, error) {
-	return kernel.Team{Lead: "tl", Members: []string{"dev", "dev2"}}, nil
+	return kernel.Team{Lead: "tl", Members: []string{"dev", "dev2"}, ProjectID: project}, nil
 }
 
 type fakeAgents struct{ err error }
@@ -41,11 +41,21 @@ func (a fakeAgents) Profile(context.Context, string) (kernel.Profile, error) {
 	return kernel.ProfileDevBackend, a.err
 }
 
-// fakeUsers son los usernames de usuarios activos.
-type fakeUsers map[string]bool
+// fakeUsers son los usernames de usuarios activos, con el error que da cada uno
+// según su rol en el proyecto: nil si es owner o editor.
+type fakeUsers map[string]error
 
-func (u fakeUsers) Active(_ context.Context, name string) (bool, error) {
-	return u[name], nil
+var (
+	project    = uuid.MustParse("00000000-0000-0000-0000-000000000100")
+	errNotWork = kernel.Conflict("el usuario es viewer del proyecto")
+)
+
+func (u fakeUsers) Worker(_ context.Context, projectID uuid.UUID, name string) (bool, error) {
+	err, ok := u[name]
+	if ok && projectID != project {
+		return true, errors.New("consultó otro proyecto")
+	}
+	return ok, err
 }
 
 var (
@@ -70,8 +80,9 @@ func TestHandle(t *testing.T) {
 		{"TL ajeno", domain.StatusInReview, otherTL, "dev2", fakeAgents{}, nil, kernel.ErrNotStageLead},
 		{"fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, nil, domain.ErrAssigneeNotMember},
 		{"agente revocado", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, nil, revoked},
-		{"usuario activo del equipo", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, fakeUsers{"dev2": true}, nil},
-		{"usuario activo fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, fakeUsers{"otro": true}, domain.ErrAssigneeNotMember},
+		{"usuario activo del equipo", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, fakeUsers{"dev2": nil}, nil},
+		{"usuario del equipo viewer o no miembro", domain.StatusInReview, tl, "dev2", fakeAgents{}, fakeUsers{"dev2": errNotWork}, errNotWork},
+		{"usuario activo fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, fakeUsers{"otro": nil}, domain.ErrAssigneeNotMember},
 		{"tarea libre", domain.StatusReady, tl, "dev2", fakeAgents{}, nil, domain.ErrTaskNotTaken},
 		{"tarea cerrada", domain.StatusDone, tl, "dev2", fakeAgents{}, nil, domain.ErrTaskNotTaken},
 	}

@@ -49,6 +49,7 @@ func verifier(authenticator kernel.Authenticator) auth.TokenVerifier {
 		if err != nil {
 			return nil, err
 		}
+		actor.Channel = kernel.ChannelToken
 		return tokenInfo(actor), nil
 	}
 }
@@ -67,9 +68,16 @@ func tokenInfo(actor kernel.Actor) *auth.TokenInfo {
 // ActorFrom devuelve el Actor de la llamada. Toda llamada autenticada lo tiene;
 // sin él devuelve el actor vacío, que no tiene perfil y ninguna regla autoriza.
 func ActorFrom(req *sdk.CallToolRequest) kernel.Actor {
-	if req == nil || req.Extra == nil || req.Extra.TokenInfo == nil {
+	if req == nil {
 		return kernel.Actor{}
 	}
-	actor, _ := req.Extra.TokenInfo.Extra[actorKey].(kernel.Actor)
+	return actorFromExtra(req.Extra)
+}
+
+func actorFromExtra(extra *sdk.RequestExtra) kernel.Actor {
+	if extra == nil || extra.TokenInfo == nil {
+		return kernel.Actor{}
+	}
+	actor, _ := extra.TokenInfo.Extra[actorKey].(kernel.Actor)
 	return actor
 }

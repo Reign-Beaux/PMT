@@ -15,12 +15,6 @@ import (
 	"pmt/internal/platform/mcp"
 )
 
-// readOnly indica si la herramienta solo lee. Una herramienta nueva que solo lee
-// debe seguir esta convención de nombre; cualquier otra cuenta como escritura.
-func readOnly(name string) bool {
-	return strings.HasPrefix(name, "list_") || strings.HasPrefix(name, "get_")
-}
-
 // statusFor da un status válido para la herramienta, para que el rechazo sea por
 // perfil y no por un status desconocido.
 var statusFor = map[string]string{

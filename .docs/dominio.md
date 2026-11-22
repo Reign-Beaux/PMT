@@ -19,15 +19,37 @@ Conceptos que PMT guarda y reglas que aplica. La documentación usa el término 
 | **Plan de desarrollo** | `DevPlan` | Cómo se hará un grupo de tareas o un bug. DP lo escribe y Dev lo sigue. |
 | **Usuario** | `User` (feature `auth`) | Persona que entra a PMT con correo y contraseña, por invitación del dueño de la instancia. Tiene nombre y un `username` en minúsculas, números y guiones que no cambia y no coincide con ningún agente. Crea sus propios tokens de API para sus agentes. Se desactiva, no se borra. |
 | **Dueño de la instancia** | `IsInstanceOwner` | El primer usuario, creado al arrancar desde la configuración. Invita y desactiva o reactiva usuarios. No se puede desactivar. |
+| **Miembro** | `Member` | Usuario con un rol en un proyecto: `owner`, `editor` o `viewer` ([Miembros y roles](#miembros-y-roles)). |
 | **Agente** | `Agent` | Trabajador de IA con nombre, perfil y token propio, creado con `pmt-server agent`. No se borra: se revoca. |
 | **Perfil** | `Profile` | PP, PC, TL, DP, DevFrontend, DevBackend, CR, QAP, QA o `User`, el usuario humano. |
-| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username`: desde el navegador, siempre con el perfil `User`; con su token, con el perfil que declara la sesión (cualquiera), o `User` si no declara ninguno. Un agente actúa con su nombre y su perfil fijo. Nombre y perfil son lo que queda en historiales (`saul` + `TL`, por ejemplo), comentarios y hallazgos. |
+| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username`: desde el navegador, siempre con el perfil `User`; con su token, con el perfil que declara la sesión (cualquiera), o `User` si no declara ninguno. Un agente actúa con su nombre y su perfil fijo. Nombre y perfil son lo que queda en historiales (`saul` + `TL`, por ejemplo), comentarios y hallazgos. Lleva además el usuario cuya membresía usa (`UserID`): el propio usuario o, con un token de agente, el dueño de la instancia; y el canal de su credencial (`Channel`): la cookie del sitio web o un token. |
 
 **Cancelar o retirar.** `cancelled` es un status reversible, para trabajo iniciado o que puede volver. Retirar (`retire`) es definitivo, para lo que nunca debió estar: deja un cambio y saca el elemento de las consultas, sin borrar nada.
 
 **Etapa o tarea activa:** la que no está retirada ni cancelada.
 
 **Versión 1:** las etapas de la planeación original, las que no tienen registro `add`.
+
+## Miembros y roles
+
+Cada proyecto tiene miembros, con uno de tres roles:
+
+| Rol | Puede |
+| --- | --- |
+| `owner` | Leer y escribir según su perfil, con cookie o token, y administrar los miembros |
+| `editor` | Leer y escribir según su perfil, con cookie o token |
+| `viewer` | Solo consultar desde el sitio web: con la cookie lee todo y cualquier escritura responde `forbidden`; con un token el proyecto no está disponible |
+
+Solo el owner y los editores trabajan en un proyecto con agentes.
+
+- **Owner.** Quien crea el proyecto (`create_project` o `import_project`) queda como su owner. Hay uno solo por proyecto, no se quita, no cambia de rol y no se transfiere. Los proyectos anteriores a los miembros son del dueño de la instancia.
+- **Sin membresía, el proyecto no existe:** `list_projects` no lo incluye, y cualquier lectura o escritura sobre él o sobre algo suyo (etapas, tareas, bugs, planes, hallazgos, comentarios, historiales, progreso) responde `not_found`, con el mismo mensaje que un ID inexistente. `/api/events` tampoco avisa de sus cambios.
+- **Viewer con token.** Con un token de usuario, por MCP o REST y con cualquier perfil declarado, el proyecto no está disponible para un viewer: `list_projects` y `GET /api/projects` no lo incluyen, cualquier lectura o escritura sobre él o algo suyo responde `forbidden` («eres viewer de este proyecto: solo puedes consultarlo en el sitio web») y `/api/events` no le avisa de sus cambios.
+- **TL, devs y dueño de tarea.** Un usuario solo puede ser TL (`assign_stage_lead`), dev (`add_stage_member`) o dueño de una tarea (`assign_task`) si es owner o editor del proyecto; un viewer o un usuario que no es miembro responde `conflict`. Los agentes (tabla `agents`) siguen con su validación de siempre.
+- **Se suma al perfil.** El rol no reemplaza las reglas de perfil: un editor con perfil PC sigue sin escribir, y un owner con perfil TL solo actúa como TL de su etapa.
+- **Administrar miembros.** Solo el owner, sin perfil declarado (perfil `User`): agrega por `username` a un usuario activo como `editor` o `viewer`, cambia su rol entre esos dos y lo quita. Cualquier miembro lista los miembros.
+- **Usuario desactivado.** Conserva sus membresías, pero ya no entra.
+- **Tokens de agente.** Actúan con la membresía del dueño de la instancia; lo que crean queda suyo.
 
 ## Proyectos
 
@@ -62,7 +84,7 @@ Nace en `planning`.
 
 - **Perfiles:** el TL de la etapa la inicia y la cierra. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User` y el TL de la etapa detienen, reanudan y reabren una etapa en `done`. Detener, cancelar y reabrir exigen motivo.
 - **Cierre:** solo pasa a `done` si todas sus tareas activas están en `done` o `cancelled`, con al menos una en `done`. Una etapa vacía o toda cancelada se cancela, no se cierra.
-- **Asignación:** PP o `User` le ponen o cambian el TL con `assign_stage_lead` y lo quitan con `remove_stage_lead`, solo con la etapa sin iniciar (`planning` o `stand_by`); quitarlo no cambia el equipo. El TL arma su equipo con `add_stage_member` y `remove_stage_member`. El TL es un agente activo con perfil TL o un usuario activo; un dev, un agente activo DevFrontend o DevBackend o un usuario activo. Al usuario no se le revisa perfil al asignarlo: actúa como TL o dev cuando su sesión declara ese perfil, y las reglas comparan su `username` con el TL y el equipo como con cualquier agente.
+- **Asignación:** PP o `User` le ponen o cambian el TL con `assign_stage_lead` y lo quitan con `remove_stage_lead`, solo con la etapa sin iniciar (`planning` o `stand_by`); quitarlo no cambia el equipo. El TL arma su equipo con `add_stage_member` y `remove_stage_member`. El TL es un agente activo con perfil TL o un usuario activo owner o editor del proyecto; un dev, un agente activo DevFrontend o DevBackend o un usuario activo owner o editor del proyecto (un viewer o un no miembro responde `conflict`). Al usuario no se le revisa perfil al asignarlo: actúa como TL o dev cuando su sesión declara ese perfil, y las reglas comparan su `username` con el TL y el equipo como con cualquier agente.
 
 ## Tareas
 
@@ -178,12 +200,13 @@ Detener o cancelar un padre congela lo de abajo, sin cambiar su status.
 ## Permisos
 
 - **Toda petición se identifica.** Sin cookie ni token válidos, PMT responde 401 ([arquitectura.md](arquitectura.md#identidad)).
-- **Todo comando de escritura exige perfil.** Uno sin permiso recibe `forbidden` antes de que se lea la base.
+- **Membresía primero.** Antes de cada operación se comprueba que quien actúa sea miembro del proyecto de los IDs que recibe, que, si es viewer, llegue con la cookie del sitio web, y que no sea viewer si escribe ([Miembros y roles](#miembros-y-roles)).
+- **Todo comando de escritura exige perfil.** Uno sin permiso recibe `forbidden` antes de que se lea el elemento.
 - **Planeación** (`create_*`, `update_*`, `delete_*`, `add_*`, `retire_*` de proyectos, etapas y tareas, `revise_task`, `import_*`, `change_product_version`, `release_project`, `assign_stage_lead`, `remove_stage_lead`): solo PP y `User`. `revise_stage` también el TL de esa etapa.
 - **PC** solo lee: no escribe nada, ni comentarios.
 - **`User`** tiene lo de PP, pero no aprueba como CR, QA ni TL, ni gestiona hallazgos o planes.
 - **Un TL** solo actúa sobre su etapa y sus tareas.
-- Las lecturas (`list_*`, `get_*`) son para todos.
+- Las lecturas (`list_*`, `get_*`) son para todos los miembros del proyecto.
 
 ## Inmutabilidad
 

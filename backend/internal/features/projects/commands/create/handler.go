@@ -13,7 +13,7 @@ import (
 
 // Repository es la persistencia que necesita la operación.
 type Repository interface {
-	Create(ctx context.Context, p domain.Project) (domain.Project, error)
+	Create(ctx context.Context, p domain.Project, owner uuid.UUID) (domain.Project, error)
 }
 
 // Command contiene los datos de entrada.
@@ -45,9 +45,14 @@ func New(repo Repository) *Handler {
 	return &Handler{repo: repo}
 }
 
-// Handle crea el proyecto.
+// Handle crea el proyecto. Quien lo crea queda como su owner: el usuario, o el
+// dueño de la instancia si actúa un token de agente.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureCanPlan(cmd.Actor); err != nil {
+		return Result{}, err
+	}
+	owner, err := domain.OwnerOf(cmd.Actor)
+	if err != nil {
 		return Result{}, err
 	}
 	p, err := domain.NewProject(cmd.Name, cmd.Description)
@@ -55,7 +60,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 
-	created, err := h.repo.Create(ctx, p)
+	created, err := h.repo.Create(ctx, p, owner)
 	if err != nil {
 		return Result{}, err
 	}

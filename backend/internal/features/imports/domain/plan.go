@@ -2,6 +2,8 @@
 package domain
 
 import (
+	"github.com/google/uuid"
+
 	projects "pmt/internal/features/projects/domain"
 	stages "pmt/internal/features/stages/domain"
 	tasks "pmt/internal/features/tasks/domain"
@@ -19,7 +21,9 @@ var (
 // El orden de sus listas es el orden del fichero.
 type Plan struct {
 	Project projects.Project
-	Stages  []StagePlan
+	// Owner es el usuario que queda como owner del proyecto: quien importa.
+	Owner  uuid.UUID
+	Stages []StagePlan
 }
 
 // StagePlan es una etapa con sus tareas.

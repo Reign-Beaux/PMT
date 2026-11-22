@@ -1,6 +1,6 @@
 [
   {
-    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Solo PP y el usuario. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
+    "description": "Crea un proyecto nuevo con todas sus etapas y tareas desde un fichero YAML. Solo PP y el usuario. Quien importa queda como owner del proyecto; con un token de agente, el dueño de la instancia. Es todo o nada: si el fichero tiene un error, no se crea nada y el mensaje indica su ubicación. No agrega datos a un proyecto existente. Importar dos veces el mismo fichero crea dos proyectos.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

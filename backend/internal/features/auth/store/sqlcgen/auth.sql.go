@@ -229,6 +229,28 @@ func (q *Queries) EnableUser(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const getInstanceOwner = `-- name: GetInstanceOwner :one
+SELECT id, email, username, name, password_hash, is_instance_owner, disabled_at, created_at, updated_at FROM users
+WHERE is_instance_owner
+`
+
+func (q *Queries) GetInstanceOwner(ctx context.Context) (User, error) {
+	row := q.db.QueryRow(ctx, getInstanceOwner)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.Name,
+		&i.PasswordHash,
+		&i.IsInstanceOwner,
+		&i.DisabledAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getInvitationByHash = `-- name: GetInvitationByHash :one
 SELECT email, expires_at, accepted_at,
        EXISTS (SELECT 1 FROM users WHERE users.email = invitations.email) AS user_exists

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"pmt/internal/features/auth/commands/acceptinvitation"
 	"pmt/internal/features/auth/commands/changepassword"
 	"pmt/internal/features/auth/commands/createinvitation"
@@ -21,6 +23,7 @@ import (
 	"pmt/internal/features/auth/domain"
 	"pmt/internal/features/auth/queries/authenticate"
 	"pmt/internal/features/auth/queries/getinvitation"
+	"pmt/internal/features/auth/queries/instanceowner"
 	"pmt/internal/features/auth/queries/listinvitations"
 	"pmt/internal/features/auth/queries/listtokens"
 	"pmt/internal/features/auth/queries/listusers"
@@ -54,6 +57,7 @@ type Repository interface {
 	listtokens.Reader
 	listinvitations.Reader
 	listusers.Reader
+	instanceowner.Reader
 }
 
 // Feature reúne las slices de la feature.
@@ -111,7 +115,15 @@ func (f *Feature) AuthenticateToken(ctx context.Context, token string, declared 
 	if err != nil {
 		return kernel.Actor{}, err
 	}
-	return kernel.AsUser(actor.Name, declared), nil
+	declaredActor := kernel.AsUser(actor.Name, declared)
+	declaredActor.UserID = actor.UserID
+	return declaredActor, nil
+}
+
+// InstanceOwnerID devuelve el ID del dueño de la instancia, o uuid.Nil si
+// todavía no existe. Los tokens de agente actúan con su membresía.
+func (f *Feature) InstanceOwnerID(ctx context.Context) (uuid.UUID, error) {
+	return instanceowner.New(f.repo).Handle(ctx)
 }
 
 // IsUserToken indica si el token es de usuario y no de agente.
@@ -119,7 +131,8 @@ func IsUserToken(token string) bool {
 	return domain.IsAPIToken(token)
 }
 
-// Checker permite a otras features saber si un nombre ya es username.
+// Checker permite a otras features saber si un nombre ya es username y resolver
+// usuarios por username o por ID.
 type Checker struct {
 	repo *store.Users
 }
@@ -149,6 +162,29 @@ func (c *Checker) Active(ctx context.Context, username string) (bool, error) {
 		return false, err
 	}
 	return !user.Disabled, nil
+}
+
+// FindByUsername devuelve el usuario con exactamente ese username, activo o no.
+// found es false si no existe.
+func (c *Checker) FindByUsername(ctx context.Context, username string) (kernel.UserRef, bool, error) {
+	user, err := c.repo.UserByUsername(ctx, username)
+	return ref(user, err)
+}
+
+// FindByID devuelve el usuario con ese ID, activo o no. found es false si no existe.
+func (c *Checker) FindByID(ctx context.Context, id uuid.UUID) (kernel.UserRef, bool, error) {
+	user, err := c.repo.UserByID(ctx, id)
+	return ref(user, err)
+}
+
+func ref(user domain.User, err error) (kernel.UserRef, bool, error) {
+	if errors.Is(err, domain.ErrUserNotFound) {
+		return kernel.UserRef{}, false, nil
+	}
+	if err != nil {
+		return kernel.UserRef{}, false, err
+	}
+	return user.Ref(), true, nil
 }
 
 // IsPublic indica si la petición va a una ruta de la feature que no pide sesión:

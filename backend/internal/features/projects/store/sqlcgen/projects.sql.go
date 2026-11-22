@@ -7,14 +7,21 @@ package sqlcgen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 const createProject = `-- name: CreateProject :one
-INSERT INTO projects (id, name, description, status, product_version)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, name, description, created_at, updated_at, status, product_version
+WITH created AS (
+    INSERT INTO projects (id, name, description, status, product_version)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, name, description, created_at, updated_at, status, product_version
+), owner AS (
+    INSERT INTO project_members (project_id, user_id, role)
+    SELECT created.id, $6, 'owner' FROM created
+)
+SELECT id, name, description, created_at, updated_at, status, product_version FROM created
 `
 
 type CreateProjectParams struct {
@@ -23,17 +30,30 @@ type CreateProjectParams struct {
 	Description    string
 	Status         string
 	ProductVersion string
+	OwnerID        uuid.UUID
 }
 
-func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
+type CreateProjectRow struct {
+	ID             uuid.UUID
+	Name           string
+	Description    string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Status         string
+	ProductVersion string
+}
+
+// Crea el proyecto y a su owner en una sola sentencia.
+func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error) {
 	row := q.db.QueryRow(ctx, createProject,
 		arg.ID,
 		arg.Name,
 		arg.Description,
 		arg.Status,
 		arg.ProductVersion,
+		arg.OwnerID,
 	)
-	var i Project
+	var i CreateProjectRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -80,12 +100,20 @@ func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error)
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT id, name, description, created_at, updated_at, status, product_version FROM projects
-ORDER BY created_at DESC, id
+SELECT p.id, p.name, p.description, p.created_at, p.updated_at, p.status, p.product_version FROM projects p
+JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
+WHERE m.role = ANY($2::text[])
+ORDER BY p.created_at DESC, p.id
 `
 
-func (q *Queries) ListProjects(ctx context.Context) ([]Project, error) {
-	rows, err := q.db.Query(ctx, listProjects)
+type ListProjectsParams struct {
+	UserID uuid.UUID
+	Roles  []string
+}
+
+// Los proyectos del usuario en los que tiene uno de los roles dados.
+func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error) {
+	rows, err := q.db.Query(ctx, listProjects, arg.UserID, arg.Roles)
 	if err != nil {
 		return nil, err
 	}

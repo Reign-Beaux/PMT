@@ -84,6 +84,16 @@ func (s *Users) UserByID(ctx context.Context, id uuid.UUID) (domain.User, error)
 	return toDomain(row), nil
 }
 
+// InstanceOwner devuelve al dueño de la instancia, o domain.ErrUserNotFound si
+// todavía no existe.
+func (s *Users) InstanceOwner(ctx context.Context) (domain.User, error) {
+	row, err := s.queries().GetInstanceOwner(ctx)
+	if err != nil {
+		return domain.User{}, notFound(err, "obtener dueño de la instancia")
+	}
+	return toDomain(row), nil
+}
+
 // PasswordHash devuelve el hash de la contraseña de un usuario.
 func (s *Users) PasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
 	row, err := s.queries().GetUserByID(ctx, id)

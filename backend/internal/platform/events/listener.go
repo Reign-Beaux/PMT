@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -185,17 +186,23 @@ func (l *Listener) listen(ctx context.Context, conn Conn) bool {
 	}
 }
 
-// handlePayload traduce el payload del NOTIFY y lo reparte. Uno inválido se
+// handlePayload traduce el payload del NOTIFY (resource, project_id y, en un
+// cambio de miembros, user_id) y lo reparte. Uno inválido se
 // registra y se descarta sin cortar el reparto.
 func (l *Listener) handlePayload(payload string) {
 	var message struct {
-		Resource string `json:"resource"`
+		Resource  string `json:"resource"`
+		ProjectID string `json:"project_id"`
+		UserID    string `json:"user_id"`
 	}
 	if err := json.Unmarshal([]byte(payload), &message); err != nil || !validResource(message.Resource) {
 		log.Printf("events: payload inválido descartado: %q", payload)
 		return
 	}
-	l.publish(ChangeEvent{Type: TypeInvalidate, Resource: message.Resource})
+	// Un ID ausente o inválido queda vacío: el evento no se entrega por él.
+	projectID, _ := uuid.Parse(message.ProjectID)
+	userID, _ := uuid.Parse(message.UserID)
+	l.publish(ChangeEvent{Type: TypeInvalidate, Resource: message.Resource, ProjectID: projectID, UserID: userID})
 }
 
 // publish entrega el evento a todos los suscriptores sin bloquearse; el que

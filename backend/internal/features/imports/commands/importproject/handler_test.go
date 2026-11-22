@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"pmt/internal/features/imports/domain"
+	projects "pmt/internal/features/projects/domain"
 	"pmt/internal/kernel"
 )
 
@@ -29,6 +32,9 @@ project:
       description: Rutas del backend.
       tasks: []
 `
+
+// saulID es el usuario con el que actúan las pruebas.
+var saulID = uuid.MustParse("00000000-0000-0000-0000-00000000000a")
 
 type fakeRepo struct {
 	saved []domain.Plan
@@ -52,7 +58,7 @@ func writeFile(t *testing.T, content string) string {
 func TestHandleBuildsPlanInFileOrder(t *testing.T) {
 	repo := &fakeRepo{}
 
-	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: writeFile(t, validFile)})
+	result, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: writeFile(t, validFile)})
 
 	if err != nil {
 		t.Fatal(err)
@@ -61,6 +67,9 @@ func TestHandleBuildsPlanInFileOrder(t *testing.T) {
 		t.Errorf("result = %+v", result)
 	}
 	plan := repo.saved[0]
+	if plan.Owner != saulID {
+		t.Errorf("owner = %v", plan.Owner)
+	}
 	if plan.Project.ID != result.ProjectID || plan.Project.Status != "planning" || plan.Project.ProductVersion != "" {
 		t.Errorf("proyecto = %+v", plan.Project)
 	}
@@ -152,7 +161,7 @@ project:
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: writeFile(t, tt.content)})
+			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: writeFile(t, tt.content)})
 
 			assertInvalid(t, err, tt.want)
 			if len(repo.saved) != 0 {
@@ -201,7 +210,7 @@ func TestHandleTranslatesSyntaxErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: writeFile(t, tt.content)})
+			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: writeFile(t, tt.content)})
 
 			assertInvalid(t, err, tt.want)
 			if err.Error() != tt.want {
@@ -267,7 +276,7 @@ project:
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: writeFile(t, tt.content)})
+			_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: writeFile(t, tt.content)})
 
 			assertInvalid(t, err, tt.want+": "+commentMessage)
 			if len(repo.saved) != 0 {
@@ -297,7 +306,7 @@ project: # proyecto de prueba
 `
 	repo := &fakeRepo{}
 
-	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: writeFile(t, content)})
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: writeFile(t, content)})
 
 	if err != nil {
 		t.Fatal(err)
@@ -319,7 +328,7 @@ project: # proyecto de prueba
 func TestHandleRejectsMissingPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "no-existe.yaml")
 
-	_, err := New(&fakeRepo{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: path})
+	_, err := New(&fakeRepo{}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: path})
 
 	assertInvalid(t, err, path)
 }
@@ -327,7 +336,7 @@ func TestHandleRejectsMissingPath(t *testing.T) {
 func TestHandlePropagatesRepositoryError(t *testing.T) {
 	failure := errors.New("sin conexión")
 
-	_, err := New(&fakeRepo{err: failure}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, Path: writeFile(t, validFile)})
+	_, err := New(&fakeRepo{err: failure}).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}, Path: writeFile(t, validFile)})
 
 	if !errors.Is(err, failure) {
 		t.Errorf("err = %v", err)
@@ -342,5 +351,15 @@ func assertInvalid(t *testing.T, err error, want string) {
 	}
 	if !strings.Contains(err.Error(), want) {
 		t.Errorf("err = %q, se esperaba %q", err, want)
+	}
+}
+
+func TestHandleRejectsActorWithoutUser(t *testing.T) {
+	repo := &fakeRepo{}
+
+	_, err := New(repo).Handle(context.Background(), Command{Actor: kernel.Actor{Name: "dbp-pp", Profile: kernel.ProfilePP}, Path: writeFile(t, validFile)})
+
+	if !errors.Is(err, projects.ErrNoUser) || len(repo.saved) != 0 {
+		t.Fatalf("err = %v, guardados = %d", err, len(repo.saved))
 	}
 }

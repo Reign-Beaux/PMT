@@ -12,7 +12,7 @@ import (
 
 type toolInput struct {
 	StageID string `json:"stage_id" jsonschema:"UUID de la etapa"`
-	Agent   string `json:"agent" jsonschema:"Nombre de un agente con perfil TL o username de un usuario activo"`
+	Agent   string `json:"agent" jsonschema:"Nombre de un agente con perfil TL o username de un usuario activo, owner o editor del proyecto"`
 }
 
 type toolOutput struct {
@@ -25,7 +25,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "assign_stage_lead",
-		Description: "Fija o reemplaza el TL responsable de una etapa de PMT. Solo PP o el usuario. Admite un agente activo con perfil TL o un usuario activo, que actúa como TL cuando su sesión declara ese perfil. Solo ese TL inicia la etapa, arma su equipo y cierra sus tareas. Usa list_stages para obtener el ID de la etapa.",
+		Description: "Fija o reemplaza el TL responsable de una etapa de PMT. Solo PP o el usuario. Admite un agente activo con perfil TL o un usuario activo que sea owner o editor del proyecto (un viewer o un usuario que no es miembro responde conflict), que actúa como TL cuando su sesión declara ese perfil. Solo ese TL inicia la etapa, arma su equipo y cierra sus tareas. Usa list_stages para obtener el ID de la etapa.",
 	}, h.callTool)
 }
 

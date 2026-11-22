@@ -136,6 +136,15 @@ func (r *Repo) UserByID(_ context.Context, id uuid.UUID) (domain.User, error) {
 	return domain.User{}, domain.ErrUserNotFound
 }
 
+func (r *Repo) InstanceOwner(_ context.Context) (domain.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if u := r.find(func(u *user) bool { return u.IsInstanceOwner }); u != nil {
+		return u.User, nil
+	}
+	return domain.User{}, domain.ErrUserNotFound
+}
+
 func (r *Repo) PasswordHash(_ context.Context, id uuid.UUID) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

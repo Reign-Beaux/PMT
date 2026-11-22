@@ -26,6 +26,8 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 
 ### Proyectos compartidos (como DBP)
 - Quien crea un proyecto es su **owner**. Lo comparte como **editor** (trabaja en él) o **viewer** (solo lo ve).
+- Solo el owner y los editores trabajan en un proyecto con agentes. El **viewer solo consulta desde el sitio web**: con su token, por MCP o REST, el proyecto no está disponible.
+- El TL, los devs y el dueño de una tarea, si son usuarios, deben ser **owner o editor** del proyecto.
 - Un proyecto no compartido solo lo ve su owner, ni en la interfaz ni por MCP, incluido `list_projects`.
 
 ### Bloqueo por persona

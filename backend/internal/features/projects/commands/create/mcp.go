@@ -27,7 +27,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_project",
-		Description: "Crea un proyecto en PMT. Solo PP y el usuario. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+		Description: "Crea un proyecto en PMT. Solo PP y el usuario. Quien lo crea queda como su owner; con un token de agente, el dueño de la instancia. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
 	}, h.callTool)
 }
 

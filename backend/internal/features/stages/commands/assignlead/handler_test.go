@@ -16,7 +16,7 @@ type fakeRepo struct {
 }
 
 func (r *fakeRepo) Get(_ context.Context, id uuid.UUID) (domain.Stage, error) {
-	return domain.Stage{ID: id}, nil
+	return domain.Stage{ID: id, ProjectID: project}, nil
 }
 
 func (r *fakeRepo) UpdateLead(_ context.Context, _ uuid.UUID, lead string) error {
@@ -33,11 +33,21 @@ func (a fakeAgents) Profile(context.Context, string) (kernel.Profile, error) {
 	return a.profile, a.err
 }
 
-// fakeUsers son los usernames de usuarios activos.
-type fakeUsers map[string]bool
+// fakeUsers son los usernames de usuarios activos, con el error que da cada uno
+// según su rol en el proyecto: nil si es owner o editor.
+type fakeUsers map[string]error
 
-func (u fakeUsers) Active(_ context.Context, name string) (bool, error) {
-	return u[name], nil
+var (
+	project    = uuid.MustParse("00000000-0000-0000-0000-000000000100")
+	errNotWork = kernel.Conflict("el usuario es viewer del proyecto")
+)
+
+func (u fakeUsers) Worker(_ context.Context, projectID uuid.UUID, name string) (bool, error) {
+	err, ok := u[name]
+	if ok && projectID != project {
+		return true, errors.New("consultó otro proyecto")
+	}
+	return ok, err
 }
 
 func TestHandle(t *testing.T) {
@@ -55,8 +65,9 @@ func TestHandle(t *testing.T) {
 		{"TL no asigna", kernel.Actor{Profile: kernel.ProfileTL}, fakeAgents{profile: kernel.ProfileTL}, nil, domain.ErrAssignLeadForbidden},
 		{"agente sin perfil TL", pp, fakeAgents{profile: kernel.ProfileDevBackend}, nil, domain.ErrAgentNotLead},
 		{"agente inexistente, como el usuario", pp, fakeAgents{err: missing}, nil, missing},
-		{"usuario activo, sin revisar perfil", pp, fakeAgents{err: missing}, fakeUsers{"tl": true}, nil},
-		{"usuario desactivado responde como hoy", pp, fakeAgents{err: missing}, fakeUsers{"tl": false}, missing},
+		{"usuario owner o editor, sin revisar perfil", pp, fakeAgents{err: missing}, fakeUsers{"tl": nil}, nil},
+		{"usuario viewer o no miembro", pp, fakeAgents{profile: kernel.ProfileTL}, fakeUsers{"tl": errNotWork}, errNotWork},
+		{"usuario desactivado responde como hoy", pp, fakeAgents{err: missing}, fakeUsers{}, missing},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

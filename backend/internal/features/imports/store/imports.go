@@ -29,14 +29,14 @@ func NewImports(db Beginner) *Imports {
 	return &Imports{db: db}
 }
 
-// Save guarda el proyecto, sus etapas y sus tareas en orden. Si algo falla, no guarda nada.
+// Save guarda el proyecto con su owner, sus etapas y sus tareas en orden. Si algo falla, no guarda nada.
 func (s *Imports) Save(ctx context.Context, plan domain.Plan) error {
 	return pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		projectRepo := projects.NewProjects(tx)
 		stageRepo := stages.NewStages(tx)
 		taskRepo := tasks.NewTasks(tx)
 
-		if _, err := projectRepo.Create(ctx, plan.Project); err != nil {
+		if _, err := projectRepo.Create(ctx, plan.Project, plan.Owner); err != nil {
 			return err
 		}
 		for _, stage := range plan.Stages {

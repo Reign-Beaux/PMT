@@ -1,15 +1,25 @@
 -- name: CreateProject :one
-INSERT INTO projects (id, name, description, status, product_version)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING *;
+-- Crea el proyecto y a su owner en una sola sentencia.
+WITH created AS (
+    INSERT INTO projects (id, name, description, status, product_version)
+    VALUES (@id, @name, @description, @status, @product_version)
+    RETURNING *
+), owner AS (
+    INSERT INTO project_members (project_id, user_id, role)
+    SELECT created.id, @owner_id, 'owner' FROM created
+)
+SELECT * FROM created;
 
 -- name: GetProject :one
 SELECT * FROM projects
 WHERE id = $1;
 
 -- name: ListProjects :many
-SELECT * FROM projects
-ORDER BY created_at DESC, id;
+-- Los proyectos del usuario en los que tiene uno de los roles dados.
+SELECT p.* FROM projects p
+JOIN project_members m ON m.project_id = p.id AND m.user_id = @user_id
+WHERE m.role = ANY(@roles::text[])
+ORDER BY p.created_at DESC, p.id;
 
 -- name: UpdateProject :one
 UPDATE projects

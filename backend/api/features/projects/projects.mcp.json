@@ -62,7 +62,7 @@
     }
   },
   {
-    "description": "Crea un proyecto en PMT. Solo PP y el usuario. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
+    "description": "Crea un proyecto en PMT. Solo PP y el usuario. Quien lo crea queda como su owner; con un token de agente, el dueño de la instancia. Si el usuario no indicó el nombre o la descripción, pídeselos antes de llamar a esta herramienta.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -116,7 +116,7 @@
     }
   },
   {
-    "description": "Lista los proyectos de PMT. Úsala para obtener el ID de un proyecto a partir de su nombre, por ejemplo antes de usar create_stage.",
+    "description": "Lista los proyectos de PMT que ves: los que creaste y los que te compartieron como editor (los que te compartieron como viewer solo se consultan en el sitio web); con un token de agente, los del dueño de la instancia. Todos los perfiles. Úsala para obtener el ID de un proyecto a partir de su nombre, por ejemplo antes de usar create_stage.",
     "inputSchema": {
       "additionalProperties": false,
       "type": "object"
@@ -474,6 +474,186 @@
       },
       "required": [
         "changes"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Lista los miembros de un proyecto de PMT con su rol: owner, editor o viewer. Cualquier miembro del proyecto, con cualquier perfil.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_project_members",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "username",
+              "name",
+              "role"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "members"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Comparte un proyecto de PMT con un usuario activo, como editor o viewer. Solo el owner del proyecto, sin perfil declarado (perfil User).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "role": {
+          "description": "editor (trabaja en el proyecto según su perfil) o viewer (solo lo ve)",
+          "type": "string"
+        },
+        "username": {
+          "description": "Username de un usuario activo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "username",
+        "role"
+      ],
+      "type": "object"
+    },
+    "name": "add_project_member",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "name",
+        "role"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Cambia el rol de un miembro de un proyecto de PMT entre editor y viewer. Solo el owner del proyecto, sin perfil declarado (perfil User). El owner no cambia de rol.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "role": {
+          "description": "Rol nuevo: editor o viewer",
+          "type": "string"
+        },
+        "username": {
+          "description": "Username del miembro",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "username",
+        "role"
+      ],
+      "type": "object"
+    },
+    "name": "update_project_member",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "name",
+        "role"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Quita a un miembro de un proyecto de PMT: deja de verlo. Solo el owner del proyecto, sin perfil declarado (perfil User). El owner no se quita.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "description": "UUID del proyecto",
+          "type": "string"
+        },
+        "username": {
+          "description": "Username del miembro",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "username"
+      ],
+      "type": "object"
+    },
+    "name": "remove_project_member",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "removed": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "removed"
       ],
       "type": "object"
     }

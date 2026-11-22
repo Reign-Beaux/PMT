@@ -391,7 +391,7 @@ paths:
           format: uuid
     put:
       summary: Pone o cambia el dueño de una tarea ya tomada
-      description: Solo el TL de la etapa. El agente o usuario debe estar activo y en el equipo. Se rechaza en backlog, ready, done y cancelled.
+      description: Solo el TL de la etapa. El agente o usuario debe estar activo y en el equipo; un usuario, además, owner o editor del proyecto (si no, conflict). Se rechaza en backlog, ready, done y cancelled.
       requestBody:
         required: true
         content:

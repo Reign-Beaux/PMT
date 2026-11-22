@@ -21,7 +21,7 @@ import (
 )
 
 func TestCredentialsResuelvenElPerfilDeclarado(t *testing.T) {
-	c := credentials{users: usuarios{}, agents: agentes{}}
+	c := credentials{users: usuarios{}, agents: agentes{}, owner: duenoDeLaInstancia{}}
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name     string
@@ -31,10 +31,10 @@ func TestCredentialsResuelvenElPerfilDeclarado(t *testing.T) {
 		kind     kernel.ErrorKind
 	}{
 		{"usuario sin perfil", "pmt_ana", "", ana, 0},
-		{"usuario como TL", "pmt_ana", kernel.ProfileTL, kernel.Actor{Name: "ana", Profile: kernel.ProfileTL}, 0},
-		{"usuario como PC", "pmt_ana", kernel.ProfilePC, kernel.Actor{Name: "ana", Profile: kernel.ProfilePC}, 0},
-		{"agente sin perfil", "token-de-agente", "", agente, 0},
-		{"agente con su perfil", "token-de-agente", kernel.ProfileTL, agente, 0},
+		{"usuario como TL", "pmt_ana", kernel.ProfileTL, kernel.Actor{Name: "ana", Profile: kernel.ProfileTL, UserID: anaID}, 0},
+		{"usuario como PC", "pmt_ana", kernel.ProfilePC, kernel.Actor{Name: "ana", Profile: kernel.ProfilePC, UserID: anaID}, 0},
+		{"agente sin perfil, con la membresía del dueño", "token-de-agente", "", agenteC, 0},
+		{"agente con su perfil", "token-de-agente", kernel.ProfileTL, agenteC, 0},
 		{"agente con otro perfil", "token-de-agente", kernel.ProfilePP, kernel.Actor{}, kernel.KindInvalid},
 		{"token inválido", "pmt_otro", kernel.ProfileTL, kernel.Actor{}, kernel.KindUnauthorized},
 	} {
@@ -158,7 +158,7 @@ func TestUsuarioComoTLIniciaSuEtapa(t *testing.T) {
 			}
 			tools := mcp.NewServer()
 			startstage.New(repo).RegisterTool(tools)
-			handler := routes(http.NewServeMux(), tools, credentials{users: usuarios{}, agents: agentes{}}, pingOK{}, frontendDePrueba())
+			handler := routes(http.NewServeMux(), tools, credentials{users: usuarios{}, agents: agentes{}, owner: duenoDeLaInstancia{}}, pingOK{}, frontendDePrueba())
 
 			rec := llamarHerramienta(handler, tc.target, "Bearer pmt_ana", "", "start_stage", `{"stage_id":"`+repo.stage.ID.String()+`"}`)
 

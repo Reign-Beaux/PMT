@@ -24,19 +24,23 @@ func NewProjects(db sqlcgen.DBTX) *Projects {
 	return &Projects{queries: sqlcgen.New(db)}
 }
 
-// Create guarda un proyecto nuevo.
-func (s *Projects) Create(ctx context.Context, p domain.Project) (domain.Project, error) {
+// Create guarda un proyecto nuevo con owner como su owner, en una sola sentencia.
+func (s *Projects) Create(ctx context.Context, p domain.Project, owner uuid.UUID) (domain.Project, error) {
 	row, err := s.queries.CreateProject(ctx, sqlcgen.CreateProjectParams{
 		ID:             p.ID,
 		Name:           p.Name,
 		Description:    p.Description,
 		Status:         string(p.Status),
 		ProductVersion: p.ProductVersion,
+		OwnerID:        owner,
 	})
+	if postgres.IsForeignKeyViolation(err) {
+		return domain.Project{}, domain.ErrNoUser
+	}
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("crear proyecto: %w", err)
 	}
-	return toDomain(row), nil
+	return toDomain(sqlcgen.Project(row)), nil
 }
 
 // Get busca un proyecto por su ID.
@@ -63,9 +67,14 @@ func (s *Projects) Lock(ctx context.Context, id uuid.UUID) (domain.Project, erro
 	return toDomain(row), nil
 }
 
-// List devuelve los proyectos, del más reciente al más antiguo.
-func (s *Projects) List(ctx context.Context) ([]domain.Project, error) {
-	rows, err := s.queries.ListProjects(ctx)
+// List devuelve los proyectos en los que el usuario tiene uno de los roles dados,
+// del más reciente al más antiguo.
+func (s *Projects) List(ctx context.Context, userID uuid.UUID, roles []domain.Role) ([]domain.Project, error) {
+	names := make([]string, 0, len(roles))
+	for _, role := range roles {
+		names = append(names, string(role))
+	}
+	rows, err := s.queries.ListProjects(ctx, sqlcgen.ListProjectsParams{UserID: userID, Roles: names})
 	if err != nil {
 		return nil, fmt.Errorf("listar proyectos: %w", err)
 	}

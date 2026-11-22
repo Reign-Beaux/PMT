@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"pmt/internal/kernel"
@@ -35,9 +36,19 @@ func (rejectAll) AuthenticateToken(context.Context, string, kernel.Profile) (ker
 }
 
 var (
-	ana    = kernel.Actor{Name: "ana", Profile: kernel.ProfileUser}
-	agente = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL}
+	anaID   = uuid.MustParse("00000000-0000-0000-0000-0000000000a1")
+	saulID  = uuid.MustParse("00000000-0000-0000-0000-00000000000a")
+	ana     = kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserID: anaID}
+	agente  = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL}
+	agenteC = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL, UserID: saulID}
 )
+
+// duenoDeLaInstancia es saul: los tokens de agente actúan con su membresía.
+type duenoDeLaInstancia struct{}
+
+func (duenoDeLaInstancia) InstanceOwnerID(context.Context) (uuid.UUID, error) {
+	return saulID, nil
+}
 
 // usuarios simula la feature auth: la sesión y el token de un usuario
 // desactivado ya no autentican, porque la base solo devuelve usuarios activos, y
@@ -53,7 +64,9 @@ func (usuarios) AuthenticateSession(_ context.Context, session string) (kernel.A
 
 func (usuarios) AuthenticateToken(_ context.Context, token string, declared kernel.Profile) (kernel.Actor, error) {
 	if token == "pmt_ana" {
-		return kernel.AsUser(ana.Name, declared), nil
+		actor := kernel.AsUser(ana.Name, declared)
+		actor.UserID = anaID
+		return actor, nil
 	}
 	return kernel.Actor{}, kernel.ErrUnauthenticated
 }
@@ -90,7 +103,7 @@ func rutasConActor() http.Handler {
 		actor := mcp.ActorFrom(req)
 		return nil, whoamiOutput{Name: actor.Name, Profile: string(actor.Profile)}, nil
 	})
-	return routes(api, tools, credentials{users: usuarios{}, agents: agentes{}}, pingOK{}, frontendDePrueba())
+	return routes(api, tools, credentials{users: usuarios{}, agents: agentes{}, owner: duenoDeLaInstancia{}}, pingOK{}, frontendDePrueba())
 }
 
 func llamarWhoami(handler http.Handler, authorization string, cookie string) *httptest.ResponseRecorder {
@@ -291,7 +304,7 @@ func TestRoutesSaludSinAutenticacion(t *testing.T) {
 func TestRoutesSinCompiladoLaAPIYLaSaludSiguen(t *testing.T) {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/projects", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("[]")) })
-	handler := routes(api, mcp.NewServer(), credentials{users: usuarios{}, agents: agentes{}}, pingOK{}, web.Handler(t.TempDir()))
+	handler := routes(api, mcp.NewServer(), credentials{users: usuarios{}, agents: agentes{}, owner: duenoDeLaInstancia{}}, pingOK{}, web.Handler(t.TempDir()))
 
 	for _, tc := range []struct {
 		path string

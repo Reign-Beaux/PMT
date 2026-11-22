@@ -15,7 +15,7 @@ func call(t *testing.T, repo Repository, path string) *sdk.CallToolResult {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
-	platformmcp.ActAs(server, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser})
+	platformmcp.ActAs(server, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID})
 	New(repo).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()

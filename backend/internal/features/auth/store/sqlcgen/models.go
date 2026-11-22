@@ -138,6 +138,13 @@ type Project struct {
 	ProductVersion string
 }
 
+type ProjectMember struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+	Role      string
+	AddedAt   time.Time
+}
+
 type ProjectStatusChange struct {
 	ID           uuid.UUID
 	ProjectID    uuid.UUID

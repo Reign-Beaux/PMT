@@ -91,7 +91,7 @@ func NewOwnPlanningStage(projectID uuid.UUID, name, description, reason, request
 
 // Team devuelve el equipo de la etapa.
 func (s Stage) Team() kernel.Team {
-	return kernel.Team{Lead: s.Lead, Members: s.Members}
+	return kernel.Team{Lead: s.Lead, Members: s.Members, ProjectID: s.ProjectID}
 }
 
 // EnsureLead devuelve un error si el actor no es el TL de la etapa.

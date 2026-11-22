@@ -9,8 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"pmt/internal/features/auth/authtest"
 	"pmt/internal/features/auth/commands/seedowner"
+	"pmt/internal/features/auth/domain"
+	"pmt/internal/kernel"
 	"pmt/internal/platform/rest"
 )
 
@@ -319,5 +323,29 @@ func TestIsPublic(t *testing.T) {
 		if got := IsPublic(httptest.NewRequest(tc.method, tc.path, nil)); got != tc.public {
 			t.Errorf("%s %s = %t", tc.method, tc.path, got)
 		}
+	}
+}
+
+// TestTokenConPerfilConservaElUsuario: el perfil declarado no cambia el usuario
+// cuya membresía usa el actor, y InstanceOwnerID da al dueño cuando existe.
+func TestTokenConPerfilConservaElUsuario(t *testing.T) {
+	ctx := context.Background()
+	repo := authtest.New()
+	f := NewWithRepository(repo, authtest.Agents{}, Settings{PublicURL: "https://pmt.example.com/"})
+	if id, err := f.InstanceOwnerID(ctx); err != nil || id != uuid.Nil {
+		t.Fatalf("sin dueño: %v %v", id, err)
+	}
+	dueno := repo.AddUser("saul@example.com", "saul", true, "contrasena")
+	ana := repo.AddUser("ana@example.com", "ana", false, "contrasena")
+	token, _ := domain.NewAPIToken()
+	repo.CreateAPIToken(ctx, uuid.New(), ana.ID, "x", domain.HashToken(token))
+
+	actor, err := f.AuthenticateToken(ctx, token, kernel.ProfileTL)
+
+	if err != nil || actor != (kernel.Actor{Name: "ana", Profile: kernel.ProfileTL, UserID: ana.ID}) {
+		t.Fatalf("actor = %+v, err = %v", actor, err)
+	}
+	if id, err := f.InstanceOwnerID(ctx); err != nil || id != dueno.ID {
+		t.Fatalf("dueño = %v, err = %v", id, err)
 	}
 }

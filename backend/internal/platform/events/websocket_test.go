@@ -34,7 +34,7 @@ func startWS(t *testing.T) *wsTest {
 		l.Run(ctx)
 		close(done)
 	}()
-	ts := httptest.NewServer(Handler(l))
+	ts := httptest.NewServer(Handler(l, nil))
 
 	t.Cleanup(func() {
 		cancel()

@@ -3,6 +3,8 @@ package kernel
 import (
 	"context"
 	"slices"
+
+	"github.com/google/uuid"
 )
 
 // Profile es el perfil con el que actúa quien hace una petición.
@@ -26,9 +28,33 @@ const (
 // nunca llega como argumento. Un usuario actúa con su username y el perfil que
 // declara su sesión, o User si no declara ninguno; un agente, con su nombre y su
 // perfil fijo.
+//
+// UserID es el usuario cuya membresía de proyecto usa la operación: el propio
+// usuario o, con un token de agente, el dueño de la instancia. Vacío, el actor no
+// es miembro de ningún proyecto.
+//
+// Channel es la credencial con la que llegó: la cookie del sitio web o un token
+// de API. Lo fija quien la autentica (rest.Authenticate, mcp.Authenticate).
 type Actor struct {
 	Name    string
 	Profile Profile
+	UserID  uuid.UUID
+	Channel Channel
+}
+
+// Channel es la credencial con la que llega una petición.
+type Channel string
+
+// Canales de una petición. El valor vacío cuenta como token: lo que solo se
+// permite desde el sitio web exige ChannelSession explícito.
+const (
+	ChannelSession Channel = "session"
+	ChannelToken   Channel = "token"
+)
+
+// InBrowser indica si el actor llegó con la cookie del sitio web.
+func (a Actor) InBrowser() bool {
+	return a.Channel == ChannelSession
 }
 
 // IsDev indica si el perfil es de desarrollo, sea frontend o backend.
@@ -36,10 +62,12 @@ func (p Profile) IsDev() bool {
 	return p == ProfileDevFrontend || p == ProfileDevBackend
 }
 
-// Team es el equipo de una etapa: su TL responsable y sus devs.
+// Team es el equipo de una etapa: su TL responsable y sus devs, y el proyecto de
+// la etapa, cuyos miembros owner o editor son los usuarios que pueden integrarlo.
 type Team struct {
-	Lead    string
-	Members []string
+	Lead      string
+	Members   []string
+	ProjectID uuid.UUID
 }
 
 // IsLead indica si el actor es el TL de la etapa.
@@ -87,4 +115,13 @@ func HasAnyTransition[S comparable](table map[S]map[S][]Profile, profile Profile
 		}
 	}
 	return false
+}
+
+// UserRef identifica a un usuario ante otras features: lo da auth a quien
+// necesite resolver un username o un ID.
+type UserRef struct {
+	ID       uuid.UUID
+	Username string
+	Name     string
+	Active   bool
 }

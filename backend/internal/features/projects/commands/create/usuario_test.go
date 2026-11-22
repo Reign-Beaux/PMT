@@ -13,5 +13,5 @@ func asUser(r *http.Request) *http.Request {
 	if rest.ActorFrom(r.Context()) != (kernel.Actor{}) {
 		return r
 	}
-	return r.WithContext(rest.WithActor(r.Context(), kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}))
+	return r.WithContext(rest.WithActor(r.Context(), kernel.Actor{Name: "saul", Profile: kernel.ProfileUser, UserID: saulID}))
 }

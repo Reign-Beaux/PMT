@@ -146,6 +146,21 @@ func TestVerifierKeepsTechnicalErrors(t *testing.T) {
 	}
 }
 
+func TestVerifierMarksTokenChannel(t *testing.T) {
+	check := verifier(authenticatorFunc(func(context.Context, string) (kernel.Actor, error) {
+		return kernel.Actor{Name: "ana", Profile: kernel.ProfileUser}, nil
+	}))
+
+	info, err := check(context.Background(), "pmt_x", nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actor, _ := info.Extra[actorKey].(kernel.Actor); actor.Channel != kernel.ChannelToken || actor.InBrowser() {
+		t.Errorf("actor = %+v", actor)
+	}
+}
+
 type authenticatorFunc func(context.Context, string) (kernel.Actor, error)
 
 func (f authenticatorFunc) AuthenticateToken(ctx context.Context, token string, _ kernel.Profile) (kernel.Actor, error) {

@@ -1,6 +1,8 @@
 package events
 
 import (
+	"github.com/google/uuid"
+
 	"context"
 	"errors"
 	"sync"
@@ -363,5 +365,27 @@ func TestCierreLimpio(t *testing.T) {
 	defer cancelLate()
 	if _, ok := <-late; ok {
 		t.Fatal("Subscribe tras Run terminado debe devolver un canal cerrado")
+	}
+}
+
+func TestPayloadConProyectoYUsuario(t *testing.T) {
+	dialer := newFakeDialer()
+	conn := newFakeConn()
+	dialer.push(conn)
+	running := startListener(t, dialer)
+	sub, cancel := running.Subscribe()
+	defer cancel()
+	waitEvent(t, sub) // resync
+
+	project, user := uuid.New(), uuid.New()
+	conn.payloads <- `{"resource":"project","project_id":"` + project.String() + `","user_id":"` + user.String() + `"}`
+	want := ChangeEvent{Type: TypeInvalidate, Resource: ResourceProject, ProjectID: project, UserID: user}
+	if event := waitEvent(t, sub); event != want {
+		t.Fatalf("evento = %+v, quiero %+v", event, want)
+	}
+
+	conn.payloads <- `{"resource":"stage","project_id":null}`
+	if event := waitEvent(t, sub); event != (ChangeEvent{Type: TypeInvalidate, Resource: ResourceStage}) {
+		t.Fatalf("sin proyecto: evento = %+v", event)
 	}
 }

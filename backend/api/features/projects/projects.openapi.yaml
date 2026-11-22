@@ -8,7 +8,8 @@ security:
 paths:
   /api/projects:
     get:
-      summary: Lista los proyectos, del más reciente al más antiguo
+      summary: Lista los proyectos que ve quien consulta, del más reciente al más antiguo
+      description: Los que creó y los que le compartieron; con token, solo aquellos en que es owner o editor (los de viewer solo se consultan con la cookie del sitio web); con un token de agente, los del dueño de la instancia.
       responses:
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -22,7 +23,7 @@ paths:
                   $ref: "#/components/schemas/Project"
     post:
       summary: Crea un proyecto
-      description: Solo PP y el usuario.
+      description: Solo PP y el usuario. Quien lo crea queda como su owner; con un token de agente, el dueño de la instancia.
       requestBody:
         $ref: "#/components/requestBodies/ProjectInput"
       responses:
@@ -218,6 +219,141 @@ paths:
                   $ref: "#/components/schemas/ProductVersionChange"
         "400":
           $ref: "#/components/responses/Error"
+  /api/projects/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Lista los miembros de un proyecto con su rol
+      description: Cualquier miembro del proyecto, con cualquier perfil. Primero el owner, luego los editores y los viewers.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Miembros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Comparte el proyecto con un usuario activo como editor o viewer
+      description: Solo el owner del proyecto, sin perfil declarado (perfil User).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [username, role]
+              properties:
+                username:
+                  type: string
+                role:
+                  $ref: "#/components/schemas/MemberRole"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "201":
+          description: Miembro agregado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          description: El proyecto no existe para quien actúa, o no hay un usuario activo con ese username
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: El usuario ya es miembro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/projects/{id}/members/{username}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: username
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      summary: Cambia el rol de un miembro entre editor y viewer
+      description: Solo el owner del proyecto, sin perfil declarado (perfil User). El owner no cambia de rol.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role]
+              properties:
+                role:
+                  $ref: "#/components/schemas/MemberRole"
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "200":
+          description: Miembro con su rol nuevo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Es el owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Quita a un miembro del proyecto
+      description: Solo el owner del proyecto, sin perfil declarado (perfil User). El owner no se quita. Un usuario desactivado conserva sus membresías hasta que lo quiten.
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "204":
+          description: Miembro quitado
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Es el owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   securitySchemes:
     bearerAuth:
@@ -281,6 +417,21 @@ components:
               error:
                 type: string
   schemas:
+    Member:
+      type: object
+      additionalProperties: false
+      required: [username, name, role]
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+    MemberRole:
+      type: string
+      enum: [editor, viewer]
     ProductVersionChange:
       type: object
       required: [id, project_id, from_version, to_version, actor_name, actor_profile, reason, changed_at]

@@ -45,8 +45,13 @@ func New(repo Repository) *Handler {
 }
 
 // Handle valida el fichero completo y después guarda todo como una unidad.
+// Quien importa queda como owner del proyecto.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureCanImport(cmd.Actor); err != nil {
+		return Result{}, err
+	}
+	owner, err := projects.OwnerOf(cmd.Actor)
+	if err != nil {
 		return Result{}, err
 	}
 	entry, err := file.ReadProject(cmd.Path)
@@ -58,6 +63,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	plan.Owner = owner
 
 	if err := h.repo.Save(ctx, plan); err != nil {
 		return Result{}, err

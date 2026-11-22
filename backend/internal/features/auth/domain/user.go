@@ -55,9 +55,15 @@ type User struct {
 }
 
 // Actor devuelve la identidad con la que actúa el usuario sin perfil declarado:
-// User. El perfil que declare la sesión de un token lo aplica kernel.AsUser.
+// User, con su ID para la membresía de los proyectos. El perfil que declare la
+// sesión de un token lo aplica kernel.AsUser.
 func (u User) Actor() kernel.Actor {
-	return kernel.Actor{Name: u.Username, Profile: kernel.ProfileUser}
+	return kernel.Actor{Name: u.Username, Profile: kernel.ProfileUser, UserID: u.ID}
+}
+
+// Ref devuelve el usuario como lo ven otras features.
+func (u User) Ref() kernel.UserRef {
+	return kernel.UserRef{ID: u.ID, Username: u.Username, Name: u.Name, Active: !u.Disabled}
 }
 
 // NormalizeEmail quita espacios y pasa el correo a minúsculas.

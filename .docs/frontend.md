@@ -79,7 +79,7 @@ pnpm test:e2e     # Playwright contra 5173 y el backend de pruebas en 8090
 
 1. Compila su propio `pmt-server` en `frontend/.harness/` y lo arranca con `CONFIG_FILE=e2e/harness/config.e2e.yaml` (127.0.0.1:8090, `frontend/dist`), la base en `DATABASE_CONNECTION_STRING`, tomada de `PMT_TEST_DATABASE_URL`, y el dueño de pruebas de `e2e/harness/owner.ts` en `OWNER_*`. No lee `backend/config/config.dev.yaml` ni toca `backend/bin` o el 8080. Espera a que `/readyz` responda.
 2. El propio servidor aplica las migraciones que falten y crea el dueño de pruebas (`e2e-dueno`) si la base no tiene usuarios.
-3. Entra con el dueño de pruebas, crea un proyecto centinela y lo lee por la API para confirmar que el 8090 usa la base de pruebas.
+3. Entra con el dueño de pruebas, crea un proyecto centinela y lo lee por la API para confirmar que el 8090 usa la base de pruebas. Los proyectos que el harness crea por SQL quedan con el dueño de pruebas como owner (`project_members`), porque sin membresía la API no los muestra.
 4. Abre sesión por el proxy de Vite y cada página del navegador arranca con esa cookie (`storageState`).
 5. Crea sus datos con prefijo `e2e-<RUN_ID>-` y los borra al terminar, aunque falle, y comprueba por SQL que no queda nada.
 

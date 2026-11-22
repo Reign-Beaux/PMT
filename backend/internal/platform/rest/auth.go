@@ -23,7 +23,7 @@ type actorKey struct{}
 // token, con el perfil que declare ProfileHeader; sin ella, la cookie de sesión,
 // que ignora esa cabecera. Sin credenciales, o con credenciales inválidas o de un
 // usuario desactivado, responde 401; con un perfil desconocido, o distinto del de
-// un token de agente, 400.
+// un token de agente, 400. El actor lleva el canal de su credencial.
 func Authenticate(authenticator kernel.Authenticator, public func(*http.Request) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +45,10 @@ func Authenticate(authenticator kernel.Authenticator, public func(*http.Request)
 					return
 				}
 				actor, err = authenticator.AuthenticateToken(r.Context(), token, declared)
+				actor.Channel = kernel.ChannelToken
 			} else if session := SessionFrom(r); session != "" {
 				actor, err = authenticator.AuthenticateSession(r.Context(), session)
+				actor.Channel = kernel.ChannelSession
 			} else {
 				unauthorized(w, kernel.Unauthorized("autenticación requerida"))
 				return

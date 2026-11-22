@@ -21,9 +21,11 @@ type AgentChecker interface {
 	Profile(ctx context.Context, name string) (kernel.Profile, error)
 }
 
-// UserChecker indica si un nombre es un usuario activo. Lo implementa la feature auth.
+// UserChecker indica si un nombre es un usuario activo y, si lo es, exige que
+// sea owner o editor del proyecto (conflict si no). Lo implementa la feature
+// projects.
 type UserChecker interface {
-	Active(ctx context.Context, username string) (bool, error)
+	Worker(ctx context.Context, projectID uuid.UUID, username string) (bool, error)
 }
 
 // Command contiene los datos de entrada.
@@ -53,8 +55,8 @@ func New(repo Repository, agents AgentChecker, users UserChecker) *Handler {
 }
 
 // Handle asigna el TL. No es un cambio de contenido: aplica en cualquier status.
-// El TL es un agente con perfil TL o un usuario activo, cuyo perfil se comprueba
-// cuando actúa.
+// El TL es un agente con perfil TL o un usuario activo owner o editor del
+// proyecto, cuyo perfil se comprueba cuando actúa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureCanAssignLead(cmd.Actor); err != nil {
 		return Result{}, err
@@ -63,7 +65,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := h.ensureLead(ctx, cmd.Agent); err != nil {
+	if err := h.ensureLead(ctx, s.ProjectID, cmd.Agent); err != nil {
 		return Result{}, err
 	}
 	if err := h.repo.UpdateLead(ctx, s.ID, cmd.Agent); err != nil {
@@ -72,8 +74,8 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	return Result{ID: s.ID, Lead: cmd.Agent, Members: append([]string{}, s.Members...)}, nil
 }
 
-func (h *Handler) ensureLead(ctx context.Context, name string) error {
-	isUser, err := h.users.Active(ctx, name)
+func (h *Handler) ensureLead(ctx context.Context, projectID uuid.UUID, name string) error {
+	isUser, err := h.users.Worker(ctx, projectID, name)
 	if err != nil || isUser {
 		return err
 	}

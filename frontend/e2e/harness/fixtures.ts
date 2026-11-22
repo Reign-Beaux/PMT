@@ -42,6 +42,12 @@ const ACTOR_PROFILE = 'QA'
 const SENTINEL_NAME = `e2e-${RUN_ID}-centinela`
 let sentinelId = ''
 
+// Con miembros (fase 1c), un proyecto solo lo ve quien es miembro: los que crea
+// el harness por SQL quedan del dueño de pruebas, como si él los hubiera creado.
+function ownedByTestOwner(projectId: string): string {
+  return `insert into project_members (project_id, user_id, role) select '${projectId}', id, 'owner' from users where username = '${TEST_OWNER.username}'`
+}
+
 type StorageState = Exclude<BrowserContextOptions['storageState'], string | undefined>
 
 // Abre sesión con el dueño de pruebas; sin ella la API responde 401.
@@ -80,7 +86,7 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
     async ({ playwright }, provide) => {
       const id = crypto.randomUUID()
       sentinelId = id
-      psql(`insert into projects (id, name) values ('${id}', '${SENTINEL_NAME}')`)
+      psql(`insert into projects (id, name) values ('${id}', '${SENTINEL_NAME}'); ${ownedByTestOwner(id)}`)
       try {
         const ctx = await playwright.request.newContext()
         try {
@@ -121,7 +127,7 @@ export const test = base.extend<{ harness: Harness }, { harnessTarget: void; har
           const status = options.status ?? 'planning'
           const version = options.productVersion ?? ''
           psql(
-            `insert into projects (id, name, status, product_version) values ('${project.id}', '${project.name}', '${status}', '${version}')`,
+            `insert into projects (id, name, status, product_version) values ('${project.id}', '${project.name}', '${status}', '${version}'); ${ownedByTestOwner(project.id)}`,
           )
           creados.push(project)
           return project

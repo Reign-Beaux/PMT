@@ -18,6 +18,7 @@ func connect(t *testing.T, reader Reader) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	server := platformmcp.NewServer()
+	platformmcp.ActAs(server, ana)
 	New(reader).RegisterTool(server)
 
 	serverTransport, clientTransport := sdk.NewInMemoryTransports()

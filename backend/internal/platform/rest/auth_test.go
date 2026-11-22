@@ -97,8 +97,15 @@ func TestAuthenticate(t *testing.T) {
 			if rec.Code != tt.status {
 				t.Errorf("status = %d", rec.Code)
 			}
-			if got != tt.actor {
-				t.Errorf("actor = %+v", got)
+			want := tt.actor
+			if tt.status == http.StatusOK {
+				want.Channel = kernel.ChannelSession
+				if tt.header != "" {
+					want.Channel = kernel.ChannelToken
+				}
+			}
+			if got != want {
+				t.Errorf("actor = %+v, quiero %+v", got, want)
 			}
 		})
 	}

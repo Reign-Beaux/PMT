@@ -8,26 +8,33 @@ import (
 	"github.com/google/uuid"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"pmt/internal/features/projects/commands/addmember"
+	"pmt/internal/features/projects/commands/adoptorphans"
 	"pmt/internal/features/projects/commands/changeproductversion"
 	"pmt/internal/features/projects/commands/changestatus"
 	"pmt/internal/features/projects/commands/create"
 	"pmt/internal/features/projects/commands/delete"
+	"pmt/internal/features/projects/commands/removemember"
 	"pmt/internal/features/projects/commands/update"
+	"pmt/internal/features/projects/commands/updatemember"
 	"pmt/internal/features/projects/domain"
 	"pmt/internal/features/projects/queries/checkplanning"
 	"pmt/internal/features/projects/queries/checkstatus"
+	"pmt/internal/features/projects/queries/checkworker"
 	"pmt/internal/features/projects/queries/checkworking"
 	"pmt/internal/features/projects/queries/get"
 	"pmt/internal/features/projects/queries/list"
+	"pmt/internal/features/projects/queries/listmembers"
 	"pmt/internal/features/projects/queries/listproductversionchanges"
 	"pmt/internal/features/projects/queries/liststatuschanges"
+	"pmt/internal/features/projects/queries/roleof"
 	"pmt/internal/features/projects/store"
 	"pmt/internal/features/projects/store/sqlcgen"
 )
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// stages lo aporta esa feature, conectada en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changestatus.StageProgress) {
+// stages y users los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changestatus.StageProgress, users domain.Users) {
 	repo := store.NewProjects(db)
 	statusChanges := store.NewStatusChanges(db)
 	versionChanges := store.NewProductVersionChanges(db)
@@ -71,6 +78,67 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages changes
 	listVersionChanges := listproductversionchanges.New(versionChanges)
 	listVersionChanges.Register(mux)
 	listVersionChanges.RegisterTool(tools)
+
+	members := store.NewMembers(db)
+
+	listMembers := listmembers.New(members, users)
+	listMembers.Register(mux)
+	listMembers.RegisterTool(tools)
+
+	addMember := addmember.New(members, users)
+	addMember.Register(mux)
+	addMember.RegisterTool(tools)
+
+	updateMember := updatemember.New(members, users)
+	updateMember.Register(mux)
+	updateMember.RegisterTool(tools)
+
+	removeMember := removemember.New(members, users)
+	removeMember.Register(mux)
+	removeMember.RegisterTool(tools)
+}
+
+// Membership resuelve a qué proyecto pertenece un elemento y qué rol tiene en él
+// un usuario. La usan la comprobación de membresía de app y los eventos.
+type Membership struct {
+	roleOf *roleof.Handler
+}
+
+// NewMembership crea la consulta de membresía.
+func NewMembership(db sqlcgen.DBTX) *Membership {
+	return &Membership{roleOf: roleof.New(store.NewMembers(db))}
+}
+
+// RoleOf devuelve el rol del usuario en el proyecto del elemento, vacío si no es
+// miembro. found es false si el elemento no existe. kind es project, stage, task,
+// bug, finding, test_plan o dev_plan.
+func (m *Membership) RoleOf(ctx context.Context, userID uuid.UUID, kind string, id uuid.UUID) (domain.Role, bool, error) {
+	result, err := m.roleOf.Handle(ctx, userID, kind, id)
+	return result.Role, result.Found, err
+}
+
+// Workers permite a otras features saber si un nombre es un usuario que puede
+// trabajar en un proyecto (ser su TL, dev o dueño de una tarea).
+type Workers struct {
+	check *checkworker.Handler
+}
+
+// NewWorkers crea el verificador. users lo aporta la feature auth.
+func NewWorkers(db sqlcgen.DBTX, users checkworker.Users) *Workers {
+	return &Workers{check: checkworker.New(store.NewMembers(db), users)}
+}
+
+// Worker indica si el nombre es un usuario activo. Si lo es y no es owner ni
+// editor del proyecto, responde conflict. Si no es un usuario activo devuelve
+// false: quien pregunta lo valida como agente.
+func (w *Workers) Worker(ctx context.Context, projectID uuid.UUID, username string) (bool, error) {
+	return w.check.Handle(ctx, projectID, username)
+}
+
+// AdoptOrphans deja al usuario como owner de los proyectos sin owner y devuelve
+// cuántos adoptó. Se llama al arrancar, con el dueño de la instancia.
+func AdoptOrphans(ctx context.Context, db sqlcgen.DBTX, owner uuid.UUID) (int64, error) {
+	return adoptorphans.New(store.NewMembers(db)).Handle(ctx, owner)
 }
 
 // Checker permite a otras features saber qué admite un proyecto según su status.
