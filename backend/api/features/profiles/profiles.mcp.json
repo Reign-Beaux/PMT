@@ -1,0 +1,10 @@
+[
+  {
+    "name": "get_profile",
+    "description": "Devuelve, en Markdown, el perfil completo de esta sesión: tus reglas como agente de PMT más las comunes, el mismo texto de GET /api/profiles/{perfil}. Todos los perfiles. Llámala al empezar la sesión, antes de cualquier otra cosa, y sigue lo que dice. Sin perfil declarado (?profile= en la URL del MCP) responde error.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
+]

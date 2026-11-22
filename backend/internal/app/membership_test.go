@@ -30,8 +30,8 @@ import (
 // sinProyecto son las herramientas y rutas que no reciben el ID de un proyecto
 // ni de algo suyo: crean un proyecto o listan los del actor, que ya filtra.
 var (
-	herramientasSinProyecto = []string{"create_project", "import_project", "list_projects"}
-	rutasSinProyecto        = []string{"GET /api/projects", "POST /api/projects"}
+	herramientasSinProyecto = []string{"create_project", "import_project", "list_projects", "get_profile"}
+	rutasSinProyecto        = []string{"GET /api/projects", "POST /api/projects", "GET /api/profiles", "GET /api/profiles/{profile}"}
 )
 
 // ningunaMembresia: todo elemento existe y el actor no es miembro de su proyecto.

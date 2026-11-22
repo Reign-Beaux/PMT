@@ -94,10 +94,11 @@ Cada slice es un paquete con `handler.go` (la operación, su autorización y las
 | `workflow` | Operaciones sobre varios agregados: `release_project`, `start_stage`, el cierre y el retiro de etapas, y `get_project_progress` |
 | `agents` | Agentes y sus tokens. Sin REST ni MCP: solo `pmt-server agent` |
 | `auth` | Usuarios, sesiones del navegador, invitaciones y tokens de API de usuario. Solo REST |
+| `profiles` | Texto de los perfiles de los agentes (`catalog/`, incrustado), servido con la herramienta `get_profile` y en `GET /api/profiles` y `GET /api/profiles/{profile}`; da también las instrucciones cortas del MCP de cada sesión. Sin tablas |
 
 ## Herramientas MCP
 
-Hay 66 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`. La prueba `internal/app/contracts_test.go` falla si una herramienta y su documentación difieren. Cada agente recibe la lista completa; la membresía la comprueba `app` y los permisos de perfil, el handler.
+Hay 67 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`. La prueba `internal/app/contracts_test.go` falla si una herramienta y su documentación difieren. Cada agente recibe la lista completa; la membresía la comprueba `app` y los permisos de perfil, el handler.
 
 | Feature | Herramientas |
 | --- | --- |
@@ -111,8 +112,9 @@ Hay 66 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`
 | `devplans` | `create_dev_plan`, `revise_dev_plan`, `list_dev_plans`, `list_dev_plan_versions` |
 | `activity` | `add_comment`, `list_comments` |
 | `imports` | `import_project`, `import_stage` |
+| `profiles` | `get_profile` |
 
-**REST** expone lo mismo bajo `/api/`, salvo `imports`, que es solo MCP. Los miembros están en `/api/projects/{id}/members` y `/api/projects/{id}/members/{username}`; liberar, en `POST /api/stages/{id}/release` y `POST /api/bugs/{id}/release`. La fuente de verdad son los `*.openapi.yaml`. Además hay `GET` de un proyecto, una etapa y una tarea por su ID, y las rutas de `auth` ([auth.openapi.yaml](../backend/api/features/auth/auth.openapi.yaml)):
+**REST** expone lo mismo bajo `/api/`, salvo `imports`, que es solo MCP. Los miembros están en `/api/projects/{id}/members` y `/api/projects/{id}/members/{username}`; liberar, en `POST /api/stages/{id}/release` y `POST /api/bugs/{id}/release`. La fuente de verdad son los `*.openapi.yaml`. Además hay `GET` de un proyecto, una etapa y una tarea por su ID, `GET /api/profiles` y `GET /api/profiles/{profile}` ([Perfiles servidos](#perfiles-servidos)), y las rutas de `auth` ([auth.openapi.yaml](../backend/api/features/auth/auth.openapi.yaml)):
 
 | Ruta | Quién |
 | --- | --- |
@@ -121,6 +123,14 @@ Hay 66 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`
 | `GET /api/auth/me`, `POST /api/auth/me/password` | El usuario; cambiar la contraseña solo con la cookie |
 | `GET`, `POST /api/tokens`, `DELETE /api/tokens/{id}` | El usuario, sobre sus propios tokens |
 | `GET`, `POST /api/invitations`, `GET /api/users`, `POST /api/users/{id}/disable` y `/enable` | El dueño de la instancia |
+
+## Perfiles servidos
+
+`internal/features/profiles/catalog` incrusta con `embed` los perfiles, `comun.md` y `pc-comun.md` ([perfiles.md](perfiles.md#dónde-viven-los-perfiles)) y arma al arrancar el texto servido de cada perfil: el rol más lo común, tomando la parte servida de cada tramo `[[local||servido]]`.
+
+- **Instrucciones por sesión.** El SDK fija las instrucciones por servidor. En vez de un servidor por perfil, `platform/mcp.Instructions` agrega un middleware de recepción al único servidor: al responder `initialize` (y `server/discover`) toma el actor que dejó `mcp.Authenticate` y le pide a `profiles.Instructions` las suyas. Las herramientas se registran una sola vez y la membresía no cambia. Lo instala `routes` en `internal/app/app.go`. Las instrucciones son cortas, muy por debajo de los ~4 000 caracteres que muestra Claude Code (los perfiles servidos miden hasta ~9 000): nombran el perfil y piden, como primer paso, llamar a `get_profile` y leer `.pmt/entorno.md` ([texto](perfiles.md#cómo-se-sirven)). Sin perfil (`User`) o con token de agente (`kernel.Actor.Agent`, que fija `app.credentials`) no hay: el kit ya da el perfil completo por archivo.
+- **`get_profile`.** Sin argumentos, devuelve como texto (Markdown, sin `structuredContent`) el perfil servido de la sesión, el mismo de `GET /api/profiles/{profile}`. Cualquier perfil, también con token de agente. Sin perfil declarado responde `invalid` con cómo declararlo (`?profile=`). No recibe IDs, así que la guardia de membresía y de bloqueos la deja pasar; empieza con `get_`, así que cuenta como lectura.
+- **REST.** `GET /api/profiles` lista `name` (como se declara en la sesión), `profile` y `description`; `GET /api/profiles/{profile}` devuelve el texto en `text/markdown`, o 404 si no existe (`user` tampoco). Cualquier credencial y cualquier perfil. Contrato en [profiles.openapi.yaml](../backend/api/features/profiles/profiles.openapi.yaml). No reciben IDs de proyecto, así que la guardia de membresía las deja pasar.
 
 ## Identidad
 
@@ -267,9 +277,12 @@ El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` co
 - Cada slice prueba su handler y sus adaptadores con dobles de la persistencia. `store` tiene pruebas propias.
 - `internal/app/contracts_test.go`: las herramientas registradas coinciden con su documentación `.mcp.json`.
 - `internal/app/permissions_test.go`: toda herramienta que no empiece con `list_` ni `get_` rechaza a PC y al actor vacío sin tocar la base. Una herramienta nueva de solo lectura debe seguir esa convención de nombre.
-- `internal/app/membership_test.go`: recorre toda herramienta registrada y toda ruta que registran los `rest.go` de las features (leídas del código), con los IDs que aceptan según su esquema o su `*.openapi.yaml`, y exige `not_found` a quien no es miembro y `forbidden` a un viewer con token, sin llegar al handler; solo se salvan `create_project`, `import_project`, `list_projects` y `GET`/`POST /api/projects`. También exige que contrato y código tengan las mismas rutas, que el viewer con cookie solo lea, y prueba owner, editor, viewer por token y por cookie, no miembro, token de agente y la visibilidad de los eventos.
+- `internal/app/membership_test.go`: recorre toda herramienta registrada y toda ruta que registran los `rest.go` de las features (leídas del código), con los IDs que aceptan según su esquema o su `*.openapi.yaml`, y exige `not_found` a quien no es miembro y `forbidden` a un viewer con token, sin llegar al handler; solo se salvan `create_project`, `import_project`, `list_projects`, `get_profile`, `GET`/`POST /api/projects` y las dos rutas de perfiles. También exige que contrato y código tengan las mismas rutas, que el viewer con cookie solo lea, y prueba owner, editor, viewer por token y por cookie, no miembro, token de agente y la visibilidad de los eventos.
 - `internal/app/holds_test.go`: recorre toda herramienta y ruta de escritura sobre una etapa tomada y un bug tomado por otra persona y exige `conflict` con su nombre sin llegar al handler; solo se salvan `release_*` y las escrituras que solo reciben el proyecto, que deben ser exactamente las de su lista. También prueba la misma persona con otro perfil o con un token de agente, una etapa libre, lecturas y que la membresía va primero.
 - `internal/app/routes_test.go`: 401 sin credenciales, cookie y token de usuario, token de agente, usuario desactivado, rutas públicas y reparto de rutas.
+- `internal/app/profiles_test.go`: `initialize` con `?profile=tl`, `qa`, `pc` y `devbackend` trae instrucciones cortas que nombran el perfil, `get_profile` y `.pmt/entorno.md`; sin perfil, con `user` o con token de agente, ninguna. `get_profile` con perfil devuelve su texto servido; sin perfil, `invalid` con `?profile=`; con token de agente, el de su perfil fijo. Las rutas de perfiles con token y cookie, sin distinguir mayúsculas, 404 y 401, y que REST y `get_profile` sirven lo mismo.
+- `internal/features/profiles/feature_test.go` y `queries/get/handler_test.go`: las instrucciones de los nueve perfiles miden menos de 4 000 caracteres y piden `get_profile` antes que `.pmt/entorno.md`; ninguna sin perfil ni con token de agente; `HandleActor` con y sin perfil.
+- `internal/features/profiles/catalog/catalog_test.go`: los nueve perfiles cargan, el texto servido no deja `{{…}}` ni tramos sin resolver, no nombra scripts del kit, menciona `.pmt/entorno.md`, y lo común abre pidiendo leerlo.
 - `internal/features/auth/feature_test.go`: el recorrido de login, tokens, invitación, desactivación y cambio de contraseña por HTTP, sobre el repositorio en memoria de `auth/authtest`.
 - Las pruebas de adaptadores REST y MCP de otras features actúan como usuario con `asUser` (`usuario_test.go`) o `platformmcp.ActAs`.
 
@@ -283,7 +296,7 @@ Para no buscarlo:
 
 - **Auditoría general** en `activity`: solo hay historiales de status, de cambios y de versión, y comentarios.
 - **`kernel.Transactor`:** cada `store` abre su propia transacción.
-- **Filtrado de herramientas MCP por perfil:** todos reciben las 66.
+- **Filtrado de herramientas MCP por perfil:** todos reciben las 67.
 - **`idempotency_key`:** un reintento repite la operación.
 - **Envío de correos:** el dueño copia el enlace de invitación y lo manda él.
 - **Tomar o reasignar a mano** una etapa o un bug: el owner solo los libera.

@@ -38,12 +38,16 @@ const (
 //
 // Channel es la credencial con la que llegó: la cookie del sitio web o un token
 // de API. Lo fija quien la autentica (rest.Authenticate, mcp.Authenticate).
+//
+// Agent indica que llegó con un token de agente (tabla agents, el kit) y no de
+// usuario.
 type Actor struct {
 	Name     string
 	Profile  Profile
 	UserID   uuid.UUID
 	UserName string
 	Channel  Channel
+	Agent    bool
 }
 
 // Channel es la credencial con la que llega una petición.

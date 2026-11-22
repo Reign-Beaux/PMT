@@ -1,6 +1,6 @@
 # Perfiles y flujo de trabajo
 
-PMT trabaja con nueve perfiles de agentes y el usuario. Cada agente tiene su token, y su perfil decide qué puede hacer en PMT ([dominio.md](dominio.md#permisos)). Las instrucciones que recibe cada agente están en `agentes/perfiles/<perfil>.md` y `agentes/comun.md`. Este documento y esos archivos se editan juntos.
+PMT trabaja con nueve perfiles de agentes y el usuario. Cada agente tiene su token, y su perfil decide qué puede hacer en PMT ([dominio.md](dominio.md#permisos)). Las instrucciones que recibe cada agente están en `backend/internal/features/profiles/catalog/perfiles/<perfil>.md` y `comun.md` de esa carpeta ([Dónde viven los perfiles](#dónde-viven-los-perfiles)). Este documento y esos archivos se editan juntos.
 
 ## Perfiles
 
@@ -123,6 +123,81 @@ Una sesión dura un solo encargo: PMT guarda el estado y cada agente arranca lim
 | TL | Cada etapa |
 | PP | Cada planeación o cada bug |
 | PC | Cada consulta |
+
+## Dónde viven los perfiles
+
+Una sola fuente, en el backend: `backend/internal/features/profiles/catalog/`, incrustada en el binario con `embed`.
+
+| Archivo | Qué es |
+| --- | --- |
+| `perfiles/<agente>.md` | El rol de cada perfil (`pp`, `pc`, `tl`, `dp`, `devback`, `devfront`, `cr`, `qap`, `qa`) |
+| `comun.md` | Lo común, que se agrega después del rol en todos menos PC |
+| `pc-comun.md` | Lo que se agrega a PC en lugar de `comun.md`: solo la ruta del proyecto y la tabla de agentes, porque PC solo lee herdr |
+
+**Dos versiones en un texto.** Los datos de la máquina (ruta, base, puertos, comandos del equipo) solo los conoce quien levanta al agente. Donde el texto los usa hay un tramo `[[local||servido]]`:
+
+- el kit (`agentes/iniciar.sh`) toma la parte local y rellena sus `{{MARCADORES}}` con el `.agentes.env`, y genera exactamente los mismos perfiles que antes;
+- PMT toma la parte servida, que remite a `.pmt/entorno.md` del proyecto.
+
+Se eligió así, y no un segundo juego de sustituciones en Go, porque un marcador suelto no basta: la versión servida cambia también el texto alrededor (`` `{{KIT}}/avisar.sh <agente> "mensaje"` `` pasa a «el comando de avisar de `.pmt/entorno.md`», sin comillas invertidas ni ruta), y con sustituciones en Go cada frase viviría lejos de su regla. Con los dos lados juntos, quien edita una regla ve las dos versiones en el mismo archivo. `comun.md` y `pc-comun.md` abren con un tramo cuya parte local está vacía: la línea que pide leer `.pmt/entorno.md` solo sale en la versión servida.
+
+### Cómo se sirven
+
+El texto servido de un perfil es el rol más lo común, en el mismo orden que los junta el kit. Se lee de dos formas, que devuelven lo mismo:
+
+- **`get_profile`** (MCP, sin argumentos): el perfil de la sesión. Cualquier perfil puede usarla. Sin perfil declarado responde `invalid` y dice cómo declararlo (`?profile=` en la URL del MCP).
+- **`GET /api/profiles/{perfil}`** (REST, `text/markdown`). `GET /api/profiles` lista los perfiles ([arquitectura.md](arquitectura.md#perfiles-servidos)).
+
+Claude Code solo muestra los primeros ~4 000 caracteres de las `instructions` de un servidor MCP, y ocho de los nueve perfiles servidos pasan de eso (entre 4 800 y 9 000). Por eso las instrucciones no llevan el perfil: una sesión MCP con perfil declarado por un usuario (`/mcp?profile=tl`) recibe en `initialize` solo unas líneas (menos de 400 caracteres). Para TL:
+
+```text
+Esta sesión de PMT tiene el perfil TL (Tech Lead).
+
+Antes de cualquier otra cosa:
+1. Llama a get_profile: devuelve tu perfil completo, con tus reglas y las comunes. Síguelo en toda la sesión.
+2. Lee .pmt/entorno.md en la raíz del proyecto: trae los datos de esta máquina (ruta, base, puertos, comandos del equipo) que tu perfil menciona.
+```
+
+Las de los demás cambian solo el perfil y su descripción. Sin perfil (`User`) no hay instrucciones. Un **token de agente** (el kit) tampoco las recibe: ya trae su perfil local completo por archivo, y su proyecto todavía no tiene `.pmt/entorno.md`; si llama a `get_profile`, recibe el texto servido de su perfil fijo.
+
+En la fase 4, `pmt pp` y `pmt equipo` pasarán el perfil completo al lanzar al agente, como hoy el kit; las instrucciones y `get_profile` quedan de respaldo ([plan_produccion.md](plan_produccion.md)).
+
+### Formato de `.pmt/entorno.md`
+
+Archivo local del proyecto, en su raíz, fuera de git (lleva la cadena de la base: `.pmt/` va en `.gitignore`). Lo generará el CLI `pmt` (fase 4 de [plan_produccion.md](plan_produccion.md)); hoy no lo genera nadie. Markdown con estas secciones, en este orden, con los nombres que usan los perfiles servidos:
+
+```markdown
+# Entorno del proyecto
+
+## Proyecto
+- Ruta: `/ruta/absoluta/al/proyecto`
+- Descripción: Tiene backend/ (Go) y frontend/ (React, Vite, TypeScript).
+
+## Base de datos
+- Cadena: `postgres://usuario:clave@localhost:5432/base?sslmode=disable` (solo DevBackend la escribe, en `config/config.dev.yaml`; los demás usan ese archivo)
+- Consultar: `docker exec postgresql psql -U usuario -d base -c "<consulta>"` (cambia `<consulta>` por la tuya)
+
+## Puertos
+- Backend: 8090
+- Frontend: 5173
+
+## Comandos del equipo
+- Avisar: `pmt avisar <agente> "mensaje"`
+- Levantar: `pmt levantar <agente> "encargo"`
+- Reiniciar: `pmt reiniciar <agente>`
+- Relanzar a DP: `pmt relanzar-dp <medium|high>`
+
+## Para el usuario
+- Archivo: `/ruta/absoluta/al/proyecto/.pmt/para-usuario.md`
+
+## Agentes
+| Agente | PMT | Perfil |
+|---|---|---|
+| pp | ana | PP |
+| tl | ana | TL |
+```
+
+Cada sección cubre un marcador del kit: Proyecto (`PROYECTO_RUTA`, `PROYECTO_DESCRIPCION`), Base de datos (`DB_URL`, `DB_CONSULTA`), Puertos (`PUERTO_BACKEND`, `PUERTO_FRONTEND`), Comandos del equipo (`KIT`), Para el usuario (`AGENTES_DIR`) y Agentes (`TABLA_AGENTES`). Los comandos son los de la fase 4; mientras tanto, con el kit, serían sus scripts.
 
 ## Herramientas y modelos en uso
 

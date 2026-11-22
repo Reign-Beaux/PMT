@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: PMT - Perfiles
+  version: 0.1.0
+  description: |
+    Texto de los perfiles de los agentes, incrustado en el binario. Es el mismo que recibe en las
+    `instructions` del `initialize` del MCP una sesión con ese perfil (`/mcp?profile=<perfil>`, o un token de
+    agente con su perfil fijo); estas rutas son para herramientas que no leen esas instrucciones.
+    El texto servido no trae datos de la máquina: remite a `.pmt/entorno.md` en la raíz del proyecto.
+    Solo REST. Cualquier usuario con sesión o token, con cualquier perfil.
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+paths:
+  /api/profiles:
+    get:
+      summary: Lista los perfiles que PMT sirve
+      description: En el orden del flujo. No incluye `User`, que no tiene perfil servido.
+      responses:
+        "200":
+          description: Perfiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Profile" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/profiles/{profile}:
+    get:
+      summary: Devuelve el texto servido de un perfil
+      description: El perfil más lo común, como lo recibe en sus instrucciones una sesión MCP con ese perfil.
+      parameters:
+        - name: profile
+          in: path
+          required: true
+          description: Nombre de sesión del perfil, sin distinguir mayúsculas.
+          schema: { $ref: "#/components/schemas/ProfileName" }
+      responses:
+        "200":
+          description: Texto del perfil
+          content:
+            text/markdown:
+              schema: { type: string }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: El perfil no existe (`user` tampoco)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pmt_session
+  responses:
+    Unauthorized:
+      description: Sin credenciales, o con un token o una sesión inválidos, revocados o de un usuario desactivado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    ProfileName:
+      type: string
+      enum: [pp, pc, tl, dp, devbackend, devfrontend, cr, qap, qa]
+    Profile:
+      type: object
+      required: [name, profile, description]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/ProfileName" }
+        profile:
+          type: string
+          enum: [PP, PC, TL, DP, DevBackend, DevFrontend, CR, QAP, QA]
+        description:
+          type: string
+          description: Nombre largo del perfil, por ejemplo `Tech Lead`.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }

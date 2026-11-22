@@ -132,16 +132,16 @@ for A in $TODOS; do
   TABLA+="| $A | $T | $X |"$'\n'
 done
 export TABLA="${TABLA%$'\n'}"
-python3 - "$KIT" "$AGENTES_DIR/perfiles" $TODOS <<'PY'
+# Los textos viven en el backend, que también los sirve: [[local||servido]] marca un tramo con dos versiones
+# y aquí se toma la local. PC recibe pc-comun.md en lugar de comun.md: solo lee herdr, sin reglas de PMT ni avisos.
+python3 - "$KIT/../backend/internal/features/profiles/catalog" "$AGENTES_DIR/perfiles" $TODOS <<'PY'
 import os,re,sys
-kit,dest,agentes=sys.argv[1],sys.argv[2],sys.argv[3:]
+src,dest,agentes=sys.argv[1],sys.argv[2],sys.argv[3:]
 v={k:os.environ.get(k,'') for k in 'KIT AGENTES_DIR PROYECTO_RUTA PROYECTO_DESCRIPCION DB_URL DB_CONSULTA PUERTO_BACKEND PUERTO_FRONTEND'.split()}
 v.update(TABLA_AGENTES=os.environ['TABLA'])
-comun=open(f'{kit}/comun.md').read()
 for a in agentes:
-    t=open(f'{kit}/perfiles/{a}.md').read()
-    # PC solo lee herdr: sin reglas de PMT ni de avisos.
-    t+=(f"\nProyecto: `{{{{PROYECTO_RUTA}}}}`.\n\nAgentes:\n| Agente | PMT | Perfil |\n|---|---|---|\n{{{{TABLA_AGENTES}}}}\n" if a=='pc' else comun)
+    t=open(f'{src}/perfiles/{a}.md').read()+open(f'{src}/{"pc-comun" if a=="pc" else "comun"}.md').read()
+    t=re.sub(r'\[\[(.*?)\|\|(.*?)\]\]',lambda m:m[1],t,flags=re.S)
     open(f'{dest}/{a}.md','w').write(re.sub(r'\{\{(\w+)\}\}',lambda m:v[m[1]],t))
 PY
 

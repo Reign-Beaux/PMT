@@ -55,7 +55,7 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 
 ### Fase 2. Perfiles servidos por PMT
 - `agentes/perfiles/*.md` y `agentes/comun.md` se incrustan en el binario.
-- Al conectarse con un perfil, el MCP devuelve ese perfil en sus `instructions`. Además, `GET /api/profiles/{perfil}` para herramientas que no lean esas instrucciones.
+- Al conectarse con un perfil, el MCP da unas `instructions` cortas que piden leer el perfil completo con la herramienta `get_profile` y después `.pmt/entorno.md` (Claude Code solo muestra ~4 000 caracteres de las instrucciones). Además, `GET /api/profiles/{perfil}` devuelve el mismo texto. Los tokens de agente del kit no reciben instrucciones.
 - Lo que hoy rellena `iniciar.sh` en los perfiles (puertos, base, descripción del proyecto) pasa a la configuración local del proyecto que lee el CLI.
 
 ### Fase 3. Importar por contenido
@@ -66,6 +66,7 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 - `pmt login`: abre el navegador, el compañero entra y el token queda en su `~/.config/pmt/`.
 - `pmt pp`, en la carpeta del proyecto: la primera vez pregunta lo mínimo (proyecto de PMT, herramienta y modelo) y lo guarda en el proyecto, fuera de git. Luego lanza Claude, Codex o Qwen en herdr con el MCP de `pmt.saulantonio.com`, su token y el perfil PP.
 - `pmt equipo` levanta los demás perfiles en herdr. `pmt avisar`, `pmt levantar`, `pmt reiniciar` y `pmt vigia` sustituyen a los scripts del kit.
+- `pmt pp` y `pmt equipo` pasan el perfil completo (de `GET /api/profiles/{perfil}`) al lanzar a Claude, Codex o Qwen, como hoy hace el kit; las instrucciones del MCP y `get_profile` son el respaldo.
 - La configuración local del proyecto (cadena de su base, puertos) la genera `pmt` y queda en el proyecto del compañero, fuera de git.
 
 ### Fase 5. Despliegue en la Raspberry Pi 5

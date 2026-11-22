@@ -20,7 +20,7 @@ Levanta el equipo de nueve agentes de PMT sobre un proyecto real. Requiere `herd
 
 4. **Effort de mcode.** Es global: se fija en `defaultModelThinking.effort` de `~/.minimax/config.yaml`. `iniciar.sh` avisa si difiere del `.env`.
 
-5. **Agentes.** Crea las pestañas que falten, guarda `.agentes/panes.env`, genera los perfiles en `.agentes/perfiles/`, crea `.mcp.json` si no existe y lanza a todos:
+5. **Agentes.** Crea las pestañas que falten, guarda `.agentes/panes.env`, genera los perfiles en `.agentes/perfiles/` (desde `backend/internal/features/profiles/catalog/`, la misma fuente que PMT sirve por MCP; ver `.docs/perfiles.md`), crea `.mcp.json` si no existe y lanza a todos:
 
    ```bash
    /ruta/a/agentes/iniciar.sh /ruta/al/proyecto/.agentes.env

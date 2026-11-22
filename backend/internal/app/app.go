@@ -21,6 +21,7 @@ import (
 	"pmt/internal/features/bugs"
 	"pmt/internal/features/devplans"
 	"pmt/internal/features/imports"
+	"pmt/internal/features/profiles"
 	"pmt/internal/features/projects"
 	"pmt/internal/features/qa"
 	"pmt/internal/features/reviews"
@@ -162,12 +163,14 @@ func (c credentials) AuthenticateToken(ctx context.Context, token string, declar
 		return kernel.Actor{}, err
 	}
 	actor.UserID, actor.UserName = owner.ID, owner.Username
+	actor.Agent = true
 	return actor, nil
 }
 
 // routes protege la API y el MCP con la autenticación, expone las sondas de
 // salud y las rutas públicas de auth sin credenciales y sirve el frontend
-// compilado en el resto de las rutas.
+// compilado en el resto de las rutas. Cada sesión MCP con perfil recibe en
+// initialize unas instrucciones cortas que remiten a get_profile.
 func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authenticator, pinger health.Pinger, frontend http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.HandleFunc("GET /healthz", health.Live)
@@ -175,6 +178,7 @@ func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authentica
 	apiHandler := rest.Authenticate(authenticator, auth.IsPublic)(api)
 	root.Handle("/api", apiHandler)
 	root.Handle("/api/", apiHandler)
+	mcp.Instructions(tools, profiles.Instructions)
 	root.Handle("/mcp", mcp.Authenticate(authenticator)(mcp.Handler(tools)))
 	root.Handle("/", frontend)
 	return root
@@ -208,4 +212,5 @@ func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool)
 	qa.Register(mux, tools, pool, taskChecker, stageChecker)
 	devplans.Register(mux, tools, pool, taskChecker, stageChecker, bugChecker)
 	activity.Register(mux, tools, pool, projectChecker, stageChecker, taskChecker, bugChecker)
+	profiles.Register(mux, tools)
 }

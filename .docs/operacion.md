@@ -164,6 +164,8 @@ El kit en `agentes/` levanta a los nueve agentes de un proyecto en herdr. Su man
 
 Lo que los agentes necesitan decirle al usuario queda en `.agentes/para-usuario.md` del proyecto.
 
+El texto de los perfiles vive en `backend/internal/features/profiles/catalog/` y va incrustado en el binario: el kit lo lee de ahí para generar `.agentes/perfiles/`, y PMT lo sirve con la herramienta `get_profile` y en `GET /api/profiles/{perfil}`. Una sesión MCP con token de usuario y `?profile=` recibe en sus instrucciones unas líneas que le piden llamar a `get_profile` y leer `.pmt/entorno.md`; los tokens de agente del kit no reciben instrucciones ([perfiles.md](perfiles.md#cómo-se-sirven)). Un cambio a un perfil llega por `get_profile` solo al reemplazar el servidor; a los agentes del kit, al regenerar con `iniciar.sh`.
+
 ## Cambios al código de PMT
 
 - Se hacen en sesión aparte (pestaña Dev del workspace `pmt-v4` en herdr). Si tocan el MCP, un agente `dummy-*` los prueba por MCP.

@@ -40,7 +40,7 @@ var (
 	saulID  = uuid.MustParse("00000000-0000-0000-0000-00000000000a")
 	ana     = kernel.Actor{Name: "ana", Profile: kernel.ProfileUser, UserID: anaID}
 	agente  = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL}
-	agenteC = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL, UserID: saulID, UserName: "saul"}
+	agenteC = kernel.Actor{Name: "dbp-tl", Profile: kernel.ProfileTL, UserID: saulID, UserName: "saul", Agent: true}
 )
 
 // duenoDeLaInstancia es saul: los tokens de agente actúan con su membresía.
