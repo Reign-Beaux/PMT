@@ -7,7 +7,7 @@ Conceptos que PMT guarda y reglas que aplica. La documentación usa el término 
 | Término | En código | Significado |
 | --- | --- | --- |
 | **Proyecto** | `Project` | Trabajo que se gestiona en PMT y se divide en etapas. Tiene status y versión de producto. |
-| **Etapa** | `Stage` | Parte de un proyecto con un orden (`position`), un TL responsable y un equipo de devs. Agrupa tareas. |
+| **Etapa** | `Stage` | Parte de un proyecto con un orden (`position`), un TL responsable y un equipo de devs, agentes o usuarios. Agrupa tareas. |
 | **Tarea** | `Task` | Unidad de trabajo de una etapa, con un dueño (`assignee`) cuando un dev la toma. |
 | **Bug** | `Bug` | Fallo de un proyecto en `working`, hallado en pruebas de rutina o en el uso. Pertenece al proyecto, no a una etapa, y no tiene dueño. Guarda pasos para reproducirlo, la versión donde apareció y quién lo reportó. |
 | **Cambio** | `Change` | Registro inmutable de tipo `add`, `edit` o `retire` sobre una etapa o tarea, con contenido completo, motivo, quién lo pidió y fecha. |
@@ -21,7 +21,7 @@ Conceptos que PMT guarda y reglas que aplica. La documentación usa el término 
 | **Dueño de la instancia** | `IsInstanceOwner` | El primer usuario, creado al arrancar desde la configuración. Invita y desactiva o reactiva usuarios. No se puede desactivar. |
 | **Agente** | `Agent` | Trabajador de IA con nombre, perfil y token propio, creado con `pmt-server agent`. No se borra: se revoca. |
 | **Perfil** | `Profile` | PP, PC, TL, DP, DevFrontend, DevBackend, CR, QAP, QA o `User`, el usuario humano. |
-| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username` y el perfil `User`, sea desde el navegador o con su token; un agente, con su nombre y su perfil. El nombre es lo que queda en historiales, comentarios y hallazgos. |
+| **Actor** | `Actor` | Quien realiza una operación: nombre y perfil. El servidor lo obtiene de la cookie o del token, nunca de los argumentos. Un usuario actúa con su `username`: desde el navegador, siempre con el perfil `User`; con su token, con el perfil que declara la sesión (cualquiera), o `User` si no declara ninguno. Un agente actúa con su nombre y su perfil fijo. Nombre y perfil son lo que queda en historiales (`saul` + `TL`, por ejemplo), comentarios y hallazgos. |
 
 **Cancelar o retirar.** `cancelled` es un status reversible, para trabajo iniciado o que puede volver. Retirar (`retire`) es definitivo, para lo que nunca debió estar: deja un cambio y saca el elemento de las consultas, sin borrar nada.
 
@@ -62,7 +62,7 @@ Nace en `planning`.
 
 - **Perfiles:** el TL de la etapa la inicia y la cierra. PP y `User` liberan, devuelven, cancelan y reabren. PP, `User` y el TL de la etapa detienen, reanudan y reabren una etapa en `done`. Detener, cancelar y reabrir exigen motivo.
 - **Cierre:** solo pasa a `done` si todas sus tareas activas están en `done` o `cancelled`, con al menos una en `done`. Una etapa vacía o toda cancelada se cancela, no se cierra.
-- **Asignación:** PP o `User` le ponen o cambian el TL con `assign_stage_lead` y lo quitan con `remove_stage_lead`, solo con la etapa sin iniciar (`planning` o `stand_by`); quitarlo no cambia el equipo. El TL arma su equipo con `add_stage_member` y `remove_stage_member`.
+- **Asignación:** PP o `User` le ponen o cambian el TL con `assign_stage_lead` y lo quitan con `remove_stage_lead`, solo con la etapa sin iniciar (`planning` o `stand_by`); quitarlo no cambia el equipo. El TL arma su equipo con `add_stage_member` y `remove_stage_member`. El TL es un agente activo con perfil TL o un usuario activo; un dev, un agente activo DevFrontend o DevBackend o un usuario activo. Al usuario no se le revisa perfil al asignarlo: actúa como TL o dev cuando su sesión declara ese perfil, y las reglas comparan su `username` con el TL y el equipo como con cualquier agente.
 
 ## Tareas
 

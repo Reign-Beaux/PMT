@@ -22,6 +22,11 @@ type AgentChecker interface {
 	Profile(ctx context.Context, name string) (kernel.Profile, error)
 }
 
+// UserChecker indica si un nombre es un usuario activo. Lo implementa la feature auth.
+type UserChecker interface {
+	Active(ctx context.Context, username string) (bool, error)
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID    uuid.UUID    `json:"-"`
@@ -40,14 +45,16 @@ type Result struct {
 type Handler struct {
 	repo   Repository
 	agents AgentChecker
+	users  UserChecker
 }
 
 // New crea el handler.
-func New(repo Repository, agents AgentChecker) *Handler {
-	return &Handler{repo: repo, agents: agents}
+func New(repo Repository, agents AgentChecker, users UserChecker) *Handler {
+	return &Handler{repo: repo, agents: agents, users: users}
 }
 
-// Handle añade al dev. Solo lo hace el TL de la etapa.
+// Handle añade al dev. Solo lo hace el TL de la etapa. El dev es un agente con
+// perfil de dev o un usuario activo, cuyo perfil se comprueba cuando actúa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureLeadProfile(cmd.Actor); err != nil {
 		return Result{}, err
@@ -59,15 +66,26 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := s.EnsureLead(cmd.Actor); err != nil {
 		return Result{}, err
 	}
-	profile, err := h.agents.Profile(ctx, cmd.Agent)
-	if err != nil {
+	if err := h.ensureDev(ctx, cmd.Agent); err != nil {
 		return Result{}, err
-	}
-	if !profile.IsDev() {
-		return Result{}, domain.ErrAgentNotDev
 	}
 	if err := h.repo.AddMember(ctx, s.ID, cmd.Agent, cmd.Actor.Name); err != nil {
 		return Result{}, err
 	}
 	return Result{ID: s.ID, Lead: s.Lead, Members: slices.Concat(s.Members, []string{cmd.Agent})}, nil
+}
+
+func (h *Handler) ensureDev(ctx context.Context, name string) error {
+	isUser, err := h.users.Active(ctx, name)
+	if err != nil || isUser {
+		return err
+	}
+	profile, err := h.agents.Profile(ctx, name)
+	if err != nil {
+		return err
+	}
+	if !profile.IsDev() {
+		return domain.ErrAgentNotDev
+	}
+	return nil
 }

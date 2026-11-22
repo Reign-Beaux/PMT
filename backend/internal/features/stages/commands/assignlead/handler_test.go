@@ -33,6 +33,13 @@ func (a fakeAgents) Profile(context.Context, string) (kernel.Profile, error) {
 	return a.profile, a.err
 }
 
+// fakeUsers son los usernames de usuarios activos.
+type fakeUsers map[string]bool
+
+func (u fakeUsers) Active(_ context.Context, name string) (bool, error) {
+	return u[name], nil
+}
+
 func TestHandle(t *testing.T) {
 	missing := kernel.NotFound("agente no encontrado")
 	pp := kernel.Actor{Name: "pp", Profile: kernel.ProfilePP}
@@ -40,19 +47,22 @@ func TestHandle(t *testing.T) {
 		name   string
 		actor  kernel.Actor
 		agents fakeAgents
+		users  fakeUsers
 		want   error
 	}{
-		{"PP asigna", pp, fakeAgents{profile: kernel.ProfileTL}, nil},
-		{"usuario asigna", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, fakeAgents{profile: kernel.ProfileTL}, nil},
-		{"TL no asigna", kernel.Actor{Profile: kernel.ProfileTL}, fakeAgents{profile: kernel.ProfileTL}, domain.ErrAssignLeadForbidden},
-		{"agente sin perfil TL", pp, fakeAgents{profile: kernel.ProfileDevBackend}, domain.ErrAgentNotLead},
-		{"agente inexistente, como el usuario", pp, fakeAgents{err: missing}, missing},
+		{"PP asigna", pp, fakeAgents{profile: kernel.ProfileTL}, nil, nil},
+		{"usuario asigna", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, fakeAgents{profile: kernel.ProfileTL}, nil, nil},
+		{"TL no asigna", kernel.Actor{Profile: kernel.ProfileTL}, fakeAgents{profile: kernel.ProfileTL}, nil, domain.ErrAssignLeadForbidden},
+		{"agente sin perfil TL", pp, fakeAgents{profile: kernel.ProfileDevBackend}, nil, domain.ErrAgentNotLead},
+		{"agente inexistente, como el usuario", pp, fakeAgents{err: missing}, nil, missing},
+		{"usuario activo, sin revisar perfil", pp, fakeAgents{err: missing}, fakeUsers{"tl": true}, nil},
+		{"usuario desactivado responde como hoy", pp, fakeAgents{err: missing}, fakeUsers{"tl": false}, missing},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			result, err := New(repo, tt.agents).Handle(context.Background(), Command{ID: uuid.New(), Agent: "tl", Actor: tt.actor})
+			result, err := New(repo, tt.agents, tt.users).Handle(context.Background(), Command{ID: uuid.New(), Agent: "tl", Actor: tt.actor})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, quiero %v", err, tt.want)

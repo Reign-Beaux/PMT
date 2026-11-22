@@ -79,6 +79,13 @@ func TestWriteToolsRejectPC(t *testing.T) {
 	assertWriteToolsReject(t, &kernel.Actor{Name: "pc-prueba", Profile: kernel.ProfilePC}, "PC")
 }
 
+// TestWriteToolsRejectUserAsPC exige lo mismo a un usuario cuya sesión declara
+// PC (/mcp?profile=pc): manda el perfil declarado, no que sea usuario.
+func TestWriteToolsRejectUserAsPC(t *testing.T) {
+	actor := kernel.AsUser("saul", kernel.ProfilePC)
+	assertWriteToolsReject(t, &actor, "un usuario como PC")
+}
+
 // TestWriteToolsRejectEmptyActor exige lo mismo para una llamada sin actor. La
 // autenticación siempre deja uno; si faltara, el actor vacío no puede escribir.
 func TestWriteToolsRejectEmptyActor(t *testing.T) {

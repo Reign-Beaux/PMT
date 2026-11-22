@@ -13,7 +13,7 @@ import (
 
 type toolInput struct {
 	TaskID string `json:"task_id" jsonschema:"UUID de la tarea"`
-	Agent  string `json:"agent" jsonschema:"Nombre del dev del equipo de la etapa"`
+	Agent  string `json:"agent" jsonschema:"Nombre del agente o username del usuario, dev del equipo de la etapa"`
 }
 
 type toolOutput struct {
@@ -31,7 +31,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "assign_task",
-		Description: "Pone o cambia el dueño de una tarea ya tomada de PMT. Solo el TL de la etapa. El agente debe estar activo y en el equipo. Se rechaza en backlog, ready, done y cancelled: una tarea libre la toma un dev con change_task_status.",
+		Description: "Pone o cambia el dueño de una tarea ya tomada de PMT. Solo el TL de la etapa. El agente o usuario debe estar activo y en el equipo. Se rechaza en backlog, ready, done y cancelled: una tarea libre la toma un dev con change_task_status.",
 	}, h.callTool)
 }
 

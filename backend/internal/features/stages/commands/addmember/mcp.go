@@ -12,7 +12,7 @@ import (
 
 type toolInput struct {
 	StageID string `json:"stage_id" jsonschema:"UUID de la etapa"`
-	Agent   string `json:"agent" jsonschema:"Nombre del agente con perfil DevFrontend o DevBackend"`
+	Agent   string `json:"agent" jsonschema:"Nombre de un agente con perfil DevFrontend o DevBackend o username de un usuario activo"`
 }
 
 type toolOutput struct {
@@ -25,7 +25,7 @@ type toolOutput struct {
 func (h *Handler) RegisterTool(server *sdk.Server) {
 	sdk.AddTool(server, &sdk.Tool{
 		Name:        "add_stage_member",
-		Description: "Añade un dev al equipo de una etapa de PMT. Solo el TL de la etapa. El agente debe estar activo y ser DevFrontend o DevBackend. Solo los devs del equipo toman las tareas de la etapa.",
+		Description: "Añade un dev al equipo de una etapa de PMT. Solo el TL de la etapa. Admite un agente activo DevFrontend o DevBackend o un usuario activo, que actúa como dev cuando su sesión declara ese perfil. Solo los devs del equipo toman las tareas de la etapa.",
 	}, h.callTool)
 }
 

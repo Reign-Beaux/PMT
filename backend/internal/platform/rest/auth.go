@@ -12,12 +12,18 @@ import (
 // SessionCookie es la cookie con la sesión del navegador.
 const SessionCookie = "pmt_session"
 
+// ProfileHeader es la cabecera con la que una petición con token declara su
+// perfil. Con la cookie se ignora: el navegador siempre actúa como User.
+const ProfileHeader = "X-PMT-Profile"
+
 type actorKey struct{}
 
 // Authenticate resuelve el Actor de cada petición y lo deja en su contexto, salvo
 // en las rutas que public declara abiertas. Con cabecera Authorization se usa el
-// token; sin ella, la cookie de sesión. Sin credenciales, o con credenciales
-// inválidas o de un usuario desactivado, responde 401.
+// token, con el perfil que declare ProfileHeader; sin ella, la cookie de sesión,
+// que ignora esa cabecera. Sin credenciales, o con credenciales inválidas o de un
+// usuario desactivado, responde 401; con un perfil desconocido, o distinto del de
+// un token de agente, 400.
 func Authenticate(authenticator kernel.Authenticator, public func(*http.Request) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +39,12 @@ func Authenticate(authenticator kernel.Authenticator, public func(*http.Request)
 					unauthorized(w, kernel.ErrUnauthenticated)
 					return
 				}
-				actor, err = authenticator.AuthenticateToken(r.Context(), token)
+				declared, perr := kernel.ParseProfile(r.Header.Get(ProfileHeader))
+				if perr != nil {
+					WriteError(w, perr)
+					return
+				}
+				actor, err = authenticator.AuthenticateToken(r.Context(), token, declared)
 			} else if session := SessionFrom(r); session != "" {
 				actor, err = authenticator.AuthenticateSession(r.Context(), session)
 			} else {

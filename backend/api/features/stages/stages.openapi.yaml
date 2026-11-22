@@ -293,7 +293,7 @@ paths:
           format: uuid
     put:
       summary: Fija o reemplaza el TL de una etapa
-      description: Solo PP o el usuario. El agente debe estar activo y tener perfil TL.
+      description: Solo PP o el usuario. Admite un agente activo con perfil TL o un usuario activo, que actúa como TL cuando su sesión declara ese perfil.
       requestBody:
         $ref: "#/components/requestBodies/AgentInput"
       responses:
@@ -335,7 +335,7 @@ paths:
           format: uuid
     post:
       summary: Añade un dev al equipo de una etapa
-      description: Solo el TL de la etapa. El agente debe estar activo y ser DevFrontend o DevBackend.
+      description: Solo el TL de la etapa. Admite un agente activo DevFrontend o DevBackend o un usuario activo, que actúa como dev cuando su sesión declara ese perfil.
       requestBody:
         $ref: "#/components/requestBodies/AgentInput"
       responses:
@@ -425,7 +425,7 @@ components:
             properties:
               agent:
                 type: string
-                description: Nombre del agente.
+                description: Nombre del agente o username del usuario.
     StageInput:
       required: true
       content:

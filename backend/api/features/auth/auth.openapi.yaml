@@ -7,7 +7,13 @@ info:
     Toda ruta de `/api`, `/api/events` y `/mcp` pide credenciales salvo las marcadas sin `security`.
     El navegador usa la cookie `pmt_session` (HttpOnly, SameSite=Lax; Secure con `auth.cookie_secure`).
     Los agentes mandan `Authorization: Bearer <token>`: un token `pmt_…` es de un usuario y actúa con su
-    `username` y el perfil `User`; uno sin prefijo es de un agente de `pmt-server agent`.
+    `username`; uno sin prefijo es de un agente de `pmt-server agent` y actúa con su nombre y su perfil fijo.
+    Perfil por sesión: con token, la cabecera `X-PMT-Profile` (en `/api` y `/api/events`) o el parámetro
+    `profile` de la URL (en `/mcp`, por ejemplo `/mcp?profile=tl`) declaran el perfil. Valores sin distinguir
+    mayúsculas: `pp`, `pc`, `tl`, `dp`, `devfrontend`, `devbackend`, `cr`, `qap`, `qa` o `user` (equivale a no
+    declarar). Un token de usuario sin perfil actúa como `User` y con perfil actúa con ese perfil; un token de
+    agente solo acepta su propio perfil. Un valor desconocido, o distinto del perfil de un agente, responde 400.
+    Con la cookie la cabecera se ignora: el navegador siempre actúa como `User`.
 security:
   - bearerAuth: []
   - cookieAuth: []
@@ -51,14 +57,24 @@ paths:
           description: Sesión cerrada
   /api/auth/me:
     get:
-      summary: Devuelve el usuario que actúa
-      description: Con cookie o token de usuario. Un token de agente responde 403.
+      summary: Devuelve el usuario que actúa y su perfil efectivo
+      description: Con cookie o token de usuario, con cualquier perfil declarado. `profile` es el perfil efectivo de la petición; con la cookie o sin perfil declarado, `User`. Un token de agente responde 403.
       responses:
         "200":
-          description: Usuario
+          description: Usuario con el perfil de la petición
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/User" }
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/User"
+                  - type: object
+                    required: [profile]
+                    properties:
+                      profile:
+                        type: string
+                        enum: [User, PP, PC, TL, DP, DevFrontend, DevBackend, CR, QAP, QA]
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

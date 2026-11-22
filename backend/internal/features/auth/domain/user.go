@@ -19,6 +19,9 @@ var (
 	ErrUserNotFound = kernel.NotFound("usuario no encontrado")
 	// ErrUsersOnly indica que la operación es de usuarios y actúa un agente.
 	ErrUsersOnly = kernel.Forbidden("solo los usuarios pueden usar esta operación")
+	// ErrProfileDeclared indica que actúa un usuario con un perfil declarado: las
+	// operaciones de cuenta son del perfil User.
+	ErrProfileDeclared = kernel.Forbidden("las operaciones de cuenta se usan sin perfil declarado")
 	// ErrOwnerOnly indica que la operación es del dueño de la instancia.
 	ErrOwnerOnly = kernel.Forbidden("solo el dueño de la instancia puede usar esta operación")
 	// ErrUsernameInvalid indica que el username no cumple el formato.
@@ -51,8 +54,8 @@ type User struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// Actor devuelve la identidad con la que actúa el usuario. El perfil por sesión
-// llega en otra fase: por ahora todo usuario actúa como User.
+// Actor devuelve la identidad con la que actúa el usuario sin perfil declarado:
+// User. El perfil que declare la sesión de un token lo aplica kernel.AsUser.
 func (u User) Actor() kernel.Actor {
 	return kernel.Actor{Name: u.Username, Profile: kernel.ProfileUser}
 }
@@ -108,16 +111,24 @@ type AgentNames interface {
 	Exists(ctx context.Context, name string) (bool, error)
 }
 
-// CurrentUser devuelve el usuario que actúa. Un agente no es usuario.
+// CurrentUser devuelve el usuario que actúa con el perfil User, para las
+// operaciones de cuenta. Un agente no es usuario; un usuario con perfil declarado
+// recibe ErrProfileDeclared.
 func CurrentUser(ctx context.Context, finder UserFinder, actor kernel.Actor) (User, error) {
-	if actor.Profile != kernel.ProfileUser || actor.Name == "" {
+	if actor.Name == "" {
 		return User{}, ErrUsersOnly
 	}
 	user, err := finder.UserByUsername(ctx, actor.Name)
 	if errors.Is(err, ErrUserNotFound) {
 		return User{}, ErrUsersOnly
 	}
-	return user, err
+	if err != nil {
+		return User{}, err
+	}
+	if actor.Profile != kernel.ProfileUser {
+		return User{}, ErrProfileDeclared
+	}
+	return user, nil
 }
 
 // CurrentOwner devuelve el usuario que actúa si es el dueño de la instancia.

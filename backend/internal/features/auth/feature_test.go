@@ -105,6 +105,41 @@ func TestFlujoCompleto(t *testing.T) {
 	if got := dueno.do("GET", "/api/whoami", "", token).Body.String(); got != "saul/User" {
 		t.Fatalf("actor con token = %q", got)
 	}
+	if me["profile"] != "User" {
+		t.Fatalf("perfil con cookie = %v", me["profile"])
+	}
+
+	// Perfil por sesión: con token, X-PMT-Profile decide el perfil; con la
+	// cookie se ignora. Un usuario con perfil sigue siendo él para me, pero las
+	// operaciones de cuenta siguen siendo solo de User.
+	conPerfil := func(path, value, bearer string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("GET", path, nil)
+		req.Header.Set(rest.ProfileHeader, value)
+		if bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+bearer)
+		} else {
+			req.AddCookie(dueno.cookie)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+	if got := conPerfil("/api/whoami", "tl", token).Body.String(); got != "saul/TL" {
+		t.Fatalf("token con perfil = %q", got)
+	}
+	if got := conPerfil("/api/whoami", "tl", "").Body.String(); got != "saul/User" {
+		t.Fatalf("cookie con perfil = %q", got)
+	}
+	if rec := conPerfil("/api/whoami", "jefe", token); rec.Code != http.StatusBadRequest {
+		t.Fatalf("perfil desconocido: %d %s", rec.Code, rec.Body)
+	}
+	meTL := decode[map[string]any](t, conPerfil("/api/auth/me", "TL", token))
+	if meTL["username"] != "saul" || meTL["profile"] != "TL" {
+		t.Fatalf("me con perfil = %v", meTL)
+	}
+	if rec := conPerfil("/api/tokens", "tl", token); rec.Code != http.StatusForbidden {
+		t.Fatalf("las cuentas siguen siendo de User: %d %s", rec.Code, rec.Body)
+	}
 	lista := dueno.do("GET", "/api/tokens", "", "").Body.String()
 	if strings.Contains(lista, token) || !strings.Contains(lista, `"laptop"`) {
 		t.Fatalf("la lista no debe traer el token: %s", lista)

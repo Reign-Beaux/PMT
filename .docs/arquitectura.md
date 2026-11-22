@@ -26,7 +26,7 @@ REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se du
 | WebSocket | `github.com/coder/websocket` |
 | YAML de importación | `gopkg.in/yaml.v3` |
 | Contraseñas | argon2id (`golang.org/x/crypto/argon2`) |
-| Pruebas | `testing` estándar: 205 archivos y unas 630 pruebas |
+| Pruebas | `testing` estándar: 208 archivos y unas 645 pruebas |
 
 ## Estructura
 
@@ -125,8 +125,8 @@ Hay 60 herramientas, documentadas en `api/features/<feature>/<feature>.mcp.json`
 
 Hay dos clases de actor ([dominio.md](dominio.md#conceptos)):
 
-- **Usuario:** una persona con correo, nombre, contraseña y `username`. Actúa como `Actor{Name: username, Profile: User}`. El perfil por sesión llega en la fase 1b del [plan de producción](plan_produccion.md).
-- **Agente:** fila de `agents` con nombre y perfil fijo, administrada con `pmt-server agent`. Sigue igual que antes.
+- **Usuario:** una persona con correo, nombre, contraseña y `username`. Actúa como `Actor{Name: username, Profile: <perfil de la sesión>}`: con la cookie, siempre `User`; con su token, el perfil que declare la sesión, o `User` si no declara ninguno. Puede usar cualquier perfil; las reglas de permisos son las mismas que para un agente de ese perfil.
+- **Agente:** fila de `agents` con nombre y perfil fijo, administrada con `pmt-server agent`. Sigue igual que antes: si la sesión declara un perfil, debe ser el suyo.
 
 Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni al revés: lo validan `auth` (al aceptar una invitación y al crear el dueño) y `pmt-server agent create`, cada uno con el `Checker` de la otra feature.
 
@@ -135,8 +135,22 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 | Credencial | Dónde | Resuelve |
 | --- | --- | --- |
 | Cookie `pmt_session` | `/api/`, incluido el WebSocket `/api/events` | El usuario de una sesión vigente (30 días) |
-| `Authorization: Bearer pmt_<64 hex>` | `/api/` y `/mcp` | El usuario dueño del token |
-| `Authorization: Bearer <64 hex>` | `/api/` y `/mcp` | El agente del token, como antes |
+| `Authorization: Bearer pmt_<64 hex>` | `/api/` y `/mcp` | El usuario dueño del token, con el perfil declarado |
+| `Authorization: Bearer <64 hex>` | `/api/` y `/mcp` | El agente del token, con su perfil fijo |
+
+**Perfil por sesión.** Solo con token:
+
+| Transporte | Cómo se declara |
+| --- | --- |
+| `/mcp` | Parámetro de la URL `profile` (`/mcp?profile=tl`), para que Claude, Codex y Qwen lo configuren sin cabeceras extra |
+| `/api/` y `/api/events` | Cabecera `X-PMT-Profile` |
+
+- Valores sin distinguir mayúsculas: `pp`, `pc`, `tl`, `dp`, `devfrontend`, `devbackend`, `cr`, `qap`, `qa`; `user` equivale a no declarar. Los interpreta `kernel.ParseProfile`.
+- `platform/rest` y `platform/mcp` leen el perfil y lo pasan a `kernel.Authenticator.AuthenticateToken`; `app.credentials` lo aplica con `kernel.AsUser` (token de usuario) o `kernel.AsAgent` (token de agente).
+- Un valor desconocido, o un perfil distinto del de un token de agente, responde **400** con el motivo (en `/mcp`, como texto plano: el middleware del SDK responde 400 a los errores `auth.ErrOAuth`). Sin credenciales sigue siendo 401 antes de mirar el perfil.
+- Con la cookie, `X-PMT-Profile` se ignora: el frontend es de consulta y siempre actúa como `User`.
+- `GET /api/auth/me` devuelve el usuario y `profile`, el perfil efectivo de la petición, con cualquier perfil. Las demás operaciones de `auth` (tokens, invitaciones, usuarios, contraseña) siguen siendo del perfil `User`: un usuario con perfil declarado recibe 403.
+- **TL y equipo.** `assign_stage_lead`, `add_stage_member` y `assign_task` aceptan el nombre de un agente activo (con la validación de perfil de siempre) o el `username` de un usuario activo, sin revisar perfil: lo comprueba cada operación cuando actúa. Lo consultan con `auth.Checker.Active`. Por eso `stages.lead`, `stage_members.agent` y `tasks.assignee` ya no tienen llave foránea a `agents` (migración `00026`).
 
 - Con cabecera `Authorization` manda el token; sin ella, la cookie. `/mcp` solo acepta tokens.
 - Sin credenciales, con `Bearer` vacío, o con una cookie o un token inválidos, vencidos, revocados o de un usuario desactivado: **401**. No hay acceso anónimo: el antiguo «sin token actúa `saul`» ya no existe.
@@ -147,7 +161,7 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 
 **Cookie.** `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` según `auth.cookie_secure`. Cambiar la contraseña cierra las demás sesiones del usuario; desactivarlo borra todas y revoca sus tokens.
 
-**Tokens de agente.** Viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`. Un token de usuario se crea en la pantalla Cuenta del frontend y se usa igual.
+**Tokens de agente.** Viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`. Un token de usuario se crea en la pantalla Cuenta del frontend y se usa igual, con `?profile=` en la URL del MCP ([operacion.md](operacion.md#usuarios-y-acceso)).
 
 ## Errores
 
@@ -159,7 +173,7 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 
 ## Datos
 
-- 25 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00025_create_invitations`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
+- 26 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00026_allow_users_in_stage_teams`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`; `00026` quita las llaves foráneas de TL, equipo y dueño de tarea hacia `agents`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
 - `sqlc.yaml` tiene una entrada por feature con consultas, todas sobre el esquema de las migraciones. Tras cambiar migraciones o consultas: `go tool sqlc generate`. El código de `sqlcgen/` no se edita a mano.
 - **Transacciones:** las operaciones que escriben varias filas usan `pgx.BeginFunc` en su `store`, y `imports` y `workflow` comparten una `pgx.Tx`. Los cambios de status bloquean con `FOR UPDATE` y comparan el status de origen; si cambió entre leer y guardar, responden `el status cambió, vuelve a consultar`. Los lotes bloquean por orden de ID.
 - **Concurrencia:** los agregados no tienen control de versión. Fuera de los casos anteriores, gana la última escritura.

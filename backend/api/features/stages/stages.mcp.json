@@ -730,12 +730,12 @@
     }
   },
   {
-    "description": "Añade un dev al equipo de una etapa de PMT. Solo el TL de la etapa. El agente debe estar activo y ser DevFrontend o DevBackend. Solo los devs del equipo toman las tareas de la etapa.",
+    "description": "Añade un dev al equipo de una etapa de PMT. Solo el TL de la etapa. Admite un agente activo DevFrontend o DevBackend o un usuario activo, que actúa como dev cuando su sesión declara ese perfil. Solo los devs del equipo toman las tareas de la etapa.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "agent": {
-          "description": "Nombre del agente con perfil DevFrontend o DevBackend",
+          "description": "Nombre de un agente con perfil DevFrontend o DevBackend o username de un usuario activo",
           "type": "string"
         },
         "stage_id": {
@@ -778,12 +778,12 @@
     }
   },
   {
-    "description": "Fija o reemplaza el TL responsable de una etapa de PMT. Solo PP o el usuario. El agente debe estar activo y tener perfil TL. Solo ese TL inicia la etapa, arma su equipo y cierra sus tareas. Usa list_stages para obtener el ID de la etapa.",
+    "description": "Fija o reemplaza el TL responsable de una etapa de PMT. Solo PP o el usuario. Admite un agente activo con perfil TL o un usuario activo, que actúa como TL cuando su sesión declara ese perfil. Solo ese TL inicia la etapa, arma su equipo y cierra sus tareas. Usa list_stages para obtener el ID de la etapa.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "agent": {
-          "description": "Nombre del agente con perfil TL",
+          "description": "Nombre de un agente con perfil TL o username de un usuario activo",
           "type": "string"
         },
         "stage_id": {

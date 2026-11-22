@@ -30,7 +30,7 @@ func (rejectAll) AuthenticateSession(context.Context, string) (kernel.Actor, err
 	return kernel.Actor{}, kernel.ErrSessionInvalid
 }
 
-func (rejectAll) AuthenticateToken(context.Context, string) (kernel.Actor, error) {
+func (rejectAll) AuthenticateToken(context.Context, string, kernel.Profile) (kernel.Actor, error) {
 	return kernel.Actor{}, kernel.ErrUnauthenticated
 }
 
@@ -40,7 +40,8 @@ var (
 )
 
 // usuarios simula la feature auth: la sesión y el token de un usuario
-// desactivado ya no autentican, porque la base solo devuelve usuarios activos.
+// desactivado ya no autentican, porque la base solo devuelve usuarios activos, y
+// el token actúa con el perfil que declare la sesión.
 type usuarios struct{}
 
 func (usuarios) AuthenticateSession(_ context.Context, session string) (kernel.Actor, error) {
@@ -50,9 +51,9 @@ func (usuarios) AuthenticateSession(_ context.Context, session string) (kernel.A
 	return kernel.Actor{}, kernel.ErrSessionInvalid
 }
 
-func (usuarios) AuthenticateToken(_ context.Context, token string) (kernel.Actor, error) {
+func (usuarios) AuthenticateToken(_ context.Context, token string, declared kernel.Profile) (kernel.Actor, error) {
 	if token == "pmt_ana" {
-		return ana, nil
+		return kernel.AsUser(ana.Name, declared), nil
 	}
 	return kernel.Actor{}, kernel.ErrUnauthenticated
 }
@@ -75,10 +76,12 @@ type whoamiOutput struct {
 // usuario y token de agente) y una API y un MCP que devuelven su actor.
 func rutasConActor() http.Handler {
 	api := http.NewServeMux()
-	api.HandleFunc("GET /api/projects", func(w http.ResponseWriter, r *http.Request) {
+	writeActor := func(w http.ResponseWriter, r *http.Request) {
 		actor := rest.ActorFrom(r.Context())
 		w.Write([]byte(actor.Name + "/" + string(actor.Profile)))
-	})
+	}
+	api.HandleFunc("GET /api/projects", writeActor)
+	api.HandleFunc("GET /api/events", writeActor)
 	api.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("login")) })
 	api.HandleFunc("GET /api/invitations/{token}", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("invitación")) })
 	api.HandleFunc("GET /api/invitations", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("lista")) })
@@ -91,8 +94,12 @@ func rutasConActor() http.Handler {
 }
 
 func llamarWhoami(handler http.Handler, authorization string, cookie string) *httptest.ResponseRecorder {
-	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"whoami","arguments":{}}}`
-	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	return llamarHerramienta(handler, "/mcp", authorization, cookie, "whoami", `{}`)
+}
+
+func llamarHerramienta(handler http.Handler, target, authorization, cookie, tool, arguments string) *httptest.ResponseRecorder {
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"` + tool + `","arguments":` + arguments + `}}`
+	req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("Mcp-Protocol-Version", "2025-06-18")

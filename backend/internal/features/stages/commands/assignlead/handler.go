@@ -21,6 +21,11 @@ type AgentChecker interface {
 	Profile(ctx context.Context, name string) (kernel.Profile, error)
 }
 
+// UserChecker indica si un nombre es un usuario activo. Lo implementa la feature auth.
+type UserChecker interface {
+	Active(ctx context.Context, username string) (bool, error)
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID    uuid.UUID    `json:"-"`
@@ -39,14 +44,17 @@ type Result struct {
 type Handler struct {
 	repo   Repository
 	agents AgentChecker
+	users  UserChecker
 }
 
 // New crea el handler.
-func New(repo Repository, agents AgentChecker) *Handler {
-	return &Handler{repo: repo, agents: agents}
+func New(repo Repository, agents AgentChecker, users UserChecker) *Handler {
+	return &Handler{repo: repo, agents: agents, users: users}
 }
 
 // Handle asigna el TL. No es un cambio de contenido: aplica en cualquier status.
+// El TL es un agente con perfil TL o un usuario activo, cuyo perfil se comprueba
+// cuando actúa.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err := domain.EnsureCanAssignLead(cmd.Actor); err != nil {
 		return Result{}, err
@@ -55,15 +63,26 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	profile, err := h.agents.Profile(ctx, cmd.Agent)
-	if err != nil {
+	if err := h.ensureLead(ctx, cmd.Agent); err != nil {
 		return Result{}, err
-	}
-	if profile != kernel.ProfileTL {
-		return Result{}, domain.ErrAgentNotLead
 	}
 	if err := h.repo.UpdateLead(ctx, s.ID, cmd.Agent); err != nil {
 		return Result{}, err
 	}
 	return Result{ID: s.ID, Lead: cmd.Agent, Members: append([]string{}, s.Members...)}, nil
+}
+
+func (h *Handler) ensureLead(ctx context.Context, name string) error {
+	isUser, err := h.users.Active(ctx, name)
+	if err != nil || isUser {
+		return err
+	}
+	profile, err := h.agents.Profile(ctx, name)
+	if err != nil {
+		return err
+	}
+	if profile != kernel.ProfileTL {
+		return domain.ErrAgentNotLead
+	}
+	return nil
 }

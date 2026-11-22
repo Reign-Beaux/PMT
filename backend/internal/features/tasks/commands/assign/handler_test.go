@@ -41,6 +41,13 @@ func (a fakeAgents) Profile(context.Context, string) (kernel.Profile, error) {
 	return kernel.ProfileDevBackend, a.err
 }
 
+// fakeUsers son los usernames de usuarios activos.
+type fakeUsers map[string]bool
+
+func (u fakeUsers) Active(_ context.Context, name string) (bool, error) {
+	return u[name], nil
+}
+
 var (
 	tl      = kernel.Actor{Name: "tl", Profile: kernel.ProfileTL}
 	otherTL = kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}
@@ -54,22 +61,25 @@ func TestHandle(t *testing.T) {
 		actor  kernel.Actor
 		agent  string
 		agents fakeAgents
+		users  fakeUsers
 		want   error
 	}{
-		{"TL reasigna", domain.StatusInReview, tl, "dev2", fakeAgents{}, nil},
-		{"perfil incorrecto", domain.StatusInReview, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "dev2", fakeAgents{}, domain.ErrAssignForbidden},
-		{"DP no asigna", domain.StatusInReview, kernel.Actor{Name: "dp", Profile: kernel.ProfileDP}, "dev2", fakeAgents{}, domain.ErrAssignForbidden},
-		{"TL ajeno", domain.StatusInReview, otherTL, "dev2", fakeAgents{}, kernel.ErrNotStageLead},
-		{"fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, domain.ErrAssigneeNotMember},
-		{"agente revocado", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, revoked},
-		{"tarea libre", domain.StatusReady, tl, "dev2", fakeAgents{}, domain.ErrTaskNotTaken},
-		{"tarea cerrada", domain.StatusDone, tl, "dev2", fakeAgents{}, domain.ErrTaskNotTaken},
+		{"TL reasigna", domain.StatusInReview, tl, "dev2", fakeAgents{}, nil, nil},
+		{"perfil incorrecto", domain.StatusInReview, kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, "dev2", fakeAgents{}, nil, domain.ErrAssignForbidden},
+		{"DP no asigna", domain.StatusInReview, kernel.Actor{Name: "dp", Profile: kernel.ProfileDP}, "dev2", fakeAgents{}, nil, domain.ErrAssignForbidden},
+		{"TL ajeno", domain.StatusInReview, otherTL, "dev2", fakeAgents{}, nil, kernel.ErrNotStageLead},
+		{"fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, nil, domain.ErrAssigneeNotMember},
+		{"agente revocado", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, nil, revoked},
+		{"usuario activo del equipo", domain.StatusInReview, tl, "dev2", fakeAgents{err: revoked}, fakeUsers{"dev2": true}, nil},
+		{"usuario activo fuera del equipo", domain.StatusInReview, tl, "otro", fakeAgents{}, fakeUsers{"otro": true}, domain.ErrAssigneeNotMember},
+		{"tarea libre", domain.StatusReady, tl, "dev2", fakeAgents{}, nil, domain.ErrTaskNotTaken},
+		{"tarea cerrada", domain.StatusDone, tl, "dev2", fakeAgents{}, nil, domain.ErrTaskNotTaken},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{task: domain.Task{ID: uuid.New(), Status: tt.status, Assignee: "dev"}}
 
-			_, err := New(repo, fakeStages{}, tt.agents).Handle(context.Background(), Command{ID: repo.task.ID, Agent: tt.agent, Actor: tt.actor})
+			_, err := New(repo, fakeStages{}, tt.agents, tt.users).Handle(context.Background(), Command{ID: repo.task.ID, Agent: tt.agent, Actor: tt.actor})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, quiero %v", err, tt.want)
@@ -87,7 +97,7 @@ func TestHandle(t *testing.T) {
 func TestREST(t *testing.T) {
 	repo := &fakeRepo{task: domain.Task{ID: uuid.New(), Status: domain.StatusInDev}}
 	mux := http.NewServeMux()
-	New(repo, fakeStages{}, fakeAgents{}).Register(mux)
+	New(repo, fakeStages{}, fakeAgents{}, fakeUsers{}).Register(mux)
 	req := httptest.NewRequest(http.MethodPut, "/api/tasks/"+repo.task.ID.String()+"/assignee", strings.NewReader(`{"agent":"dev"}`))
 	rec := httptest.NewRecorder()
 

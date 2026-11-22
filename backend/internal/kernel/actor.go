@@ -23,8 +23,9 @@ const (
 )
 
 // Actor identifica a quien ejecuta una operación. Lo resuelve el servidor y
-// nunca llega como argumento. Un usuario actúa con su username y el perfil User;
-// un agente, con su nombre y su perfil.
+// nunca llega como argumento. Un usuario actúa con su username y el perfil que
+// declara su sesión, o User si no declara ninguno; un agente, con su nombre y su
+// perfil fijo.
 type Actor struct {
 	Name    string
 	Profile Profile
@@ -46,7 +47,7 @@ func (t Team) IsLead(actor Actor) bool {
 	return t.Lead != "" && t.Lead == actor.Name
 }
 
-// HasMember indica si el agente pertenece al equipo de devs de la etapa.
+// HasMember indica si el agente o usuario pertenece al equipo de devs de la etapa.
 func (t Team) HasMember(name string) bool {
 	return slices.Contains(t.Members, name)
 }
@@ -60,11 +61,13 @@ var ErrUnauthenticated = Unauthorized("token inválido")
 var ErrSessionInvalid = Unauthorized("sesión no válida")
 
 // Authenticator resuelve las credenciales de una petición a su actor: la cookie
-// de sesión del navegador o un token de API (de usuario o de agente). Devuelve
-// un error de tipo KindUnauthorized si no son válidas; cualquier otro es técnico.
+// de sesión del navegador, que siempre actúa como User, o un token de API (de
+// usuario o de agente) con el perfil que declara la sesión (vacío si no declara
+// ninguno). Devuelve un error de tipo KindUnauthorized si las credenciales no son
+// válidas y KindInvalid si el perfil declarado no cabe; cualquier otro es técnico.
 type Authenticator interface {
 	AuthenticateSession(ctx context.Context, session string) (Actor, error)
-	AuthenticateToken(ctx context.Context, token string) (Actor, error)
+	AuthenticateToken(ctx context.Context, token string, declared Profile) (Actor, error)
 }
 
 // IsPlanner indica si el perfil planea: PP o el usuario, que tiene lo de PP.

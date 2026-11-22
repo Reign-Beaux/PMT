@@ -136,12 +136,16 @@ func TestCurrentUserAndOwner(t *testing.T) {
 	for _, actor := range []kernel.Actor{
 		{Name: "dbp-tl", Profile: kernel.ProfileTL},
 		{Name: "agente-user", Profile: kernel.ProfileUser},
-		{Name: "saul", Profile: kernel.ProfilePP},
 		{},
 	} {
 		if _, err := CurrentUser(ctx, users, actor); !errors.Is(err, ErrUsersOnly) {
 			t.Errorf("%+v: %v", actor, err)
 		}
+	}
+	// Un usuario con perfil declarado sigue siendo él, pero las operaciones de
+	// cuenta son del perfil User.
+	if _, err := CurrentUser(ctx, users, kernel.Actor{Name: "saul", Profile: kernel.ProfilePP}); !errors.Is(err, ErrProfileDeclared) {
+		t.Errorf("usuario como PP: %v", err)
 	}
 }
 

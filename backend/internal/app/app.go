@@ -88,11 +88,13 @@ func Run(cfg config.Config) error {
 }
 
 // credentials resuelve las credenciales de una petición: la cookie es siempre de
-// un usuario; un token con prefijo pmt_ es de usuario y cualquier otro, de agente.
+// un usuario y actúa como User; un token con prefijo pmt_ es de usuario y actúa
+// con el perfil que declare la sesión; cualquier otro es de agente y conserva su
+// perfil fijo.
 type credentials struct {
 	users interface {
 		AuthenticateSession(ctx context.Context, session string) (kernel.Actor, error)
-		AuthenticateToken(ctx context.Context, token string) (kernel.Actor, error)
+		AuthenticateToken(ctx context.Context, token string, declared kernel.Profile) (kernel.Actor, error)
 	}
 	agents interface {
 		Authenticate(ctx context.Context, token string) (kernel.Actor, error)
@@ -103,11 +105,15 @@ func (c credentials) AuthenticateSession(ctx context.Context, session string) (k
 	return c.users.AuthenticateSession(ctx, session)
 }
 
-func (c credentials) AuthenticateToken(ctx context.Context, token string) (kernel.Actor, error) {
+func (c credentials) AuthenticateToken(ctx context.Context, token string, declared kernel.Profile) (kernel.Actor, error) {
 	if auth.IsUserToken(token) {
-		return c.users.AuthenticateToken(ctx, token)
+		return c.users.AuthenticateToken(ctx, token, declared)
 	}
-	return c.agents.Authenticate(ctx, token)
+	agent, err := c.agents.Authenticate(ctx, token)
+	if err != nil {
+		return kernel.Actor{}, err
+	}
+	return kernel.AsAgent(agent, declared)
 }
 
 // routes protege la API y el MCP con la autenticación, expone las sondas de
@@ -129,12 +135,13 @@ func routes(api http.Handler, tools *sdk.Server, authenticator kernel.Authentica
 func registerFeatures(mux *http.ServeMux, tools *sdk.Server, pool *pgxpool.Pool) {
 	projectChecker := projects.NewChecker(pool)
 	agentChecker := agents.NewChecker(pool)
+	userChecker := auth.NewChecker(pool)
 
 	projects.Register(mux, tools, pool, stages.NewProgress(pool))
 	taskChecker := tasks.NewChecker(pool)
-	stages.Register(mux, tools, pool, taskChecker, projectChecker, agentChecker, workflow.NewCloser(pool))
+	stages.Register(mux, tools, pool, taskChecker, projectChecker, agentChecker, userChecker, workflow.NewCloser(pool))
 	stageChecker := stages.NewChecker(pool, projectChecker)
-	tasks.Register(mux, tools, pool, stageChecker, agentChecker)
+	tasks.Register(mux, tools, pool, stageChecker, agentChecker, userChecker)
 	imports.Register(tools, pool)
 	workflow.Register(mux, tools, pool, taskChecker)
 	bugs.Register(mux, tools, pool, projectChecker)

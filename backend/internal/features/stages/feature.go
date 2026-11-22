@@ -53,6 +53,12 @@ type AgentChecker interface {
 	addmember.AgentChecker
 }
 
+// UserChecker reúne lo que las slices piden a la feature auth.
+type UserChecker interface {
+	assignlead.UserChecker
+	addmember.UserChecker
+}
+
 // StageCloser cierra, cancela o retira una etapa y mueve el proyecto si termina la
 // versión 1. Lo implementa la feature workflow.
 type StageCloser interface {
@@ -61,8 +67,8 @@ type StageCloser interface {
 }
 
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// tasks, projects, agents y closer los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker, closer StageCloser) {
+// tasks, projects, agents, users y closer los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChecker, projects ProjectChecker, agents AgentChecker, users UserChecker, closer StageCloser) {
 	repo := store.NewStages(db)
 	changes := store.NewChanges(db)
 	statusChanges := store.NewStatusChanges(db)
@@ -84,7 +90,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	changeStatus.Register(mux)
 	changeStatus.RegisterTool(tools)
 
-	assignLead := assignlead.New(repo, agents)
+	assignLead := assignlead.New(repo, agents, users)
 	assignLead.Register(mux)
 	assignLead.RegisterTool(tools)
 
@@ -92,7 +98,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, tasks TaskChec
 	removeLead.Register(mux)
 	removeLead.RegisterTool(tools)
 
-	addMember := addmember.New(repo, agents)
+	addMember := addmember.New(repo, agents, users)
 	addMember.Register(mux)
 	addMember.RegisterTool(tools)
 

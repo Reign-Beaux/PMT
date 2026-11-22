@@ -27,6 +27,11 @@ type AgentChecker interface {
 	Profile(ctx context.Context, name string) (kernel.Profile, error)
 }
 
+// UserChecker indica si un nombre es un usuario activo. Lo implementa la feature auth.
+type UserChecker interface {
+	Active(ctx context.Context, username string) (bool, error)
+}
+
 // Command contiene los datos de entrada.
 type Command struct {
 	ID    uuid.UUID    `json:"-"`
@@ -53,14 +58,16 @@ type Handler struct {
 	repo   Repository
 	stages StageChecker
 	agents AgentChecker
+	users  UserChecker
 }
 
 // New crea el handler.
-func New(repo Repository, stages StageChecker, agents AgentChecker) *Handler {
-	return &Handler{repo: repo, stages: stages, agents: agents}
+func New(repo Repository, stages StageChecker, agents AgentChecker, users UserChecker) *Handler {
+	return &Handler{repo: repo, stages: stages, agents: agents, users: users}
 }
 
-// Handle pone a la tarea un dueño del equipo. Solo lo hace el TL de la etapa.
+// Handle pone a la tarea un dueño del equipo. Solo lo hace el TL de la etapa. El
+// dueño es un agente activo o un usuario activo del equipo.
 func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if cmd.Actor.Profile != kernel.ProfileTL {
 		return Result{}, domain.ErrAssignForbidden
@@ -76,7 +83,7 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 	if !team.IsLead(cmd.Actor) {
 		return Result{}, kernel.ErrNotStageLead
 	}
-	if _, err := h.agents.Profile(ctx, cmd.Agent); err != nil {
+	if err := h.ensureActive(ctx, cmd.Agent); err != nil {
 		return Result{}, err
 	}
 	if !team.HasMember(cmd.Agent) {
@@ -90,4 +97,13 @@ func (h *Handler) Handle(ctx context.Context, cmd Command) (Result, error) {
 		return Result{}, err
 	}
 	return Result(updated), nil
+}
+
+func (h *Handler) ensureActive(ctx context.Context, name string) error {
+	isUser, err := h.users.Active(ctx, name)
+	if err != nil || isUser {
+		return err
+	}
+	_, err = h.agents.Profile(ctx, name)
+	return err
 }

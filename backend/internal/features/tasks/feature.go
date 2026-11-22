@@ -45,9 +45,14 @@ type AgentChecker interface {
 	assign.AgentChecker
 }
 
+// UserChecker reúne lo que las slices piden a la feature auth.
+type UserChecker interface {
+	assign.UserChecker
+}
+
 // Register registra las rutas REST y las herramientas MCP de la feature.
-// stages y agents los aportan esas features, conectadas en app.
-func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageChecker, agents AgentChecker) {
+// stages, agents y users los aportan esas features, conectadas en app.
+func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageChecker, agents AgentChecker, users UserChecker) {
 	repo := store.NewTasks(db)
 	changes := store.NewChanges(db)
 	statusChanges := store.NewStatusChanges(db)
@@ -75,7 +80,7 @@ func Register(mux *http.ServeMux, tools *sdk.Server, db store.DB, stages StageCh
 	changeBatch.Register(mux)
 	changeBatch.RegisterTool(tools)
 
-	assignTask := assign.New(repo, stages, agents)
+	assignTask := assign.New(repo, stages, agents, users)
 	assignTask.Register(mux)
 	assignTask.RegisterTool(tools)
 

@@ -104,9 +104,14 @@ func (f *Feature) AuthenticateSession(ctx context.Context, session string) (kern
 	return f.auth.Session(ctx, session)
 }
 
-// AuthenticateToken resuelve un token de API de usuario.
-func (f *Feature) AuthenticateToken(ctx context.Context, token string) (kernel.Actor, error) {
-	return f.auth.Token(ctx, token)
+// AuthenticateToken resuelve un token de API de usuario al actor con el perfil
+// que declara la sesión, o User si no declara ninguno.
+func (f *Feature) AuthenticateToken(ctx context.Context, token string, declared kernel.Profile) (kernel.Actor, error) {
+	actor, err := f.auth.Token(ctx, token)
+	if err != nil {
+		return kernel.Actor{}, err
+	}
+	return kernel.AsUser(actor.Name, declared), nil
 }
 
 // IsUserToken indica si el token es de usuario y no de agente.
@@ -131,6 +136,19 @@ func (c *Checker) Exists(ctx context.Context, username string) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// Active indica si hay un usuario activo con exactamente ese username: puede ser
+// TL o dev de una etapa.
+func (c *Checker) Active(ctx context.Context, username string) (bool, error) {
+	user, err := c.repo.UserByUsername(ctx, username)
+	if errors.Is(err, domain.ErrUserNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return !user.Disabled, nil
 }
 
 // IsPublic indica si la petición va a una ruta de la feature que no pide sesión:

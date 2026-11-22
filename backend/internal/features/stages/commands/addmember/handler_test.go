@@ -25,10 +25,22 @@ func (r *fakeRepo) AddMember(_ context.Context, _ uuid.UUID, agent, _ string) er
 	return nil
 }
 
+var errAgentMissing = kernel.NotFound("agente no encontrado")
+
 type fakeAgents struct{ profile kernel.Profile }
 
 func (a fakeAgents) Profile(context.Context, string) (kernel.Profile, error) {
+	if a.profile == "" {
+		return "", errAgentMissing
+	}
 	return a.profile, nil
+}
+
+// fakeUsers son los usernames de usuarios activos.
+type fakeUsers map[string]bool
+
+func (u fakeUsers) Active(_ context.Context, name string) (bool, error) {
+	return u[name], nil
 }
 
 func TestHandle(t *testing.T) {
@@ -37,20 +49,23 @@ func TestHandle(t *testing.T) {
 		name    string
 		actor   kernel.Actor
 		profile kernel.Profile
+		users   fakeUsers
 		want    error
 	}{
-		{"backend", tl, kernel.ProfileDevBackend, nil},
-		{"frontend", tl, kernel.ProfileDevFrontend, nil},
-		{"TL ajeno", kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
-		{"PP", kernel.Actor{Name: "tl", Profile: kernel.ProfilePP}, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
-		{"usuario", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, kernel.ProfileDevBackend, kernel.ErrNotStageLead},
-		{"no es dev", tl, kernel.ProfileCR, domain.ErrAgentNotDev},
+		{"backend", tl, kernel.ProfileDevBackend, nil, nil},
+		{"frontend", tl, kernel.ProfileDevFrontend, nil, nil},
+		{"TL ajeno", kernel.Actor{Name: "tl2", Profile: kernel.ProfileTL}, kernel.ProfileDevBackend, nil, kernel.ErrNotStageLead},
+		{"PP", kernel.Actor{Name: "tl", Profile: kernel.ProfilePP}, kernel.ProfileDevBackend, nil, kernel.ErrNotStageLead},
+		{"usuario", kernel.Actor{Name: "saul", Profile: kernel.ProfileUser}, kernel.ProfileDevBackend, nil, kernel.ErrNotStageLead},
+		{"no es dev", tl, kernel.ProfileCR, nil, domain.ErrAgentNotDev},
+		{"usuario activo, sin revisar perfil", tl, "", fakeUsers{"dev2": true}, nil},
+		{"ni agente ni usuario activo", tl, "", fakeUsers{"dev2": false}, errAgentMissing},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeRepo{}
 
-			result, err := New(repo, fakeAgents{tt.profile}).Handle(context.Background(), Command{ID: uuid.New(), Agent: "dev2", Actor: tt.actor})
+			result, err := New(repo, fakeAgents{tt.profile}, tt.users).Handle(context.Background(), Command{ID: uuid.New(), Agent: "dev2", Actor: tt.actor})
 
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, quiero %v", err, tt.want)

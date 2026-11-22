@@ -75,11 +75,29 @@ export PMT_TOKEN=$(cat ~/.config/pmt/tokens/<usuario>)     # antes de abrir Clau
 
 `.mcp.json` manda `Authorization: Bearer ${PMT_TOKEN:-}`; sin la variable, el MCP responde 401.
 
+**Agente con token de usuario y perfil.** Un usuario lanza agentes de cualquier perfil con su propio token: cada sesión declara su perfil en la URL del MCP con `?profile=` (`pp`, `pc`, `tl`, `dp`, `devfrontend`, `devbackend`, `cr`, `qap` o `qa`; sin distinguir mayúsculas). Sin `profile`, o con `profile=user`, actúa como `User`. El historial queda con su `username` y el perfil declarado (por ejemplo `saul` + `TL`). Para Claude Code, un archivo por perfil:
+
+```json
+{
+  "mcpServers": {
+    "pmt": {
+      "type": "http",
+      "url": "http://127.0.0.1:8080/mcp?profile=tl",
+      "headers": { "Authorization": "Bearer ${PMT_TOKEN:-}" }
+    }
+  }
+}
+```
+
+y se lanza con `PMT_TOKEN=$(cat ~/.config/pmt/tokens/<usuario>) claude --strict-mcp-config --mcp-config <archivo>`. Codex y Qwen usan la misma URL y la misma cabecera en su configuración de MCP. Un perfil desconocido responde 400 con la lista de válidos. Por REST y `/api/events` el perfil va en la cabecera `X-PMT-Profile`; con la cookie del navegador se ignora. `GET /api/auth/me` devuelve el usuario y `profile`, el perfil efectivo de la petición, para comprobar la configuración.
+
+Para que un usuario trabaje como TL o dev de una etapa, PP lo asigna por su `username` con `assign_stage_lead` o el TL con `add_stage_member`, igual que a un agente. Las operaciones de cuenta (tokens, invitaciones, usuarios) solo se usan sin perfil declarado.
+
 **Usuarios.** El dueño los ve en `/cuenta` y los desactiva o reactiva. Desactivar cierra sus sesiones y revoca sus tokens; al reactivarlo, crea tokens nuevos.
 
 ## Agentes y tokens
 
-Los tokens de agente solo se administran por línea de comandos, para que ningún agente pueda emitirlos. Siguen funcionando igual que antes de los usuarios. `create` y `rotate` imprimen únicamente el token. `create` rechaza un nombre que ya sea `username` de un usuario.
+Los tokens de agente solo se administran por línea de comandos, para que ningún agente pueda emitirlos. Siguen funcionando igual que antes de los usuarios: su perfil es fijo, así que `?profile=` o `X-PMT-Profile` solo se aceptan si coinciden con él (si no, 400). `create` y `rotate` imprimen únicamente el token. `create` rechaza un nombre que ya sea `username` de un usuario.
 
 ```bash
 cd backend
