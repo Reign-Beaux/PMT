@@ -365,6 +365,13 @@ type fakeHerdr struct {
 	renamed    map[string]string
 	focused    []string
 	next       int
+	// Para los comandos del equipo.
+	screen  map[string]string // lo visible de cada pane
+	keys    []string          // pane: teclas
+	texts   []string          // pane: texto
+	prompts []string          // pane: mensaje
+	// hook corre tras cada Run, Prompt, SendKeys y SendText, para simular al agente.
+	hook func(f *fakeHerdr, op, pane, arg string)
 }
 
 func (f *fakeHerdr) id(prefix string) string { f.next++; return fmt.Sprintf("%s%d", prefix, f.next) }
@@ -415,12 +422,71 @@ func (f *fakeHerdr) Panes(_ context.Context, ws string) ([]herdrPane, error) {
 func (f *fakeHerdr) Busy(_ context.Context, pane string) (bool, error) { return f.busy[pane], nil }
 func (f *fakeHerdr) Run(_ context.Context, pane, command string) error {
 	f.runs = append(f.runs, pane+": "+command)
-	// El agente arranca en el pane.
 	for i := range f.panes {
-		if f.panes[i].ID == pane {
-			f.panes[i].Agent = "claude"
+		if f.panes[i].ID != pane {
+			continue
+		}
+		switch {
+		case command == "/exit" || command == "/quit":
+			// El agente sale y queda el shell.
+			f.panes[i].Agent, f.panes[i].Status = "", ""
+			f.busy[pane] = false
+		case strings.HasPrefix(command, "/"):
+		default:
+			// El agente arranca en el pane.
+			f.panes[i].Agent, f.panes[i].Status = "claude", "idle"
+			if f.busy != nil {
+				f.busy[pane] = true
+			}
 		}
 	}
+	f.fire("run", pane, command)
+	return nil
+}
+
+// stop simula que el agente del pane terminó: queda el shell.
+func (f *fakeHerdr) stop(pane string) {
+	if p := f.pane(pane); p != nil {
+		p.Agent, p.Status = "", ""
+	}
+	f.busy[pane] = false
+}
+func (f *fakeHerdr) fire(op, pane, arg string) {
+	if f.hook != nil {
+		f.hook(f, op, pane, arg)
+	}
+}
+func (f *fakeHerdr) pane(id string) *herdrPane {
+	for i := range f.panes {
+		if f.panes[i].ID == id {
+			return &f.panes[i]
+		}
+	}
+	return nil
+}
+func (f *fakeHerdr) Pane(_ context.Context, pane string) (herdrPane, error) {
+	if p := f.pane(pane); p != nil {
+		return *p, nil
+	}
+	return herdrPane{}, fmt.Errorf("pane %s no existe", pane)
+}
+func (f *fakeHerdr) Read(_ context.Context, pane string, _ int) (string, error) {
+	return f.screen[pane], nil
+}
+func (f *fakeHerdr) SendKeys(_ context.Context, pane string, keys ...string) error {
+	k := strings.Join(keys, " ")
+	f.keys = append(f.keys, pane+": "+k)
+	f.fire("keys", pane, k)
+	return nil
+}
+func (f *fakeHerdr) SendText(_ context.Context, pane, text string) error {
+	f.texts = append(f.texts, pane+": "+text)
+	f.fire("text", pane, text)
+	return nil
+}
+func (f *fakeHerdr) Prompt(_ context.Context, pane, text string) error {
+	f.prompts = append(f.prompts, pane+": "+text)
+	f.fire("prompt", pane, text)
 	return nil
 }
 func (f *fakeHerdr) Agents(context.Context) ([]herdrAgent, error) { return f.agents, nil }
@@ -437,6 +503,7 @@ type ppServer struct {
 	projects     []projectItem
 	profileCode  int
 	profileCalls int
+	description  string // de GET /api/projects/{id}
 }
 
 func newPPServer(t *testing.T) *ppServer {
@@ -448,6 +515,9 @@ func newPPServer(t *testing.T) *ppServer {
 			return
 		}
 		json.NewEncoder(w).Encode(s.projects)
+	})
+	mux.HandleFunc("GET /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{"id": r.PathValue("id"), "description": s.description})
 	})
 	mux.HandleFunc("GET /api/profiles/{p}", func(w http.ResponseWriter, r *http.Request) {
 		s.profileCalls++
@@ -473,7 +543,7 @@ type ppHarness struct {
 }
 
 func newPPHarness(t *testing.T, srv *ppServer) *ppHarness {
-	h := &ppHarness{harness: newHarness(t), root: filepath.Join(t.TempDir(), "demo"), hd: &fakeHerdr{busy: map[string]bool{}},
+	h := &ppHarness{harness: newHarness(t), root: filepath.Join(t.TempDir(), "demo"), hd: &fakeHerdr{busy: map[string]bool{}, screen: map[string]string{}},
 		env: map[string]string{"HERDR_ENV": "1"}}
 	if err := os.MkdirAll(filepath.Join(h.root, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -637,7 +707,7 @@ func TestPPProyectoNuevoYReconfigurar(t *testing.T) {
 
 	// PP creó el proyecto; en el siguiente arranque se confirma y se guarda.
 	srv.projects = append(srv.projects, projectItem{ID: "id-nuevo", Name: "Demo", Role: "owner", CreatedAt: start.Add(time.Minute)})
-	h.hd.panes[0].Agent = "" // PP terminó.
+	h.hd.stop(h.hd.panes[0].ID) // PP terminó.
 	h.app.Stdin = strings.NewReader("\n")
 	if code := h.run("pp"); code != 0 {
 		t.Fatalf("segunda %d: %s", code, h.errOut)
@@ -648,7 +718,7 @@ func TestPPProyectoNuevoYReconfigurar(t *testing.T) {
 	}
 
 	// --configurar propone lo actual: Enter en todo lo deja igual salvo la herramienta.
-	h.hd.panes[0].Agent = ""
+	h.hd.stop(h.hd.panes[0].ID)
 	h.out.Reset()
 	h.app.Stdin = strings.NewReader("\nclaude\n\n\n")
 	if code := h.run("pp", "--configurar"); code != 0 {
@@ -670,14 +740,14 @@ func TestPPPerfilSinServidorUsaCopia(t *testing.T) {
 		t.Fatalf("salida %d: %s", code, h.errOut)
 	}
 	srv.profileCode = http.StatusBadGateway
-	h.hd.panes[0].Agent = ""
+	h.hd.stop(h.hd.panes[0].ID)
 	if code := h.run("pp"); code != 0 || !strings.Contains(h.errOut.String(), "uso la copia") {
 		t.Fatalf("con copia %d: %s", code, h.errOut)
 	}
 	if err := os.Remove(filepath.Join(h.root, pmtDir, "perfiles", "pp.md")); err != nil {
 		t.Fatal(err)
 	}
-	h.hd.panes[0].Agent = ""
+	h.hd.stop(h.hd.panes[0].ID)
 	h.errOut.Reset()
 	if code := h.run("pp"); code != 1 || !strings.Contains(h.errOut.String(), "no hay copia local") {
 		t.Fatalf("sin copia %d: %s", code, h.errOut)

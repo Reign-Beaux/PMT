@@ -62,7 +62,7 @@ func renderEntorno(c Config, root, username string) string {
 
 	var b strings.Builder
 	b.WriteString("# Entorno del proyecto\n\n")
-	b.WriteString("Lo genera `pmt pp` en cada arranque desde `.pmt/config.yaml`: no lo edites a mano.\n\n")
+	b.WriteString("Lo generan `pmt pp` y `pmt equipo` en cada arranque desde `.pmt/config.yaml`: no lo edites a mano.\n\n")
 
 	b.WriteString("## Proyecto\n")
 	fmt.Fprintf(&b, "- Ruta: `%s`\n", path)

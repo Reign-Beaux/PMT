@@ -60,7 +60,7 @@ PMT trabaja con nueve perfiles de agentes y el usuario. Cada agente tiene su tok
 - El flujo es TL → DP → Dev. Dev sigue el plan; si lo encuentra mal se lo dice al TL, que relanza a DP si es técnico o pasa a PP si cambia el alcance.
 - A Dev nunca le toca comprobar nada en navegador. "Contra la API real" solo si la tarea consume la API.
 - El plan no agrega exigencias que la tarea no pide, como apagado por señales o recuperación ante fallos.
-- **Effort de DP:** `high` si el grupo toca pagos, permisos, migraciones de datos o contratos entre etapas; `medium` en lo demás. Se cambia con `relanzar-dp.sh`.
+- **Effort de DP:** `high` si el grupo toca pagos, permisos, migraciones de datos o contratos entre etapas; `medium` en lo demás. Se cambia con `relanzar-dp.sh` del kit o `pmt relanzar-dp`.
 
 ## Flujo de un bug
 
@@ -98,7 +98,7 @@ Al subir un dígito, los de su derecha vuelven a 0. Las etapas de la versión 1 
 
 ## Coordinación entre agentes
 
-- **Avisos.** Los agentes se comunican con avisos de herdr (`avisar.sh`), fuera de PMT. Lo que deba quedar registrado va en PMT; los avisos no se copian.
+- **Avisos.** Los agentes se comunican con avisos de herdr (`avisar.sh` del kit o `pmt avisar`), fuera de PMT. Lo que deba quedar registrado va en PMT; los avisos no se copian.
 - **El TL coordina.** DP, Dev, CR, QAP y QA le avisan al terminar. Él comprueba en PMT que el trabajo quedó registrado, reinicia esa sesión y levanta al siguiente.
 - **Encargo.** Indica proyecto, etapa e ID de las tareas, o el bug.
 - **Avance.** Se revisa con `get_project_progress`. Sus `signals` apuntan a atascos: `ready_without_work`, `stage_not_closed` y `stage_not_started`.
@@ -160,16 +160,16 @@ Antes de cualquier otra cosa:
 
 Las de los demás cambian solo el perfil y su descripción. Sin perfil (`User`) no hay instrucciones. Un **token de agente** (el kit) tampoco las recibe: ya trae su perfil local completo por archivo, y su proyecto todavía no tiene `.pmt/entorno.md`; si llama a `get_profile`, recibe el texto servido de su perfil fijo.
 
-`pmt pp` pasa el perfil completo al lanzar a PP, como el kit (y `pmt equipo` lo hará con los demás en la fase 4c); las instrucciones y `get_profile` quedan de respaldo ([plan_produccion.md](plan_produccion.md)).
+`pmt pp` y `pmt equipo` pasan el perfil completo al lanzar a cada agente, como el kit; las instrucciones y `get_profile` quedan de respaldo ([plan_produccion.md](plan_produccion.md)).
 
 ### Formato de `.pmt/entorno.md`
 
-Archivo local del proyecto, en su raíz, fuera de git (lleva la cadena de la base: `.pmt/` va en `.gitignore`). Lo genera `pmt pp` en cada arranque desde [`.pmt/config.yaml`](#formato-de-pmtconfigyaml), así que no se edita a mano. Markdown con estas secciones, en este orden, con los nombres que usan los perfiles servidos:
+Archivo local del proyecto, en su raíz, fuera de git (lleva la cadena de la base: `.pmt/` va en `.gitignore`). Lo generan `pmt pp` y `pmt equipo` en cada arranque desde [`.pmt/config.yaml`](#formato-de-pmtconfigyaml), así que no se edita a mano. Markdown con estas secciones, en este orden, con los nombres que usan los perfiles servidos:
 
 ```markdown
 # Entorno del proyecto
 
-Lo genera `pmt pp` en cada arranque desde `.pmt/config.yaml`: no lo edites a mano.
+Lo generan `pmt pp` y `pmt equipo` en cada arranque desde `.pmt/config.yaml`: no lo edites a mano.
 
 ## Proyecto
 - Ruta: `/ruta/absoluta/al/proyecto`
@@ -204,14 +204,14 @@ Lo genera `pmt pp` en cada arranque desde `.pmt/config.yaml`: no lo edites a man
 Cada sección cubre un marcador del kit: Proyecto (`PROYECTO_RUTA`, `PROYECTO_DESCRIPCION`), Base de datos (`DB_URL`, `DB_CONSULTA`), Puertos (`PUERTO_BACKEND`, `PUERTO_FRONTEND`), Comandos del equipo (`KIT`), Para el usuario (`AGENTES_DIR`) y Agentes (`TABLA_AGENTES`).
 
 - **Proyecto en PMT:** nombre e ID del proyecto, o «todavía no existe; lo crea PP» si se eligió nuevo.
-- **Lo que aún no se sabe** (descripción, cadena, consulta, puertos) dice `pendiente: lo completa \`pmt equipo\``. Lo pregunta `pmt equipo` (fase 4c).
-- **Comandos del equipo:** se listan siempre, aunque `avisar`, `levantar`, `reiniciar`, `relanzar-dp` y `vigia` llegan en la 4c.
-- **Agentes:** una fila por perfil configurado en `config.yaml`, con su nombre en herdr (con el prefijo, si hay), el `username` de quien lanzó (todos sus agentes actúan con su token) y el perfil. Los nombres en herdr son los del kit: `pp`, `pc`, `tl`, `dp`, `devback`, `devfront`, `cr`, `qap`, `qa`.
+- **Lo que aún no se sabe** (descripción, cadena, consulta, puertos) dice `pendiente: lo completa \`pmt equipo\``. Solo pasa entre el primer `pmt pp` y el primer `pmt equipo`, que lo pregunta.
+- **Comandos del equipo:** se listan siempre ([arquitectura.md](arquitectura.md#comandos-del-equipo)).
+- **Agentes:** una fila por perfil configurado en `config.yaml`, con su nombre en herdr (con el prefijo, si hay), el `username` de quien lanzó (todos sus agentes actúan con su token) y el perfil. Los nombres en herdr son los del kit: `pp`, `pc`, `tl`, `dp`, `devback`, `devfront`, `cr`, `qap`, `qa`. Los comandos del equipo aceptan el nombre con o sin prefijo (`pmt avisar demo-tl` y `pmt avisar tl` son lo mismo).
 - **Para el usuario:** `.pmt/para-usuario.md`, que `pmt pp` crea vacío si falta.
 
 ### Formato de `.pmt/config.yaml`
 
-Lo que `pmt` sabe del proyecto en esta máquina. Fuera de git y **sin tokens**: el de PMT sale de las credenciales de `pmt login` y los de MCP extra de archivos en `~/.config/pmt/`. Lo crea `pmt pp` la primera vez y lo cambia `pmt pp --configurar`; la 4c agrega lo de `pmt equipo` en los mismos campos.
+Lo que `pmt` sabe del proyecto en esta máquina. Fuera de git y **sin tokens**: el de PMT sale de las credenciales de `pmt login` y los de MCP extra de archivos en `~/.config/pmt/`. Lo crea `pmt pp` la primera vez (proyecto y PP) y lo completa `pmt equipo` (descripción, base, puertos y los otros ocho perfiles); cada uno lo vuelve a preguntar con `--configurar`. `pmt relanzar-dp` guarda ahí el effort de DP.
 
 ```yaml
 version: 1
@@ -219,14 +219,14 @@ proyecto:
   id: 0b9c…                 # vacío mientras PP no lo crea
   nombre: Mi proyecto
   nuevo_desde: 2026-11-22T18:00:00Z   # solo si se eligió «nuevo, lo crea PP»
-  ruta: ""                  # vacío: la carpeta donde está .pmt/  (4c)
-  descripcion: ""           # (4c)
+  ruta: ""                  # vacío: la carpeta donde está .pmt/ (no se pregunta)
+  descripcion: ""           # pmt equipo; propone la descripción del proyecto en PMT
 base:
-  cadena: ""                # (4c)
-  consulta: ""              # (4c) con <consulta> donde va la consulta
+  cadena: ""                # pmt equipo; no se muestra al volver a preguntar
+  consulta: ""              # pmt equipo, con <consulta> donde va la consulta
 puertos:
-  backend: 0                # (4c)
-  frontend: 0               # (4c)
+  backend: 0                # pmt equipo; propone 8090
+  frontend: 0               # pmt equipo; propone 5173
 herdr:
   workspace: mi-proyecto    # por omisión, el nombre de la carpeta; se crea si no existe
   prefijo: ""               # se pone solo si otro workspace ya tiene un agente «pp»
@@ -241,16 +241,20 @@ perfiles:                   # por nombre de sesión: pp, pc, tl, dp, devbackend,
     modelo: opus            # por omisión opus en Claude, gpt-6.1-terra en Codex
     effort: medium          # medium o high
     mcp: [dbp]              # MCP extra que carga este perfil, opcional
+  tl:                       # pmt equipo propone claude, opus, medium para tl, dp y cr,
+    herramienta: claude     # y codex, gpt-6.1-terra, high para pc, devbackend, devfrontend, qap y qa
+    modelo: opus
+    effort: medium
 ```
 
 - **Raíz del proyecto:** la carpeta actual, o la más cercana hacia arriba que ya tenga `.pmt/`.
 - **Proyecto nuevo:** con `nuevo_desde`, cada `pmt pp` busca proyectos de los que el usuario es owner creados desde esa hora; si hay uno pregunta si es ese, si hay varios pide elegir, y guarda `id` y `nombre`. Nunca impide el arranque.
 - **MCP extra:** el nombre va en minúsculas y dígitos, distinto de `pmt`. El token se pasa al agente en `MCP_TOKEN_<NOMBRE>`, como en el kit.
-- Además, `.pmt/` lleva `entorno.md`, `para-usuario.md`, `perfiles/<perfil>.md` (el perfil descargado en cada arranque) y, con Claude, `mcp-<perfil>.json`.
+- Además, `.pmt/` lleva `entorno.md`, `para-usuario.md`, `perfiles/<perfil>.md` (el perfil descargado en cada arranque), con Claude `mcp-<perfil>.json`, y del vigía `vigia.log` y `vigia.pid`.
 
 ## Herramientas y modelos en uso
 
-Cada agente se configura en el `.agentes.env` del proyecto. Así trabajaron DBP y está configurado BrisaFMS:
+Con el kit, cada agente se configura en el `.agentes.env` del proyecto; con `pmt`, en `.pmt/config.yaml`. Así trabajaron DBP y está configurado BrisaFMS:
 
 | Perfil | Herramienta | Modelo | Effort |
 | --- | --- | --- | --- |
@@ -258,4 +262,4 @@ Cada agente se configura en el `.agentes.env` del proyecto. Así trabajaron DBP 
 | DevBackend y DevFrontend | `codex` | gpt-6.1-terra | `high` |
 | PC, QAP y QA | `codex` | gpt-6.1-terra | `medium` |
 
-El kit también admite `mcode` (MiniMax) y `qwen`. El frontend de PMT se hizo con Qwen en PC, Devs, QAP y QA. Cómo se levanta el equipo está en `agentes/README.md`.
+El kit también admite `mcode` (MiniMax) y `qwen`; `pmt`, solo `claude` y `codex`, y propone `high` también para PC, QAP y QA. El frontend de PMT se hizo con Qwen en PC, Devs, QAP y QA. Cómo se levanta el equipo: con `pmt` en [operacion.md](operacion.md#equipo-de-agentes); con el kit, en `agentes/README.md`.

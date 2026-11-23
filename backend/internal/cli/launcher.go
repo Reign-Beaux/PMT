@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// launcherCommand es el subcomando interno que pmt pp escribe en el pane del
+// launcherCommand es el subcomando interno que pmt pp y pmt equipo escriben en el pane del
 // agente. Corre dentro del pane, como lanzar.sh del kit: lee el token de las
 // credenciales, lo pone en el entorno y se reemplaza por Claude o Codex. Así el
 // token no aparece en el comando escrito en el pane, ni en sus argumentos (ps),
@@ -44,12 +44,12 @@ func (a *App) launch(_ context.Context, args []string) error {
 	}
 	text, err := os.ReadFile(in.ProfileFile)
 	if err != nil {
-		return fmt.Errorf("falta el perfil descargado %s: corre «pmt pp»", in.ProfileFile)
+		return fmt.Errorf("falta el perfil descargado %s: corre «pmt equipo»", in.ProfileFile)
 	}
 	in.ProfileText = string(text)
 	if p.Herramienta == "claude" {
 		if _, err := os.Stat(in.MCPFile); err != nil {
-			return fmt.Errorf("falta %s: corre «pmt pp»", in.MCPFile)
+			return fmt.Errorf("falta %s: corre «pmt equipo»", in.MCPFile)
 		}
 	}
 	spec, err := buildLaunch(in)

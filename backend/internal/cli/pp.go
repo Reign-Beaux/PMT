@@ -111,15 +111,15 @@ func (a *App) pp(ctx context.Context, args []string) error {
 	}
 
 	// herdr: workspace, nombre del agente y si PP ya corre.
-	ws, err := a.ensureWorkspace(ctx, hd, cfg.Herdr.Workspace, cfg.projectPath(root))
+	ws, err := a.ensureWorkspace(ctx, hd, cfg.Herdr.Workspace, cfg.projectPath(root), "pp")
 	if err != nil {
 		return err
 	}
-	if prefix, changed, err := resolvePrefix(ctx, hd, cfg, ws.ID); err != nil {
+	if prefix, taken, err := resolvePrefix(ctx, hd, cfg, ws.ID, []string{"pp"}); err != nil {
 		return err
-	} else if changed {
+	} else if taken != "" {
 		cfg.Herdr.Prefijo = prefix
-		fmt.Fprintf(a.Stdout, "Ya hay un agente «pp» en otro workspace: este equipo usa el prefijo «%s».\n", prefix)
+		fmt.Fprintf(a.Stdout, "Ya hay un agente «%s» en otro workspace: este equipo usa el prefijo «%s».\n", taken, prefix)
 		if err := saveConfig(root, cfg); err != nil {
 			return err
 		}
@@ -137,21 +137,7 @@ func (a *App) pp(ctx context.Context, args []string) error {
 		return hd.FocusTab(ctx, tab)
 	}
 
-	// Perfil y MCP.
-	if err := a.downloadProfile(ctx, api, root, "pp"); err != nil {
-		return err
-	}
-	if pp.Herramienta == "claude" {
-		raw, err := mcpConfigJSON(cfg, creds.Server, "pp")
-		if err != nil {
-			return err
-		}
-		if err := writeFileAtomic(filepath.Join(root, pmtDir, "mcp-pp.json"), raw, 0o644); err != nil {
-			return err
-		}
-	}
-	// Se valida ya lo que el lanzador necesita, para fallar aquí y no en el pane.
-	if _, _, err := extraMCP(cfg, "pp", a.Home); err != nil {
+	if err := a.prepareLaunch(ctx, api, cfg, root, creds.Server, "pp"); err != nil {
 		return err
 	}
 
@@ -162,13 +148,7 @@ func (a *App) pp(ctx context.Context, args []string) error {
 		}
 		tab, pane = t.ID, p
 	}
-	exe, err := a.Executable()
-	if err != nil {
-		return err
-	}
-	// El comando que se escribe en el pane no lleva el token: el lanzador lo lee
-	// de las credenciales y lo pone en el entorno del agente.
-	if err := hd.Run(ctx, pane, shellQuote(exe)+" "+launcherCommand+" pp "+shellQuote(root)); err != nil {
+	if err := a.runLauncher(ctx, hd, pane, root, "pp"); err != nil {
 		return err
 	}
 	fmt.Fprintf(a.Stdout, "Lanzando PP con %s (%s, effort %s) en el workspace %s…\n", pp.Herramienta, pp.Modelo, pp.Effort, ws.Label)
@@ -413,23 +393,66 @@ func (a *App) downloadProfile(ctx context.Context, api client, root, profile str
 	return fmt.Errorf("no pude descargar el perfil %s y no hay copia local: %w", profile, err)
 }
 
-// ensureWorkspace busca el workspace por etiqueta o ID y lo crea si no existe.
-// Al crearlo, su primera pestaña queda como la de PP.
-func (a *App) ensureWorkspace(ctx context.Context, hd herdr, label, cwd string) (herdrWorkspace, error) {
+// findWorkspace busca el workspace por etiqueta o ID.
+func findWorkspace(ctx context.Context, hd herdr, label string) (herdrWorkspace, bool, error) {
 	list, err := hd.Workspaces(ctx)
 	if err != nil {
-		return herdrWorkspace{}, err
+		return herdrWorkspace{}, false, err
 	}
 	for _, w := range list {
 		if w.Label == label || w.ID == label {
-			return w, nil
+			return w, true, nil
 		}
+	}
+	return herdrWorkspace{}, false, nil
+}
+
+// prepareLaunch deja listo lo que el lanzador lee de .pmt/ para un perfil: el
+// perfil descargado y, con Claude, mcp-<perfil>.json. Valida ya los MCP extra,
+// para fallar aquí y no en el pane.
+func (a *App) prepareLaunch(ctx context.Context, api client, cfg Config, root, server, session string) error {
+	p, ok := cfg.profile(session)
+	if !ok {
+		return fmt.Errorf("el perfil %s no está configurado en .pmt/config.yaml", session)
+	}
+	if err := a.downloadProfile(ctx, api, root, session); err != nil {
+		return err
+	}
+	if p.Herramienta == "claude" {
+		raw, err := mcpConfigJSON(cfg, server, session)
+		if err != nil {
+			return err
+		}
+		if err := writeFileAtomic(filepath.Join(root, pmtDir, "mcp-"+session+".json"), raw, 0o644); err != nil {
+			return err
+		}
+	}
+	_, _, err := extraMCP(cfg, session, a.Home)
+	return err
+}
+
+// runLauncher escribe en el pane «pmt _lanzar <perfil> <raíz>». El comando no
+// lleva el token: el lanzador lo lee de las credenciales y lo pone en el
+// entorno del agente.
+func (a *App) runLauncher(ctx context.Context, hd herdr, pane, root, session string) error {
+	exe, err := a.Executable()
+	if err != nil {
+		return err
+	}
+	return hd.Run(ctx, pane, shellQuote(exe)+" "+launcherCommand+" "+session+" "+shellQuote(root))
+}
+
+// ensureWorkspace busca el workspace por etiqueta o ID y lo crea si no existe.
+// Al crearlo, su primera pestaña queda como la del agente first.
+func (a *App) ensureWorkspace(ctx context.Context, hd herdr, label, cwd, first string) (herdrWorkspace, error) {
+	if w, ok, err := findWorkspace(ctx, hd, label); err != nil || ok {
+		return w, err
 	}
 	w, tab, _, err := hd.CreateWorkspace(ctx, cwd, label)
 	if err != nil {
 		return herdrWorkspace{}, err
 	}
-	if err := hd.RenameTab(ctx, tab.ID, "pp"); err != nil {
+	if err := hd.RenameTab(ctx, tab.ID, first); err != nil {
 		return herdrWorkspace{}, err
 	}
 	fmt.Fprintf(a.Stdout, "Creé el workspace %s en herdr.\n", label)
@@ -439,26 +462,30 @@ func (a *App) ensureWorkspace(ctx context.Context, hd herdr, label, cwd string) 
 var prefixClean = regexp.MustCompile(`[^a-z0-9]+`)
 
 // resolvePrefix decide el prefijo de los nombres: si otro workspace ya tiene
-// un agente con el nombre de PP y no hay prefijo, usa el del workspace.
-func resolvePrefix(ctx context.Context, hd herdr, cfg Config, workspace string) (string, bool, error) {
-	agents, err := hd.Agents(ctx)
+// un agente con el nombre de alguno de agents y no hay prefijo, usa el del
+// workspace. taken es el nombre que chocó, si el prefijo cambió.
+func resolvePrefix(ctx context.Context, hd herdr, cfg Config, workspace string, agents []string) (prefix, taken string, err error) {
+	list, err := hd.Agents(ctx)
 	if err != nil {
-		return "", false, err
+		return "", "", err
 	}
-	name := cfg.agentName("pp")
-	for _, ag := range agents {
-		if ag.Name == name && ag.Workspace != workspace {
+	for _, agent := range agents {
+		name := cfg.agentName(agent)
+		for _, ag := range list {
+			if ag.Name != name || ag.Workspace == workspace {
+				continue
+			}
 			if cfg.Herdr.Prefijo != "" {
-				return cfg.Herdr.Prefijo, false, fmt.Errorf("ya hay un agente «%s» en otro workspace: cambia herdr.prefijo en .pmt/config.yaml", name)
+				return cfg.Herdr.Prefijo, "", fmt.Errorf("ya hay un agente «%s» en otro workspace: cambia herdr.prefijo en .pmt/config.yaml", name)
 			}
 			p := strings.Trim(prefixClean.ReplaceAllString(strings.ToLower(cfg.Herdr.Workspace), "-"), "-")
 			if p == "" {
 				p = "equipo"
 			}
-			return p + "-", true, nil
+			return p + "-", name, nil
 		}
 	}
-	return cfg.Herdr.Prefijo, false, nil
+	return cfg.Herdr.Prefijo, "", nil
 }
 
 // findAgentPane busca la pestaña de un agente en el workspace: el pane del

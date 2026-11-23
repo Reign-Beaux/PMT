@@ -1,6 +1,8 @@
 // Package cli es el CLI pmt: inicia sesión en un servidor PMT por el navegador,
-// guarda el token de API del usuario en ~/.config/pmt/credenciales.yaml y
-// levanta a PP en herdr para el proyecto de la carpeta actual (pmt pp).
+// guarda el token de API del usuario en ~/.config/pmt/credenciales.yaml,
+// levanta a PP y al equipo en herdr para el proyecto de la carpeta actual
+// (pmt pp, pmt equipo) y tiene los comandos del equipo (avisar, levantar,
+// reiniciar, relanzar-dp y vigia).
 //
 // Usa flag de la biblioteca estándar: con pocos subcomandos y opciones no
 // hace falta una librería. cobra solo está en el módulo como dependencia
@@ -51,6 +53,9 @@ type App struct {
 	Exec func(bin string, argv, env []string) error
 	// Herdr da acceso a herdr; falla si no está instalado.
 	Herdr func() (herdr, error)
+	// Spawn arranca un proceso en segundo plano, desligado de la terminal, con
+	// sus errores en logPath (el vigía).
+	Spawn func(bin string, args []string, dir, logPath string) error
 }
 
 // New crea el CLI real: la carpeta personal del usuario, el navegador del sistema
@@ -77,6 +82,7 @@ func New() (*App, error) {
 		Executable:  executable,
 		Exec:        syscall.Exec,
 		Herdr:       findHerdr,
+		Spawn:       spawn,
 	}, nil
 }
 
@@ -88,6 +94,16 @@ Uso:
   pmt whoami                                    muestra tu usuario y el servidor
   pmt version                                   muestra la versión
   pmt pp [--configurar]                         levanta a PP en herdr para el proyecto de esta carpeta
+  pmt equipo [--configurar] [agente…]           levanta al equipo (o a los agentes nombrados) en herdr
+
+Comandos del equipo, desde la carpeta del proyecto o una subcarpeta:
+  pmt avisar <agente> "mensaje"                 envía un aviso y confirma que llegó
+  pmt levantar <agente> "encargo"               reinicia al agente y le da el encargo
+  pmt reiniciar <agente>                        deja al agente con una sesión vacía
+  pmt relanzar-dp <medium|high>                 relanza a DP con ese effort y lo guarda
+  pmt vigia                                     avisa al TL si todos llevan un rato quietos
+
+Agentes: pp, pc, tl, dp, devback, devfront, cr, qap y qa.
 
 Por omisión el servidor es ` + DefaultServer + `; el que uses en login queda guardado.
 `
@@ -108,6 +124,18 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		err = noArgs(ctx, "whoami", args[1:], a.whoami)
 	case "pp":
 		err = a.pp(ctx, args[1:])
+	case "equipo":
+		err = a.equipo(ctx, args[1:])
+	case "avisar":
+		err = a.avisar(ctx, args[1:])
+	case "reiniciar":
+		err = a.reiniciar(ctx, args[1:])
+	case "levantar":
+		err = a.levantar(ctx, args[1:])
+	case "relanzar-dp":
+		err = a.relanzarDP(ctx, args[1:])
+	case "vigia", "vigía":
+		err = a.vigia(ctx, args[1:])
 	case launcherCommand:
 		err = a.launch(ctx, args[1:])
 	case "version", "--version", "-v":

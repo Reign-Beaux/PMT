@@ -26,6 +26,14 @@ type herdr interface {
 	Run(ctx context.Context, pane, command string) error
 	Agents(ctx context.Context) ([]herdrAgent, error)
 	RenameAgent(ctx context.Context, pane, name string) error
+	// Pane es el estado de un pane: agente, su estado y el título.
+	Pane(ctx context.Context, pane string) (herdrPane, error)
+	// Read devuelve las últimas líneas visibles del pane, como texto.
+	Read(ctx context.Context, pane string, lines int) (string, error)
+	SendKeys(ctx context.Context, pane string, keys ...string) error
+	SendText(ctx context.Context, pane, text string) error
+	// Prompt envía un mensaje al agente del pane, con su Enter.
+	Prompt(ctx context.Context, pane, text string) error
 }
 
 type herdrWorkspace struct {
@@ -45,6 +53,10 @@ type herdrPane struct {
 	Workspace string `json:"workspace_id"`
 	// Agent es la herramienta que herdr detectó en el pane (claude, codex…).
 	Agent string `json:"agent"`
+	// Status es el estado del agente: idle, working, blocked, done o unknown.
+	Status string `json:"agent_status"`
+	// Title es el título de la terminal sin adornos.
+	Title string `json:"terminal_title_stripped"`
 }
 
 type herdrAgent struct {
@@ -58,10 +70,7 @@ type herdrAgent struct {
 type herdrCLI struct{ bin string }
 
 func (h herdrCLI) call(ctx context.Context, out any, args ...string) error {
-	cmd := exec.CommandContext(ctx, h.bin, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	runErr := cmd.Run()
+	stdout, stderr, runErr := h.exec(ctx, args...)
 	// Algunos comandos (pane run) no imprimen nada cuando salen bien.
 	if runErr == nil && out == nil && len(bytes.TrimSpace(stdout.Bytes())) == 0 {
 		return nil
@@ -74,6 +83,10 @@ func (h herdrCLI) call(ctx context.Context, out any, args ...string) error {
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		if runErr == nil && out == nil {
+			// Salió bien con una respuesta que no es JSON: no hay nada que leer.
+			return nil
+		}
 		if runErr != nil {
 			return fmt.Errorf("herdr %s: %v: %s", args[0], runErr, strings.TrimSpace(stderr.String()))
 		}
@@ -89,6 +102,14 @@ func (h herdrCLI) call(ctx context.Context, out any, args ...string) error {
 		return nil
 	}
 	return json.Unmarshal(resp.Result, out)
+}
+
+func (h herdrCLI) exec(ctx context.Context, args ...string) (bytes.Buffer, bytes.Buffer, error) {
+	cmd := exec.CommandContext(ctx, h.bin, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err := cmd.Run()
+	return stdout, stderr, err
 }
 
 func (h herdrCLI) Workspaces(ctx context.Context) ([]herdrWorkspace, error) {
@@ -176,6 +197,34 @@ func (h herdrCLI) Agents(ctx context.Context) ([]herdrAgent, error) {
 
 func (h herdrCLI) RenameAgent(ctx context.Context, pane, name string) error {
 	return h.call(ctx, nil, "agent", "rename", pane, name)
+}
+
+func (h herdrCLI) Pane(ctx context.Context, pane string) (herdrPane, error) {
+	var r struct {
+		Pane herdrPane `json:"pane"`
+	}
+	err := h.call(ctx, &r, "pane", "get", pane)
+	return r.Pane, err
+}
+
+func (h herdrCLI) Read(ctx context.Context, pane string, lines int) (string, error) {
+	stdout, stderr, err := h.exec(ctx, "pane", "read", pane, "--source", "visible", "--lines", fmt.Sprint(lines))
+	if err != nil {
+		return "", fmt.Errorf("herdr pane read: %v: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.String(), nil
+}
+
+func (h herdrCLI) SendKeys(ctx context.Context, pane string, keys ...string) error {
+	return h.call(ctx, nil, append([]string{"pane", "send-keys", pane}, keys...)...)
+}
+
+func (h herdrCLI) SendText(ctx context.Context, pane, text string) error {
+	return h.call(ctx, nil, "pane", "send-text", pane, text)
+}
+
+func (h herdrCLI) Prompt(ctx context.Context, pane, text string) error {
+	return h.call(ctx, nil, "agent", "prompt", pane, text)
 }
 
 // errHerdrMissing indica que no hay comando herdr.

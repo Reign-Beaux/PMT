@@ -87,6 +87,8 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 
 **4b, hecha:** `pmt pp` y `pmt pp --configurar`, `.pmt/config.yaml` y `.pmt/entorno.md` ([arquitectura.md](arquitectura.md#pmt-pp), [perfiles.md](perfiles.md#formato-de-pmtconfigyaml), [operacion.md](operacion.md#cli-pmt)). Sin cambios a las decisiones.
 
+**4c, hecha:** `pmt equipo [--configurar] [agente…]` y los comandos del equipo `avisar`, `levantar`, `reiniciar`, `relanzar-dp` y `vigia`, que hacen lo de los scripts del kit con `.pmt/` y el token del usuario ([arquitectura.md](arquitectura.md#pmt-equipo), [operacion.md](operacion.md#equipo-de-agentes)). El kit sigue para FMS y DBP hasta la fase 6. Sin cambios a las decisiones.
+
 ### Fase 5. Despliegue en la Raspberry Pi 5
 - Imagen arm64 con el `Dockerfile` actual.
 - `docker-compose.prod.yml` como el de DBP: PMT y PostgreSQL con su volumen, sin puertos expuestos, y Cloudflare Tunnel hacia `pmt.saulantonio.com`.

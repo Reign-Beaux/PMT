@@ -142,7 +142,7 @@ El status no cambia y queda sin tomar: escribir en ella no la toma. La toma de n
 
 ## CLI pmt
 
-`pmt` inicia sesión en PMT desde la terminal y guarda el token del usuario en `~/.config/pmt/credenciales.yaml` ([arquitectura.md](arquitectura.md#cli-pmt)). Tiene `login`, `logout`, `whoami`, `version` y `pp`; `equipo` y los comandos del equipo vienen en la fase 4c del [plan](plan_produccion.md).
+`pmt` inicia sesión en PMT desde la terminal y guarda el token del usuario en `~/.config/pmt/credenciales.yaml` ([arquitectura.md](arquitectura.md#cli-pmt)). Tiene `login`, `logout`, `whoami`, `version`, `pp`, `equipo` y los comandos del equipo (`avisar`, `levantar`, `reiniciar`, `relanzar-dp` y `vigia`).
 
 **Compilar los binarios** (Linux y macOS, amd64 y arm64, con `SHA256SUMS`), desde `backend/`:
 
@@ -199,7 +199,38 @@ El nombre del agente en PMT debe ser el mismo del archivo de token, porque así 
 
 ## Equipo de agentes
 
-El kit en `agentes/` levanta a los nueve agentes de un proyecto en herdr. Su manual es `agentes/README.md`. En resumen:
+Hay dos formas de levantar a los nueve agentes de un proyecto en herdr: `pmt`, para los proyectos con `.pmt/`, y el kit en `agentes/`, que siguen usando FMS y DBP hasta la fase 6 del [plan](plan_produccion.md).
+
+### Con pmt
+
+Necesita `pmt login`, herdr, `claude` y `codex` instalados, y `pmt` en el `PATH`: los agentes lo usan para avisarse. Desde un pane de herdr, en la carpeta del proyecto:
+
+```bash
+pmt pp                       # PP: la primera vez pregunta proyecto, herramienta, modelo y effort
+pmt equipo                   # los otros ocho; la primera vez pregunta lo que falta
+pmt equipo tl dp             # solo esos
+pmt equipo --configurar      # vuelve a preguntar descripción, base, puertos y perfiles
+```
+
+- La primera vez, `pmt equipo` pregunta la descripción del proyecto (propone la de PMT), la cadena de la base y el comando para consultarla (con `<consulta>`), los puertos (8090 y 5173 por omisión) y la herramienta, modelo y effort de cada perfil. Muestra lo propuesto (Claude Opus `medium` para TL, DP y CR; Codex `gpt-6.1-terra` `high` para PC, devs, QAP y QA) y Enter lo acepta todo; con `n` pregunta perfil por perfil. Lo guarda en `.pmt/config.yaml` y regenera `.pmt/entorno.md` completo.
+- Cada agente queda en su pestaña del workspace (`tl`, `devback`…), con su nombre en herdr (con el prefijo, si lo hay). Uno que ya corre no se toca.
+- La primera vez en una carpeta, cada Claude pregunta si se confía en ella.
+
+Comandos del equipo, desde la raíz del proyecto o cualquier subcarpeta. Los agentes los usan solos (están en `.pmt/entorno.md`); el usuario, para supervisar o destrabar:
+
+| Comando | Qué hace |
+| --- | --- |
+| `pmt avisar <agente> "mensaje"` | Envía el aviso y confirma que llegó; reintenta una vez sin duplicarlo. Si no se confirma, deja una línea en `.pmt/para-usuario.md` y sale con error |
+| `pmt levantar <agente> "encargo"` | Reinicia al agente y le da el encargo. Con el TL arranca el vigía si no corre |
+| `pmt reiniciar <agente>` | Sesión vacía: `/new` en Claude, relanzar en Codex. Espera hasta 90 s si el agente sigue trabajando; si responde que sigue trabajando y ya avisó, se vuelve a correr |
+| `pmt relanzar-dp <medium\|high>` | Relanza a DP con ese effort y lo guarda en `.pmt/config.yaml` |
+| `pmt vigia` | Avisa al TL si todos llevan 150 s quietos; termina cuando alguien escribe en `.pmt/para-usuario.md` o un agente queda bloqueado. Bitácora en `.pmt/vigia.log`, pid en `.pmt/vigia.pid` |
+
+Lo que los agentes necesitan decirle al usuario queda en `.pmt/para-usuario.md`.
+
+### Con el kit
+
+El kit en `agentes/` es para los proyectos que todavía lo usan. Su manual es `agentes/README.md`. En resumen:
 
 1. Copiar `agentes/agentes.env.example` al proyecto como `.agentes.env`, ajustarlo y crear los tokens.
 2. `agentes/iniciar.sh /ruta/al/proyecto/.agentes.env` crea las pestañas, genera perfiles y MCP en `.agentes/` y lanza a los agentes.
@@ -207,7 +238,7 @@ El kit en `agentes/` levanta a los nueve agentes de un proyecto en herdr. Su man
 
 Lo que los agentes necesitan decirle al usuario queda en `.agentes/para-usuario.md` del proyecto.
 
-El texto de los perfiles vive en `backend/internal/features/profiles/catalog/` y va incrustado en el binario: el kit lo lee de ahí para generar `.agentes/perfiles/`, y PMT lo sirve con la herramienta `get_profile` y en `GET /api/profiles/{perfil}`. Una sesión MCP con token de usuario y `?profile=` recibe en sus instrucciones unas líneas que le piden llamar a `get_profile` y leer `.pmt/entorno.md`; los tokens de agente del kit no reciben instrucciones ([perfiles.md](perfiles.md#cómo-se-sirven)). Un cambio a un perfil llega por `get_profile` solo al reemplazar el servidor; a los agentes del kit, al regenerar con `iniciar.sh`.
+El texto de los perfiles vive en `backend/internal/features/profiles/catalog/` y va incrustado en el binario: el kit lo lee de ahí para generar `.agentes/perfiles/`, y PMT lo sirve con la herramienta `get_profile` y en `GET /api/profiles/{perfil}`. Una sesión MCP con token de usuario y `?profile=` recibe en sus instrucciones unas líneas que le piden llamar a `get_profile` y leer `.pmt/entorno.md`; los tokens de agente del kit no reciben instrucciones ([perfiles.md](perfiles.md#cómo-se-sirven)). Un cambio a un perfil llega por `get_profile` solo al reemplazar el servidor; a los agentes del kit, al regenerar con `iniciar.sh`; a los de `pmt`, al relanzarlos (`pmt equipo` tras sacarlos con `/exit`, o `pmt reiniciar` en Codex, que descarga el perfil de nuevo).
 
 ## Cambios al código de PMT
 

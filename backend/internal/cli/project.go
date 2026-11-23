@@ -46,13 +46,13 @@ type ProjectConfig struct {
 	Descripcion string `yaml:"descripcion"`
 }
 
-// DatabaseConfig es la base del proyecto. La llena pmt equipo.
+// DatabaseConfig es la base del proyecto. La pregunta pmt equipo.
 type DatabaseConfig struct {
 	Cadena   string `yaml:"cadena"`
 	Consulta string `yaml:"consulta"`
 }
 
-// PortsConfig son los puertos del proyecto. Los llena pmt equipo.
+// PortsConfig son los puertos del proyecto. Los pregunta pmt equipo.
 type PortsConfig struct {
 	Backend  int `yaml:"backend"`
 	Frontend int `yaml:"frontend"`
@@ -82,7 +82,7 @@ type ProfileConfig struct {
 
 const configHeader = `# Configuración de pmt para este proyecto en esta máquina. Va fuera de git.
 # No lleva tokens: el de PMT sale de «pmt login» y los de MCP extra de archivos en ~/.config/pmt/.
-# La genera «pmt pp»; «pmt pp --configurar» vuelve a preguntar. Ver .docs/perfiles.md en PMT.
+# La generan «pmt pp» y «pmt equipo»; con --configurar vuelven a preguntar. Ver .docs/perfiles.md en PMT.
 `
 
 // findRoot es la carpeta más cercana hacia arriba desde dir que ya tiene .pmt/;

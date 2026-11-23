@@ -1,5 +1,5 @@
 // Command pmt es el CLI de PMT: inicia sesión por el navegador, guarda el token
-// de API del usuario en ~/.config/pmt/credenciales.yaml y levanta a PP en herdr.
+// de API del usuario en ~/.config/pmt/credenciales.yaml y levanta a PP y al equipo en herdr.
 package main
 
 import (
