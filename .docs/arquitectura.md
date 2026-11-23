@@ -356,7 +356,7 @@ Como en DBP, una llave solo se puede sobrescribir con su variable si existe en e
 
 ## Imagen
 
-El `Dockerfile` de la raíz compila el frontend con pnpm, `./cmd/pmt-server` con Go y el CLI con `scripts/build-cli.sh` (versión en `--build-arg PMT_VERSION`, por omisión `dev`), y deja en alpine el binario, `config/config.prod.yaml`, el `dist` en `/app/web` y los cuatro binarios de `pmt` con `SHA256SUMS` en `/app/cli`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING` y, la primera vez, `OWNER_EMAIL`, `OWNER_PASSWORD` y `OWNER_USERNAME`.
+El `Dockerfile` de la raíz compila el frontend con pnpm, `./cmd/pmt-server` con Go y el CLI con `scripts/build-cli.sh` (versión en `--build-arg PMT_VERSION`, por omisión `dev`), y deja en alpine el binario, `config/config.prod.yaml`, el `dist` en `/app/web` y los cuatro binarios de `pmt` con `SHA256SUMS` en `/app/cli`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING` y, la primera vez, `OWNER_EMAIL`, `OWNER_PASSWORD` y `OWNER_USERNAME`. `docker-compose.prod.yml` la levanta con PostgreSQL 17 y pasa `SOURCE_COMMIT` (de Coolify) como `PMT_VERSION` ([despliegue.md](despliegue.md)).
 
 ## Pruebas del servidor
 

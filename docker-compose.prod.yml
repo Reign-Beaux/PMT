@@ -1,0 +1,36 @@
+services:
+  pmt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Coolify da SOURCE_COMMIT en la construcción; sin él, `pmt version` dice dev.
+        PMT_VERSION: ${SOURCE_COMMIT:-dev}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_CONNECTION_STRING: ${DATABASE_CONNECTION_STRING:?falta DATABASE_CONNECTION_STRING}
+      OWNER_EMAIL: ${OWNER_EMAIL:?falta OWNER_EMAIL}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?falta OWNER_PASSWORD}
+      OWNER_USERNAME: ${OWNER_USERNAME:?falta OWNER_USERNAME}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://pmt.saulantonio.com}
+  db:
+    image: postgres:17.12
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pmt
+      POSTGRES_DB: pmt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+    volumes:
+      - pmt-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pmt -d pmt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  pmt-pgdata:

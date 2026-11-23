@@ -1,6 +1,6 @@
 # Operación
 
-Cómo se corre PMT en esta máquina. Los comandos de Go se ejecutan desde `backend/`.
+Cómo se corre PMT en esta máquina. Los comandos de Go se ejecutan desde `backend/`. El despliegue en la Raspberry (Coolify, Cloudflare Tunnel, respaldos y traspaso de la base) está en [despliegue.md](despliegue.md).
 
 ## Piezas
 
@@ -41,7 +41,7 @@ setsid nohup ./bin/pmt-server >> bin/pmt-server.log 2>&1 < /dev/null &
 
 Si hubo cambios en el frontend, primero `cd frontend && pnpm build`. Si hubo cambios en el CLI, recompila sus binarios (ver [CLI pmt](#cli-pmt)); eso no pide reiniciar. Si el binario nuevo trae migraciones, respalda antes la base (ver Migraciones): las aplica al arrancar.
 
-La imagen de contenedor se construye desde la raíz con `docker build -t pmt --build-arg PMT_VERSION=$(git describe --tags --always) .` y se corre con `DATABASE_CONNECTION_STRING` en el entorno. Ya trae los binarios del CLI en `/app/cli`. Si `docker build` falla con `DeadlineExceeded` al leer los metadatos de las imágenes, es el gestor de credenciales de Docker (`gpg`): se puede construir con `DOCKER_CONFIG` apuntando a una carpeta con `{"currentContext":"default"}`, que baja las imágenes públicas sin credenciales.
+La imagen de contenedor se construye desde la raíz con `docker build -t pmt --build-arg PMT_VERSION=$(git describe --tags --always) .` y se corre con `DATABASE_CONNECTION_STRING` en el entorno. Ya trae los binarios del CLI en `/app/cli`. Si `docker build` falla con `DeadlineExceeded` al leer los metadatos de las imágenes, es el gestor de credenciales de Docker (`gpg`): se puede construir con `DOCKER_CONFIG` apuntando a una carpeta con `{"currentContext":"default"}`, que baja las imágenes públicas sin credenciales. Para producción se usa `docker-compose.prod.yml` ([despliegue.md](despliegue.md)).
 
 ## Migraciones
 
