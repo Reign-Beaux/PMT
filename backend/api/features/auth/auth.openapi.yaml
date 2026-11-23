@@ -324,6 +324,136 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /api/cli/login:
+    post:
+      summary: Pide un código para que el CLI pmt inicie sesión por el navegador
+      description: |
+        Pública. Devuelve un código corto (`ABCD-1234`) que la persona compara en la pantalla, un secreto de
+        sondeo que solo conoce el CLI (PMT guarda su SHA-256) y la URL a abrir
+        (`app.public_url` + `/cli?codigo=<código>`). Caduca a los 10 minutos. Pedir un código borra los vencidos;
+        con 20 códigos pendientes y vigentes en toda la instancia responde 409.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [machine]
+              properties:
+                machine: { type: string, description: "Nombre de la máquina, de 1 a 60 caracteres. El token se llamará `pmt <máquina>`." }
+      responses:
+        "201":
+          description: Código creado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, poll_secret, url, expires_at, interval]
+                properties:
+                  code: { type: string }
+                  poll_secret: { type: string }
+                  url: { type: string }
+                  expires_at: { type: string, format: date-time }
+                  interval: { type: integer, description: Segundos entre sondeos }
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/cli/login/poll:
+    post:
+      summary: Sondea el código del CLI pmt
+      description: |
+        Pública: el secreto de sondeo es la credencial. Con el código autorizado y vigente crea un token de API
+        del usuario llamado `pmt <máquina>` y lo entrega esta única vez; después el código responde `expired`.
+        Si el usuario se desactivó entre autorizar y sondear, responde `cancelled`. `Cache-Control: no-store`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [poll_secret]
+              properties:
+                poll_secret: { type: string }
+      responses:
+        "200":
+          description: Estado del código; `token`, `token_id` y `username` solo con `authorized`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [pending, authorized, cancelled, expired] }
+                  token: { type: string }
+                  token_id: { type: string, format: uuid }
+                  username: { type: string }
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/cli/login/{code}:
+    get:
+      summary: Muestra el código que pidió el CLI pmt
+      description: Operación de cuenta, sin perfil declarado. Acepta el código con minúsculas o sin guion.
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Código, máquina y estado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CLILogin" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/cli/login/{code}/authorize:
+    post:
+      summary: Autoriza el código del CLI pmt
+      description: Operación de cuenta, sin perfil declarado. Solo un código pendiente y vigente; si no, 409. El token lo recibe el CLI al sondear.
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Código autorizado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CLILogin" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/cli/login/{code}/cancel:
+    post:
+      summary: Cancela el código del CLI pmt
+      description: Operación de cuenta, sin perfil declarado. Solo un código pendiente y vigente; si no, 409.
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Código cancelado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CLILogin" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     bearerAuth:
@@ -377,3 +507,12 @@ components:
         email: { type: string }
         expires_at: { type: string, format: date-time }
         accepted_at: { type: [string, "null"], format: date-time }
+    CLILogin:
+      type: object
+      required: [code, machine, token_name, status, expires_at]
+      properties:
+        code: { type: string }
+        machine: { type: string }
+        token_name: { type: string }
+        status: { type: string, enum: [pending, authorized, cancelled, expired] }
+        expires_at: { type: string, format: date-time }

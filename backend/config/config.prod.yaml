@@ -6,6 +6,8 @@ database:
   connection_string: changeme # override: DATABASE_CONNECTION_STRING
 frontend:
   dist: ""
+cli:
+  dist: /app/cli
 auth:
   cookie_secure: true
 owner:

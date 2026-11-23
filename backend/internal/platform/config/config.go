@@ -15,13 +15,14 @@ type Config struct {
 	Server   *options.ServerSettings
 	Database *options.DatabaseSettings
 	Frontend *options.FrontendSettings
+	CLI      *options.CLISettings
 	Auth     *options.AuthSettings
 	Owner    *options.OwnerSettings
 }
 
 // Load lee el archivo del ambiente, aplica las variables de entorno y valida
-// cada sección. Un frontend.dist relativo se resuelve contra el directorio del
-// archivo de configuración.
+// cada sección. Un frontend.dist o un cli.dist relativos se resuelven contra el
+// directorio del archivo de configuración.
 func Load() (Config, error) {
 	v := source.NewViper()
 	if err := v.ReadInConfig(); err != nil {
@@ -33,12 +34,14 @@ func Load() (Config, error) {
 		}
 		v.Set(key, v.Get(key))
 	}
-	if dist := v.GetString("frontend.dist"); dist != "" && !filepath.IsAbs(dist) {
-		abs, err := filepath.Abs(filepath.Join(filepath.Dir(v.ConfigFileUsed()), dist))
-		if err != nil {
-			return Config{}, fmt.Errorf("frontend.dist: %w", err)
+	for _, key := range []string{"frontend.dist", "cli.dist"} {
+		if dist := v.GetString(key); dist != "" && !filepath.IsAbs(dist) {
+			abs, err := filepath.Abs(filepath.Join(filepath.Dir(v.ConfigFileUsed()), dist))
+			if err != nil {
+				return Config{}, fmt.Errorf("%s: %w", key, err)
+			}
+			v.Set(key, abs)
 		}
-		v.Set("frontend.dist", abs)
 	}
 	var c Config
 	var err error
@@ -52,6 +55,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if c.Frontend, err = options.LoadFrontendSettingsFrom(v); err != nil {
+		return Config{}, err
+	}
+	if c.CLI, err = options.LoadCLISettingsFrom(v); err != nil {
 		return Config{}, err
 	}
 	if c.Auth, err = options.LoadAuthSettingsFrom(v); err != nil {

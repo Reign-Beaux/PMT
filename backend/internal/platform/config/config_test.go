@@ -15,6 +15,8 @@ database:
   connection_string: postgres://localhost/pmt
 frontend:
   dist: ""
+cli:
+  dist: ""
 auth:
   cookie_secure: false
 owner:
@@ -24,7 +26,7 @@ owner:
 `
 
 var overrides = []string{
-	"APP_PUBLIC_URL", "SERVER_ADDR", "DATABASE_CONNECTION_STRING", "FRONTEND_DIST",
+	"APP_PUBLIC_URL", "SERVER_ADDR", "DATABASE_CONNECTION_STRING", "FRONTEND_DIST", "CLI_DIST",
 	"AUTH_COOKIE_SECURE", "OWNER_EMAIL", "OWNER_PASSWORD", "OWNER_USERNAME",
 }
 
@@ -104,6 +106,9 @@ func TestProdConfig(t *testing.T) {
 	if cfg.Server.Addr != "0.0.0.0:8080" || cfg.Database.ConnectionString != "changeme" || cfg.Frontend.Dist != "" {
 		t.Fatalf("configuración de producción inesperada: addr=%q dist=%q", cfg.Server.Addr, cfg.Frontend.Dist)
 	}
+	if cfg.CLI.Dist != "/app/cli" {
+		t.Fatalf("cli.dist de producción = %q", cfg.CLI.Dist)
+	}
 	if cfg.App.PublicURL != "https://pmt.saulantonio.com" || !cfg.Auth.CookieSecure || cfg.Owner.Email != "changeme" || cfg.Owner.Username != "changeme" {
 		t.Fatalf("app, auth u owner de producción inesperados: url=%q secure=%t", cfg.App.PublicURL, cfg.Auth.CookieSecure)
 	}
@@ -148,5 +153,27 @@ func TestFrontendDistRelativeToConfig(t *testing.T) {
 		if err != nil || cfg.Frontend.Dist != dist {
 			t.Fatalf("override=%q dist=%v error=%v", override, cfg.Frontend, err)
 		}
+	}
+}
+
+func TestCLIDistRelativoAlArchivoYOpcional(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(strings.Replace(valid, "cli:\n  dist: \"\"", "cli:\n  dist: ../dist/cli", 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIG_FILE", path)
+	clearOverrides(t)
+	t.Chdir(t.TempDir())
+	cfg, err := Load()
+	if err != nil || cfg.CLI.Dist != filepath.Join(filepath.Dir(dir), "dist", "cli") {
+		t.Fatalf("cli.dist = %v, error = %v", cfg.CLI, err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(valid, "cli:\n  dist: \"\"\n", "", 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load()
+	if err != nil || cfg.CLI.Dist != "" {
+		t.Fatalf("sin cli.dist: %v, error = %v", cfg.CLI, err)
 	}
 }

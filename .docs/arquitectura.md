@@ -12,7 +12,7 @@ Agentes ───── MCP /mcp (token) ─┘                       ▲
                       listener de eventos ◄─────────────┘
 ```
 
-REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se duplican. Todo pide credenciales salvo las sondas de salud, el login, las invitaciones y los archivos del frontend ([Identidad](#identidad)), y cada operación comprueba antes la membresía del proyecto ([Membresía](#membresía)) y, si escribe, los bloqueos por persona ([Bloqueos](#bloqueos)).
+REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se duplican. Todo pide credenciales salvo las sondas de salud, el login, las invitaciones, el inicio de sesión del CLI, las descargas del CLI y los archivos del frontend ([Identidad](#identidad)), y cada operación comprueba antes la membresía del proyecto ([Membresía](#membresía)) y, si escribe, los bloqueos por persona ([Bloqueos](#bloqueos)).
 
 | Necesidad | Elección |
 | --- | --- |
@@ -26,7 +26,7 @@ REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se du
 | WebSocket | `github.com/coder/websocket` |
 | YAML de importación | `gopkg.in/yaml.v3` |
 | Contraseñas | argon2id (`golang.org/x/crypto/argon2`) |
-| Pruebas | `testing` estándar: 231 archivos y unas 740 pruebas |
+| Pruebas | `testing` estándar: 238 archivos y unas 780 pruebas |
 
 ## Estructura
 
@@ -34,14 +34,18 @@ REST y MCP llaman a los mismos handlers, así que las reglas de negocio no se du
 backend/
 ├── api/features/<feature>/     contratos: <feature>.openapi.yaml (REST) y <feature>.mcp.json (MCP)
 ├── cmd/pmt-server/             punto de entrada; `pmt-server agent ...` administra tokens de agente
+├── cmd/pmt/                    el CLI `pmt` ([CLI pmt](#cli-pmt))
+├── scripts/build-cli.sh        compila `pmt` para los cuatro sistemas y escribe SHA256SUMS
 ├── internal/
 │   ├── app/                    armado de features, rutas, arranque y cierre
+│   ├── cli/                    subcomandos del CLI, credenciales y cliente HTTP
 │   ├── kernel/                 Actor, Profile, errores de negocio
 │   ├── platform/
 │   │   ├── rest/               servidor HTTP, autenticación por cookie o Bearer, errores
 │   │   ├── mcp/                servidor MCP, autenticación por Bearer, errores de herramienta
 │   │   ├── events/             listener de NOTIFY y WebSocket /api/events
 │   │   ├── web/                frontend compilado con fallback SPA
+│   │   ├── downloads/          /install.sh y /descargas del CLI, desde cli.dist
 │   │   ├── config/             carga de la configuración; options/ con una sección por archivo
 │   │   ├── health/             /healthz y /readyz
 │   │   └── postgres/           conexión, errores, migrate.go y migraciones/
@@ -167,7 +171,7 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 
 - Con cabecera `Authorization` manda el token; sin ella, la cookie. `/mcp` solo acepta tokens.
 - Sin credenciales, con `Bearer` vacío, o con una cookie o un token inválidos, vencidos, revocados o de un usuario desactivado: **401**. No hay acceso anónimo: el antiguo «sin token actúa `saul`» ya no existe.
-- Abiertas sin credenciales: `/healthz`, `/readyz`, las rutas públicas de `auth` (`auth.IsPublic`) y los archivos del frontend.
+- Abiertas sin credenciales: `/healthz`, `/readyz`, las rutas públicas de `auth` (`auth.IsPublic`: login, logout, consultar y aceptar una invitación, y `POST /api/cli/login` y `/api/cli/login/poll`), `/install.sh`, `/descargas/` y los archivos del frontend.
 - Si una ruta protegida llegara sin actor, `ActorFrom` devuelve el actor vacío, sin perfil. `permissions_test.go` exige que toda herramienta de escritura lo rechace sin tocar la base.
 
 **Secretos.** Sesiones, tokens de API e invitaciones son 32 bytes aleatorios; PMT solo guarda su SHA-256. Las contraseñas se guardan con argon2id. El token de API y el enlace de invitación solo se muestran al crearlos.
@@ -175,6 +179,34 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 **Cookie.** `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` según `auth.cookie_secure`. Cambiar la contraseña cierra las demás sesiones del usuario; desactivarlo borra todas y revoca sus tokens.
 
 **Tokens de agente.** Viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`. Un token de usuario se crea en la pantalla Cuenta del frontend y se usa igual, con `?profile=` en la URL del MCP ([operacion.md](operacion.md#usuarios-y-acceso)).
+
+## CLI pmt
+
+`pmt` es un binario aparte, en `cmd/pmt` sobre `internal/cli`, del mismo módulo. Usa `flag` de la biblioteca estándar: con cuatro subcomandos no hace falta una librería, y `cobra` solo está en el módulo como dependencia indirecta de `sqlc`.
+
+| Comando | Qué hace |
+| --- | --- |
+| `pmt login [--servidor URL] [--sin-navegador]` | Inicia sesión por el navegador y guarda el token. El servidor por omisión es `https://pmt.saulantonio.com`; el que se use queda guardado para el siguiente `login`. Si había otro token, lo revoca |
+| `pmt logout` | Revoca el token en el servidor (`DELETE /api/tokens/{id}` con el mismo token) y borra el archivo. Sin conexión no borra nada; con el token ya inválido, solo borra |
+| `pmt whoami` | Usuario y servidor, con `GET /api/auth/me` |
+| `pmt version` | Versión incrustada al compilar (`-X pmt/internal/cli.Version=…`), sistema y arquitectura |
+
+**Credenciales:** `~/.config/pmt/credenciales.yaml` con `servidor`, `username`, `token` y `token_id`, permiso 600, carpeta 700. Se escribe a un temporal y se renombra. No usa `~/.config/pmt/tokens/`, que es del kit. El token nunca se imprime.
+
+**Login por navegador** (como `gh auth login`), en la feature `auth`:
+
+1. `POST /api/cli/login` (público) con `machine` (el nombre de la máquina, de 1 a 60 caracteres) devuelve `code` (`ABCD-1234`: cuatro letras sin I ni O y cuatro dígitos), `poll_secret` (32 bytes aleatorios que solo conoce el CLI), `url` (`app.public_url` + `/cli?codigo=<código>`), `expires_at` (10 minutos) e `interval` (2 s).
+2. El CLI abre el navegador con `xdg-open` u `open` (en Linux, solo con `DISPLAY` o `WAYLAND_DISPLAY`) y siempre imprime la URL, para abrirla en otro equipo. Muestra el código para compararlo.
+3. La pantalla `/cli` del frontend ([frontend.md](frontend.md)) muestra el código y la máquina con `GET /api/cli/login/{code}` y llama a `POST /api/cli/login/{code}/authorize` o `/cancel`. Son operaciones de cuenta: sin perfil declarado. Solo un código pendiente y vigente se autoriza o se cancela; si no, `conflict`.
+4. El CLI sondea `POST /api/cli/login/poll` (público) con su secreto cada 2 s: `pending`, `authorized` (con `token`, `token_id` y `username`), `cancelled` o `expired`. Responde con `Cache-Control: no-store`. Un fallo de red se reintenta hasta que caduca el código.
+
+- **Hashes y uso único:** se guarda solo el SHA-256 del secreto. El token de API (`pmt <máquina>`, como los de la cuenta) se crea en el primer sondeo después de autorizar, en la misma transacción que deja el código `consumed`; así nunca queda en la base en ninguna forma recuperable. Después el código responde `expired`. Si el usuario se desactivó entre autorizar y sondear, responde `cancelled`. Autorizado pero sin sondear antes de los 10 minutos, caduca sin token.
+- **Contra abusos:** pedir un código es público, así que hay un tope de **20 códigos pendientes y vigentes en toda la instancia**; el 21.º responde `conflict` («hay demasiados inicios de sesión pendientes; intenta en unos minutos»). Cada petición borra los vencidos. El secreto de sondeo no se puede adivinar, y autorizar exige sesión.
+- La tabla es `cli_logins` (migración `00029`).
+
+**Descargas.** `platform/downloads` sirve, sin credenciales, `GET /install.sh` (`internal/platform/downloads/install.sh`, incrustado, con `app.public_url` ya puesto) y `GET /descargas/{pmt-linux-amd64|pmt-linux-arm64|pmt-darwin-amd64|pmt-darwin-arm64|SHA256SUMS}` desde `cli.dist`. Cualquier otro nombre responde 404. La carpeta se revisa en cada petición, así que basta compilar los binarios sin reiniciar. Si `cli.dist` está vacío, no existe o no tiene `SHA256SUMS`, el servidor arranca igual con un aviso en el log: `/install.sh` responde un script que dice «este servidor no tiene los binarios del CLI» y sale con error, y `/descargas/` responde 404.
+
+`install.sh` es POSIX `sh`: detecta sistema (`uname -s`) y arquitectura (`uname -m`), descarga con `curl` o `wget`, verifica la suma con `sha256sum` o `shasum -a 256` contra `SHA256SUMS`, instala en `~/.local/bin/pmt` sin `sudo` y avisa si esa carpeta no está en el `PATH`. Si la suma no coincide no instala nada.
 
 ## Membresía
 
@@ -215,7 +247,7 @@ Las reglas están en [dominio.md](dominio.md#bloqueos-por-persona). Se reparten 
 
 ## Datos
 
-- 28 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00028_add_holds`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`; `00026` quita las llaves foráneas de TL, equipo y dueño de tarea hacia `agents`. `00027` crea `project_members`, deja al dueño de la instancia como owner de los proyectos existentes, crea `pmt_project_of` y agrega el proyecto a los avisos de cambios. `00028` agrega los bloqueos a `stages` y `bugs`, deja lo que ya se trabajaba tomado por el dueño de la instancia y crea `pmt_hold_of`. Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
+- 29 migraciones en `internal/platform/postgres/migrations/`, de `00001_create_projects` a `00029_create_cli_logins`. Las de usuarios son `00023_create_users_and_sessions`, `00024_create_api_tokens` y `00025_create_invitations`; `00026` quita las llaves foráneas de TL, equipo y dueño de tarea hacia `agents`. `00027` crea `project_members`, deja al dueño de la instancia como owner de los proyectos existentes, crea `pmt_project_of` y agrega el proyecto a los avisos de cambios. `00028` agrega los bloqueos a `stages` y `bugs`, deja lo que ya se trabajaba tomado por el dueño de la instancia y crea `pmt_hold_of`. `00029` crea `cli_logins`, los inicios de sesión del CLI ([CLI pmt](#cli-pmt)). Van embebidas en el binario y `postgres.Migrate` (goose provider) aplica las que falten al arrancar `pmt-server`, antes de abrir el puerto. Si una falla, el servidor no arranca. `pmt-server agent` no migra.
 - `sqlc.yaml` tiene una entrada por feature con consultas, todas sobre el esquema de las migraciones. Tras cambiar migraciones o consultas: `go tool sqlc generate`. El código de `sqlcgen/` no se edita a mano.
 - **Transacciones:** las operaciones que escriben varias filas usan `pgx.BeginFunc` en su `store`, y `imports` y `workflow` comparten una `pgx.Tx`. Los cambios de status bloquean con `FOR UPDATE` y comparan el status de origen; si cambió entre leer y guardar, responden `el status cambió, vuelve a consultar`. Los lotes bloquean por orden de ID.
 - **Concurrencia:** los agregados no tienen control de versión. Fuera de los casos anteriores, gana la última escritura.
@@ -241,14 +273,15 @@ Los recursos son `project`, `stage`, `task`, `bug`, `comment` y `status_change`.
 - `CONFIG_FILE` da la ruta del archivo. Si falta, se lee `config/config.<ENV>.yaml` relativo al directorio de arranque, con `ENV` por omisión `dev`.
 - Cada llave se sobrescribe con una variable de entorno de su mismo nombre en mayúsculas y con `_` en lugar de `.` (Viper `AutomaticEnv`).
 - Cada sección se lee a su estructura en `options/` y se valida ahí.
-- Un `frontend.dist` relativo se resuelve contra el directorio del archivo de configuración.
+- Un `frontend.dist` o un `cli.dist` relativos se resuelven contra el directorio del archivo de configuración.
 
 | Llave | Variable | Regla |
 | --- | --- | --- |
 | `server.addr` | `SERVER_ADDR` | obligatoria |
 | `database.connection_string` | `DATABASE_CONNECTION_STRING` | obligatoria |
 | `frontend.dist` | `FRONTEND_DIST` | opcional; si falta el compilado, el servidor arranca igual (ver Frontend servido) |
-| `app.public_url` | `APP_PUBLIC_URL` | obligatoria; base de los enlaces de invitación |
+| `cli.dist` | `CLI_DIST` | opcional; carpeta con los binarios de `pmt` y `SHA256SUMS`. Si falta, el servidor arranca igual (ver [CLI pmt](#cli-pmt)) |
+| `app.public_url` | `APP_PUBLIC_URL` | obligatoria; base de los enlaces de invitación, de la pantalla `/cli` y de `install.sh` |
 | `auth.cookie_secure` | `AUTH_COOKIE_SECURE` | `true` marca la cookie como `Secure` (solo HTTPS) |
 | `owner.email` | `OWNER_EMAIL` | dueño de la instancia; se crea al arrancar si no hay usuarios |
 | `owner.password` | `OWNER_PASSWORD` | al menos 8 caracteres |
@@ -260,8 +293,8 @@ Como en DBP, una llave solo se puede sobrescribir con su variable si existe en e
 
 | Archivo | En git | Contenido |
 | --- | --- | --- |
-| `backend/config/config.dev.yaml` | no | `127.0.0.1:8080`, la base `pmt`, `../../frontend/dist`, `public_url` `http://127.0.0.1:8080`, cookie sin `Secure` y el dueño `saul` |
-| `backend/config/config.prod.yaml` | sí | `0.0.0.0:8080`, `https://pmt.saulantonio.com`, cookie `Secure`, `frontend.dist: ""` porque la imagen fija `FRONTEND_DIST`, y `changeme # override: ...` en la base y en `owner.*` |
+| `backend/config/config.dev.yaml` | no | `127.0.0.1:8080`, la base `pmt`, `../../frontend/dist`, `cli.dist` `../../dist/cli`, `public_url` `http://127.0.0.1:8080`, cookie sin `Secure` y el dueño `saul` |
+| `backend/config/config.prod.yaml` | sí | `0.0.0.0:8080`, `https://pmt.saulantonio.com`, cookie `Secure`, `frontend.dist: ""` porque la imagen fija `FRONTEND_DIST`, `cli.dist` `/app/cli`, y `changeme # override: ...` en la base y en `owner.*` |
 | `frontend/e2e/harness/config.e2e.yaml` | sí | El backend de pruebas e2e: `127.0.0.1:8090`, `public_url` `http://localhost:5173`, y la base y el dueño de pruebas por variable ([frontend.md](frontend.md)) |
 
 ## Salud
@@ -270,7 +303,7 @@ Como en DBP, una llave solo se puede sobrescribir con su variable si existe en e
 
 ## Imagen
 
-El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` con Go, y deja en alpine el binario, `config/config.prod.yaml` y el `dist` en `/app/web`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING` y, la primera vez, `OWNER_EMAIL`, `OWNER_PASSWORD` y `OWNER_USERNAME`.
+El `Dockerfile` de la raíz compila el frontend con pnpm, `./cmd/pmt-server` con Go y el CLI con `scripts/build-cli.sh` (versión en `--build-arg PMT_VERSION`, por omisión `dev`), y deja en alpine el binario, `config/config.prod.yaml`, el `dist` en `/app/web` y los cuatro binarios de `pmt` con `SHA256SUMS` en `/app/cli`, con `ENV=prod FRONTEND_DIST=/app/web`. Escucha en 8080 y su `HEALTHCHECK` consulta `/readyz`. Al correrla hay que dar `DATABASE_CONNECTION_STRING` y, la primera vez, `OWNER_EMAIL`, `OWNER_PASSWORD` y `OWNER_USERNAME`.
 
 ## Pruebas del servidor
 
@@ -279,11 +312,12 @@ El `Dockerfile` de la raíz compila el frontend con pnpm y `./cmd/pmt-server` co
 - `internal/app/permissions_test.go`: toda herramienta que no empiece con `list_` ni `get_` rechaza a PC y al actor vacío sin tocar la base. Una herramienta nueva de solo lectura debe seguir esa convención de nombre.
 - `internal/app/membership_test.go`: recorre toda herramienta registrada y toda ruta que registran los `rest.go` de las features (leídas del código), con los IDs que aceptan según su esquema o su `*.openapi.yaml`, y exige `not_found` a quien no es miembro y `forbidden` a un viewer con token, sin llegar al handler; solo se salvan `create_project`, `import_project`, `list_projects`, `get_profile`, `GET`/`POST /api/projects` y las dos rutas de perfiles. También exige que contrato y código tengan las mismas rutas, que el viewer con cookie solo lea, y prueba owner, editor, viewer por token y por cookie, no miembro, token de agente y la visibilidad de los eventos.
 - `internal/app/holds_test.go`: recorre toda herramienta y ruta de escritura sobre una etapa tomada y un bug tomado por otra persona y exige `conflict` con su nombre sin llegar al handler; solo se salvan `release_*` y las escrituras que solo reciben el proyecto, que deben ser exactamente las de su lista. También prueba la misma persona con otro perfil o con un token de agente, una etapa libre, lecturas y que la membresía va primero.
-- `internal/app/routes_test.go`: 401 sin credenciales, cookie y token de usuario, token de agente, usuario desactivado, rutas públicas y reparto de rutas.
+- `internal/app/routes_test.go`: 401 sin credenciales, cookie y token de usuario, token de agente, usuario desactivado, rutas públicas (incluidas las del CLI, `/install.sh` y `/descargas/`) y reparto de rutas.
 - `internal/app/profiles_test.go`: `initialize` con `?profile=tl`, `qa`, `pc` y `devbackend` trae instrucciones cortas que nombran el perfil, `get_profile` y `.pmt/entorno.md`; sin perfil, con `user` o con token de agente, ninguna. `get_profile` con perfil devuelve su texto servido; sin perfil, `invalid` con `?profile=`; con token de agente, el de su perfil fijo. Las rutas de perfiles con token y cookie, sin distinguir mayúsculas, 404 y 401, y que REST y `get_profile` sirven lo mismo.
 - `internal/features/profiles/feature_test.go` y `queries/get/handler_test.go`: las instrucciones de los nueve perfiles miden menos de 4 000 caracteres y piden `get_profile` antes que `.pmt/entorno.md`; ninguna sin perfil ni con token de agente; `HandleActor` con y sin perfil.
 - `internal/features/profiles/catalog/catalog_test.go`: los nueve perfiles cargan, el texto servido no deja `{{…}}` ni tramos sin resolver, no nombra scripts del kit, menciona `.pmt/entorno.md`, y lo común abre pidiendo leerlo.
-- `internal/features/auth/feature_test.go`: el recorrido de login, tokens, invitación, desactivación y cambio de contraseña por HTTP, sobre el repositorio en memoria de `auth/authtest`.
+- `internal/features/auth/feature_test.go`: el recorrido de login, tokens, invitación, desactivación y cambio de contraseña por HTTP, sobre el repositorio en memoria de `auth/authtest`. `clilogin_test.go`: el login del CLI autorizado, cancelado, caducado, autorizado sin sondear a tiempo, uso único, tope de pendientes, perfil declarado, usuario desactivado y entradas inválidas; `domain/clilogin_test.go`, el código y los estados.
+- `internal/cli/cli_test.go`: credenciales con permisos 600 y 700, servidor por omisión, alternativo e inválido, cada respuesta del sondeo, reintento por red, navegador que no abre, logout y whoami con token revocado o sin conexión. `internal/platform/downloads`: con y sin binarios, nombres no permitidos y binarios compilados después de arrancar.
 - Las pruebas de adaptadores REST y MCP de otras features actúan como usuario con `asUser` (`usuario_test.go`) o `platformmcp.ActAs`.
 
 ```bash

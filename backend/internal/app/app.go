@@ -30,6 +30,7 @@ import (
 	"pmt/internal/features/workflow"
 	"pmt/internal/kernel"
 	"pmt/internal/platform/config"
+	"pmt/internal/platform/downloads"
 	"pmt/internal/platform/events"
 	"pmt/internal/platform/health"
 	"pmt/internal/platform/mcp"
@@ -86,7 +87,8 @@ func Run(cfg config.Config) error {
 	registerFeatures(mux, tools, pool)
 	api := protect(mux, tools, members)
 
-	frontend := web.Handler(cfg.Frontend.Dist)
+	// El CLI pmt (/install.sh y /descargas) y el frontend no piden credenciales.
+	frontend := downloads.Mount(cfg.CLI.Dist, cfg.App.PublicURL, web.Handler(cfg.Frontend.Dist))
 	authenticator := credentials{users: users, agents: agents.NewAuthenticator(pool), owner: users}
 	serveErr := rest.Serve(ctx, cfg.Server.Addr, routes(api, tools, authenticator, pool, frontend))
 	stop() // si Serve falló antes de la señal, el listener termina con ctx

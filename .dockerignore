@@ -11,3 +11,4 @@ frontend/playwright-report
 frontend/.harness
 backend/bin
 backend/config/config.dev.yaml
+dist

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,6 +14,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"pmt/internal/kernel"
+	"pmt/internal/platform/downloads"
 	"pmt/internal/platform/mcp"
 	"pmt/internal/platform/rest"
 	"pmt/internal/platform/web"
@@ -98,6 +101,9 @@ func rutasConActor() http.Handler {
 	api.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("login")) })
 	api.HandleFunc("GET /api/invitations/{token}", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("invitación")) })
 	api.HandleFunc("GET /api/invitations", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("lista")) })
+	for _, pattern := range []string{"POST /api/cli/login", "POST /api/cli/login/poll", "GET /api/cli/login/{code}", "POST /api/cli/login/{code}/authorize", "POST /api/cli/login/{code}/cancel"} {
+		api.HandleFunc(pattern, func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("cli")) })
+	}
 	tools := mcp.NewServer()
 	sdk.AddTool(tools, &sdk.Tool{Name: "whoami"}, func(_ context.Context, req *sdk.CallToolRequest, _ struct{}) (*sdk.CallToolResult, whoamiOutput, error) {
 		actor := mcp.ActorFrom(req)
@@ -200,6 +206,12 @@ func TestRoutesPublicasDeAuth(t *testing.T) {
 		{http.MethodGet, "/api/invitations/abc", http.StatusOK},
 		{http.MethodGet, "/api/invitations", http.StatusUnauthorized},
 		{http.MethodGet, "/api/auth/login", http.StatusUnauthorized},
+		{http.MethodPost, "/api/cli/login", http.StatusOK},
+		{http.MethodPost, "/api/cli/login/poll", http.StatusOK},
+		{http.MethodGet, "/api/cli/login/ABCD-1234", http.StatusUnauthorized},
+		{http.MethodPost, "/api/cli/login/ABCD-1234/authorize", http.StatusUnauthorized},
+		{http.MethodPost, "/api/cli/login/ABCD-1234/cancel", http.StatusUnauthorized},
+		{http.MethodGet, "/api/cli/login/poll", http.StatusUnauthorized},
 	} {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
@@ -320,6 +332,37 @@ func TestRoutesSinCompiladoLaAPIYLaSaludSiguen(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
 		req.Header.Set("Authorization", "Bearer pmt_ana")
 		handler.ServeHTTP(rec, req)
+		if rec.Code != tc.code || !strings.Contains(rec.Body.String(), tc.body) {
+			t.Errorf("%s: status = %d, cuerpo = %q", tc.path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// TestRoutesDescargasDelCLISinCredenciales: /install.sh y /descargas son
+// públicos y no tapan la API ni el MCP.
+func TestRoutesDescargasDelCLISinCredenciales(t *testing.T) {
+	dist := t.TempDir()
+	for name, body := range map[string]string{"pmt-linux-amd64": "binario", downloads.Sums: "x  pmt-linux-amd64\n"} {
+		if err := os.WriteFile(filepath.Join(dist, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler := routes(http.NewServeMux(), mcp.NewServer(), rejectAll{}, pingOK{}, downloads.Mount(dist, "https://pmt.example.com", frontendDePrueba()))
+	for _, tc := range []struct {
+		path string
+		code int
+		body string
+	}{
+		{"/install.sh", http.StatusOK, `SERVIDOR="https://pmt.example.com"`},
+		{"/descargas/pmt-linux-amd64", http.StatusOK, "binario"},
+		{"/descargas/SHA256SUMS", http.StatusOK, "pmt-linux-amd64"},
+		{"/descargas/pmt-darwin-arm64", http.StatusNotFound, "no tiene los binarios"},
+		{"/cli", http.StatusOK, "index de prueba"},
+		{"/api/projects", http.StatusUnauthorized, ""},
+		{"/mcp", http.StatusUnauthorized, ""},
+	} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
 		if rec.Code != tc.code || !strings.Contains(rec.Body.String(), tc.body) {
 			t.Errorf("%s: status = %d, cuerpo = %q", tc.path, rec.Code, rec.Body.String())
 		}

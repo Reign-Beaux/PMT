@@ -64,10 +64,26 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 ### Fase 4. CLI `pmt`
 - Instalación con `curl -fsSL https://pmt.saulantonio.com/install.sh | sh`, para Linux y macOS, x86 y arm.
 - `pmt login`: abre el navegador, el compañero entra y el token queda en su `~/.config/pmt/`.
-- `pmt pp`, en la carpeta del proyecto: la primera vez pregunta lo mínimo (proyecto de PMT, herramienta y modelo) y lo guarda en el proyecto, fuera de git. Luego lanza Claude, Codex o Qwen en herdr con el MCP de `pmt.saulantonio.com`, su token y el perfil PP.
+- `pmt pp`, en la carpeta del proyecto: la primera vez pregunta lo mínimo (proyecto de PMT, herramienta y modelo) y lo guarda en el proyecto, fuera de git. Luego lanza Claude o Codex en herdr con el MCP de `pmt.saulantonio.com`, su token y el perfil PP.
 - `pmt equipo` levanta los demás perfiles en herdr. `pmt avisar`, `pmt levantar`, `pmt reiniciar` y `pmt vigia` sustituyen a los scripts del kit.
-- `pmt pp` y `pmt equipo` pasan el perfil completo (de `GET /api/profiles/{perfil}`) al lanzar a Claude, Codex o Qwen, como hoy hace el kit; las instrucciones del MCP y `get_profile` son el respaldo.
+- `pmt pp` y `pmt equipo` pasan el perfil completo (de `GET /api/profiles/{perfil}`) al lanzar a Claude o Codex, como hoy hace el kit; las instrucciones del MCP y `get_profile` son el respaldo.
 - La configuración local del proyecto (cadena de su base, puertos) la genera `pmt` y queda en el proyecto del compañero, fuera de git.
+
+**Decisiones acordadas con el usuario** (22 de noviembre de 2026):
+
+1. **Lenguaje y lugar:** Go, en este repo, `backend/cmd/pmt` (mismo módulo). Un binario sin dependencias para Linux y macOS, amd64 y arm64.
+2. **Instalación:** `pmt-server` sirve `/install.sh` y los binarios. `curl -fsSL https://pmt.saulantonio.com/install.sh | sh` instala en `~/.local/bin/pmt`.
+3. **`pmt login`:** flujo con código por navegador (como `gh auth login`); crea un token de API del usuario con el nombre de la máquina.
+4. **Configuración del proyecto:** `.pmt/` en la raíz del proyecto, fuera de git: `config.yaml` (proyecto de PMT, herramienta y modelo por perfil, puertos, comando de consulta de la base, workspace de herdr) y `entorno.md` generado.
+5. **`pmt pp`** la primera vez pregunta solo proyecto de PMT (owner o editor, o «nuevo, lo crea PP»), herramienta y modelo. Ruta, puertos y base los pregunta `pmt equipo`.
+6. **Herramientas:** solo **Claude y Codex**. Qwen y mcode (MiniMax) quedan fuera.
+7. **`pmt equipo`:** levanta los otros ocho perfiles en herdr con el token del usuario y `?profile=`. Propone Opus para DP, TL y CR, y Codex `gpt-6.1-terra` para PC, devs, QAP y QA.
+8. **Comandos del equipo:** `pmt avisar`, `pmt levantar`, `pmt reiniciar`, `pmt vigia`, que `entorno.md` lista.
+9. **MCP extra** por perfil (por ejemplo DBP para PP y TL), con su token en `~/.config/pmt/`.
+10. **Tokens de agente y `pmt-server agent`:** se retiran en la fase 6.
+11. **Partes:** 4a (binario, instalación, login), 4b (`pp`, `config.yaml`, `entorno.md`), 4c (`equipo` y comandos del equipo).
+
+**4a, hecha:** `pmt login`, `logout`, `whoami` y `version`; login por navegador con `/api/cli/login` y la pantalla `/cli`; `pmt-server` sirve `/install.sh` y `/descargas/` desde `cli.dist`; la imagen lleva los cuatro binarios ([arquitectura.md](arquitectura.md#cli-pmt), [operacion.md](operacion.md#cli-pmt)).
 
 ### Fase 5. Despliegue en la Raspberry Pi 5
 - Imagen arm64 con el `Dockerfile` actual.

@@ -3,3 +3,5 @@
 /.qwen/
 
 /backend/config/config.dev.yaml
+
+/dist/

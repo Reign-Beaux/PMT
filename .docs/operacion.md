@@ -10,6 +10,7 @@ Cómo se corre PMT en esta máquina. Los comandos de Go se ejecutan desde `backe
 | `pmt-server` | `backend/bin/pmt-server`, en `127.0.0.1:8080`, con su log en `backend/bin/pmt-server.log` |
 | Configuración | `backend/config/config.dev.yaml`, fuera de git ([arquitectura.md](arquitectura.md#configuración)) |
 | Frontend | `frontend/dist`, servido por `pmt-server` |
+| Binarios del CLI `pmt` | `dist/cli/` en la raíz del repo, fuera de git, servidos por `pmt-server` en `/install.sh` y `/descargas/` |
 | Tokens | De agente: `~/.config/pmt/tokens/<agente>`, permiso 600. De usuario: se crean en la pantalla Cuenta |
 | Respaldos viejos | `~/Respaldos/pmt/` (`pg_dump` de octubre y noviembre de 2026) |
 | Base de pruebas del frontend | `pmt_frontend_test`, en el mismo contenedor |
@@ -38,9 +39,9 @@ mv bin/pmt-server.nuevo bin/pmt-server
 setsid nohup ./bin/pmt-server >> bin/pmt-server.log 2>&1 < /dev/null &
 ```
 
-Si hubo cambios en el frontend, primero `cd frontend && pnpm build`. Si el binario nuevo trae migraciones, respalda antes la base (ver Migraciones): las aplica al arrancar.
+Si hubo cambios en el frontend, primero `cd frontend && pnpm build`. Si hubo cambios en el CLI, recompila sus binarios (ver [CLI pmt](#cli-pmt)); eso no pide reiniciar. Si el binario nuevo trae migraciones, respalda antes la base (ver Migraciones): las aplica al arrancar.
 
-La imagen de contenedor se construye desde la raíz con `docker build -t pmt .` y se corre con `DATABASE_CONNECTION_STRING` en el entorno.
+La imagen de contenedor se construye desde la raíz con `docker build -t pmt --build-arg PMT_VERSION=$(git describe --tags --always) .` y se corre con `DATABASE_CONNECTION_STRING` en el entorno. Ya trae los binarios del CLI en `/app/cli`. Si `docker build` falla con `DeadlineExceeded` al leer los metadatos de las imágenes, es el gestor de credenciales de Docker (`gpg`): se puede construir con `DOCKER_CONFIG` apuntando a una carpeta con `{"currentContext":"default"}`, que baja las imágenes públicas sin credenciales.
 
 ## Migraciones
 
@@ -138,6 +139,32 @@ curl -X POST http://127.0.0.1:8080/api/stages/<id>/release \
 ```
 
 El status no cambia y queda sin tomar: escribir en ella no la toma. La toma de nuevo quien la inicie con `start_stage`, la pase otra vez a `in_dev` (reanudar o reabrir) o, en un bug, quien lo pase a `in_dev`.
+
+## CLI pmt
+
+`pmt` inicia sesión en PMT desde la terminal y guarda el token del usuario en `~/.config/pmt/credenciales.yaml` ([arquitectura.md](arquitectura.md#cli-pmt)). Por ahora tiene `login`, `logout`, `whoami` y `version`; `pp` y `equipo` vienen en las fases 4b y 4c del [plan](plan_produccion.md).
+
+**Compilar los binarios** (Linux y macOS, amd64 y arm64, con `SHA256SUMS`), desde `backend/`:
+
+```bash
+scripts/build-cli.sh                 # en ../dist/cli, con la versión de git describe
+scripts/build-cli.sh /otra/carpeta v1.2.0
+```
+
+`config.dev.yaml` tiene `cli.dist: ../../dist/cli`, así que el 8080 los sirve en cuanto existen, sin reiniciar. En la imagen ya vienen compilados.
+
+**Cómo instala un compañero** (Linux o macOS, sin `sudo`):
+
+```bash
+curl -fsSL https://pmt.saulantonio.com/install.sh | sh   # deja pmt en ~/.local/bin
+pmt login                                                # abre el navegador; entra y pulsa «Autorizar»
+pmt whoami
+```
+
+- `install.sh` verifica la suma SHA-256 y avisa si `~/.local/bin` no está en el `PATH`. Para actualizar, se corre otra vez.
+- `pmt login` muestra un código y abre `https://pmt.saulantonio.com/cli?codigo=…`. Sin navegador (por SSH, o con `--sin-navegador`), se abre esa URL en cualquier equipo con sesión en PMT. El código vence en 10 minutos.
+- Al autorizar se crea un token llamado `pmt <máquina>`, que aparece en `/cuenta` y se puede revocar ahí. `pmt logout` lo revoca y borra el archivo.
+- Contra otro servidor: `pmt login --servidor http://127.0.0.1:8080`. Queda guardado.
 
 ## Agentes y tokens
 

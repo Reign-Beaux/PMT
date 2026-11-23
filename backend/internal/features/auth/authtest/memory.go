@@ -45,6 +45,7 @@ type Repo struct {
 	sessions    []session
 	tokens      []*token
 	invitations []*invitation
+	cliLogins   []*cliLogin
 }
 
 // New crea un repositorio vacío.
@@ -351,3 +352,115 @@ type Agents map[string]bool
 
 // Exists indica si el nombre es de un agente.
 func (a Agents) Exists(_ context.Context, name string) (bool, error) { return a[name], nil }
+
+type cliLogin struct {
+	domain.CLILogin
+	pollHash []byte
+	userID   uuid.UUID
+}
+
+// CLILogins devuelve los inicios de sesión del CLI guardados.
+func (r *Repo) CLILogins() []domain.CLILogin {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := []domain.CLILogin{}
+	for _, l := range r.cliLogins {
+		out = append(out, l.CLILogin)
+	}
+	return out
+}
+
+// ExpireCLILogins vence todos los códigos, como si pasaran diez minutos.
+func (r *Repo) ExpireCLILogins() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, l := range r.cliLogins {
+		l.ExpiresAt = time.Now().Add(-time.Second)
+	}
+}
+
+func (r *Repo) StartCLILogin(_ context.Context, login domain.NewCLILogin, maxPending int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	now := time.Now()
+	kept := r.cliLogins[:0]
+	pending := 0
+	for _, l := range r.cliLogins {
+		if !l.ExpiresAt.After(now) {
+			continue
+		}
+		if l.Code == login.Code {
+			return domain.ErrCLICodeTaken
+		}
+		if l.State == domain.CLIStatePending {
+			pending++
+		}
+		kept = append(kept, l)
+	}
+	r.cliLogins = kept
+	if pending >= maxPending {
+		return domain.ErrTooManyCLILogins
+	}
+	r.cliLogins = append(r.cliLogins, &cliLogin{
+		CLILogin: domain.CLILogin{ID: login.ID, Code: login.Code, Machine: login.Machine, State: domain.CLIStatePending, ExpiresAt: login.ExpiresAt},
+		pollHash: login.PollHash,
+	})
+	return nil
+}
+
+func (r *Repo) CLILoginByCode(_ context.Context, code string) (domain.CLILogin, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, l := range r.cliLogins {
+		if l.Code == code {
+			return l.CLILogin, nil
+		}
+	}
+	return domain.CLILogin{}, domain.ErrCLILoginNotFound
+}
+
+func (r *Repo) decideCLILogin(code, state string, userID uuid.UUID) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, l := range r.cliLogins {
+		if l.Code == code && l.State == domain.CLIStatePending && l.ExpiresAt.After(time.Now()) {
+			l.State, l.userID = state, userID
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Repo) AuthorizeCLILogin(_ context.Context, code string, userID uuid.UUID) (bool, error) {
+	return r.decideCLILogin(code, domain.CLIStateAuthorized, userID), nil
+}
+
+func (r *Repo) CancelCLILogin(_ context.Context, code string) (bool, error) {
+	return r.decideCLILogin(code, domain.CLIStateCancelled, uuid.Nil), nil
+}
+
+func (r *Repo) PollCLILogin(_ context.Context, pollHash []byte, tok domain.IssuedToken, now time.Time) (domain.CLIPoll, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, l := range r.cliLogins {
+		if !bytes.Equal(l.pollHash, pollHash) {
+			continue
+		}
+		poll := domain.CLIPoll{Status: domain.CLILoginStatus(l.State, l.ExpiresAt, now)}
+		if poll.Status != domain.CLIStatusAuthorized {
+			return poll, nil
+		}
+		u := r.find(func(u *user) bool { return u.ID == l.userID })
+		if u == nil {
+			return domain.CLIPoll{}, domain.ErrUserNotFound
+		}
+		if u.Disabled {
+			return domain.CLIPoll{Status: domain.CLIStatusCancelled}, nil
+		}
+		r.tokens = append(r.tokens, &token{APIToken: domain.APIToken{ID: tok.ID, Name: domain.CLITokenName(l.Machine), CreatedAt: now}, userID: u.ID, hash: domain.HashToken(tok.Token)})
+		l.State = domain.CLIStateConsumed
+		poll.UserID, poll.Username, poll.TokenID = u.ID, u.Username, tok.ID
+		return poll, nil
+	}
+	return domain.CLIPoll{}, domain.ErrCLILoginNotFound
+}

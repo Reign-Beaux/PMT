@@ -121,3 +121,39 @@ WHERE id = $1;
 INSERT INTO users (id, email, username, name, password_hash, is_instance_owner)
 VALUES ($1, $2, $3, $4, $5, false)
 RETURNING *;
+
+-- name: DeleteExpiredCLILogins :exec
+DELETE FROM cli_logins
+WHERE expires_at <= now();
+
+-- name: CountPendingCLILogins :one
+SELECT count(*) FROM cli_logins
+WHERE status = 'pending' AND expires_at > now();
+
+-- name: CreateCLILogin :exec
+INSERT INTO cli_logins (id, code, poll_hash, machine, expires_at)
+VALUES ($1, $2, $3, $4, $5);
+
+-- name: GetCLILoginByCode :one
+SELECT id, code, machine, status, expires_at FROM cli_logins
+WHERE code = $1;
+
+-- name: AuthorizeCLILogin :execrows
+UPDATE cli_logins
+SET status = 'authorized', user_id = $2, decided_at = now()
+WHERE code = $1 AND status = 'pending' AND expires_at > now();
+
+-- name: CancelCLILogin :execrows
+UPDATE cli_logins
+SET status = 'cancelled', decided_at = now()
+WHERE code = $1 AND status = 'pending' AND expires_at > now();
+
+-- name: LockCLILoginByPollHash :one
+SELECT id, machine, status, user_id, expires_at FROM cli_logins
+WHERE poll_hash = $1
+FOR UPDATE;
+
+-- name: ConsumeCLILogin :exec
+UPDATE cli_logins
+SET status = 'consumed', token_id = $2
+WHERE id = $1;

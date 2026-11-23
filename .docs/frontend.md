@@ -1,6 +1,6 @@
 # Frontend
 
-Interfaz web para que el usuario siga los proyectos. **Sobre el trabajo de los proyectos solo consulta:** etapas, tareas y bugs los cambian los agentes por MCP. Las únicas escrituras son las de la cuenta (login, invitaciones, tokens, contraseña y usuarios) y, solo para el owner de un proyecto, administrar sus miembros y liberar etapas o bugs tomados. Van con la cookie y sin perfil declarado (perfil `User`); los errores del backend se muestran con su mensaje. En producción la sirve `pmt-server` en `http://127.0.0.1:8080`, y se actualiza sola en tiempo real.
+Interfaz web para que el usuario siga los proyectos. **Sobre el trabajo de los proyectos solo consulta:** etapas, tareas y bugs los cambian los agentes por MCP. Las únicas escrituras son las de la cuenta (login, invitaciones, tokens, contraseña, usuarios y autorizar el CLI `pmt`) y, solo para el owner de un proyecto, administrar sus miembros y liberar etapas o bugs tomados. Van con la cookie y sin perfil declarado (perfil `User`); los errores del backend se muestran con su mensaje. En producción la sirve `pmt-server` en `http://127.0.0.1:8080`, y se actualiza sola en tiempo real.
 
 Sin sesión, toda ruta lleva a `/login` y vuelve a la pedida al entrar. La sesión es la cookie `pmt_session` del backend; el frontend no guarda credenciales. Si la API responde 401 a media sesión, vuelve a `/login`.
 
@@ -19,6 +19,7 @@ Sin sesión, toda ruta lleva a `/login` y vuelve a la pedida al entrar. La sesi�
 | --- | --- |
 | `/login` | Correo y contraseña. Avisa si el usuario está desactivado |
 | `/invitacion/:token` | Aceptar una invitación: nombre, `username` (no cambia) y contraseña. Abre la sesión al crear la cuenta |
+| `/cli?codigo=ABCD-1234` | Autorizar el inicio de sesión del CLI `pmt` ([arquitectura.md](arquitectura.md#cli-pmt)): el código en grande para compararlo con la terminal, la máquina y el nombre del token que se crea, con «Autorizar» y «Cancelar». Sin sesión pasa por `/login` y vuelve con el código. Después dice «Listo», «Inicio de sesión cancelado» o «El código caducó»; un código que no existe o falta, «Código no encontrado». Va dentro de `RequireAuth` pero fuera del marco de la app, con la tarjeta de login |
 | `/cuenta` | Mis tokens de API (crear, ver el token una sola vez, revocar), cambiar la contraseña y cerrar sesión. El dueño ve además Invitaciones (crear y copiar el enlace, lista con estado) y Usuarios (desactivar y reactivar) |
 | `/` | Redirige a `/projects` |
 | `/dashboard` | Indicadores calculados de proyectos, etapas, tareas y bugs |
@@ -39,7 +40,7 @@ El avance de una etapa excluye las tareas canceladas. Los textos se muestran com
 ```text
 frontend/
 ├── src/
-│   ├── api/          clientes por recurso sobre GET, POST, PUT y DELETE con timeout y validación; auth.ts para la cuenta, members.ts para los miembros
+│   ├── api/          clientes por recurso sobre GET, POST, PUT y DELETE con timeout y validación; auth.ts para la cuenta, members.ts para los miembros, cli.ts para autorizar el CLI
 │   ├── realtime/     conexión WebSocket única y refresco por evento
 │   ├── routes/       rutas y selección del detalle por URL
 │   ├── shell/        marco de la app, migas, layout del proyecto, RequireAuth y la tarjeta de login

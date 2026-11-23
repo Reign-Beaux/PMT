@@ -57,6 +57,19 @@ type BugStatusChange struct {
 	ChangedAt    time.Time
 }
 
+type CliLogin struct {
+	ID        uuid.UUID
+	Code      string
+	PollHash  []byte
+	Machine   string
+	Status    string
+	UserID    pgtype.UUID
+	TokenID   pgtype.UUID
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	DecidedAt pgtype.Timestamptz
+}
+
 type Comment struct {
 	ID           uuid.UUID
 	ItemKind     string

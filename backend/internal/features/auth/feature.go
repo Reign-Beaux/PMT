@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	"pmt/internal/features/auth/commands/acceptinvitation"
+	"pmt/internal/features/auth/commands/authorizeclilogin"
+	"pmt/internal/features/auth/commands/cancelclilogin"
 	"pmt/internal/features/auth/commands/changepassword"
 	"pmt/internal/features/auth/commands/createinvitation"
 	"pmt/internal/features/auth/commands/createtoken"
@@ -18,10 +20,13 @@ import (
 	"pmt/internal/features/auth/commands/enableuser"
 	"pmt/internal/features/auth/commands/login"
 	"pmt/internal/features/auth/commands/logout"
+	"pmt/internal/features/auth/commands/pollclilogin"
 	"pmt/internal/features/auth/commands/revoketoken"
 	"pmt/internal/features/auth/commands/seedowner"
+	"pmt/internal/features/auth/commands/startclilogin"
 	"pmt/internal/features/auth/domain"
 	"pmt/internal/features/auth/queries/authenticate"
+	"pmt/internal/features/auth/queries/getclilogin"
 	"pmt/internal/features/auth/queries/getinvitation"
 	"pmt/internal/features/auth/queries/instanceowner"
 	"pmt/internal/features/auth/queries/listinvitations"
@@ -52,12 +57,17 @@ type Repository interface {
 	changepassword.Repository
 	disableuser.Repository
 	enableuser.Repository
+	startclilogin.Repository
+	pollclilogin.Repository
+	authorizeclilogin.Repository
+	cancelclilogin.Repository
 	authenticate.Reader
 	getinvitation.Reader
 	listtokens.Reader
 	listinvitations.Reader
 	listusers.Reader
 	instanceowner.Reader
+	getclilogin.Reader
 }
 
 // Feature reúne las slices de la feature.
@@ -96,6 +106,11 @@ func (f *Feature) Register(mux *http.ServeMux) {
 	listusers.New(f.repo).Register(mux)
 	disableuser.New(f.repo).Register(mux)
 	enableuser.New(f.repo).Register(mux)
+	startclilogin.New(f.repo, f.settings.PublicURL).Register(mux)
+	pollclilogin.New(f.repo).Register(mux)
+	getclilogin.New(f.repo).Register(mux)
+	authorizeclilogin.New(f.repo).Register(mux)
+	cancelclilogin.New(f.repo).Register(mux)
 }
 
 // SeedOwner crea al dueño de la instancia si no hay usuarios.
@@ -196,10 +211,12 @@ func ref(user domain.User, err error) (kernel.UserRef, bool, error) {
 }
 
 // IsPublic indica si la petición va a una ruta de la feature que no pide sesión:
-// login, logout, y consultar o aceptar una invitación.
+// login, logout, consultar o aceptar una invitación, y pedir o sondear el código
+// del CLI pmt.
 func IsPublic(r *http.Request) bool {
 	path := r.URL.Path
-	if r.Method == http.MethodPost && (path == "/api/auth/login" || path == "/api/auth/logout") {
+	if r.Method == http.MethodPost && (path == "/api/auth/login" || path == "/api/auth/logout" ||
+		path == "/api/cli/login" || path == "/api/cli/login/poll") {
 		return true
 	}
 	rest, ok := strings.CutPrefix(path, "/api/invitations/")

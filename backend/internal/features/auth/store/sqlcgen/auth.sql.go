@@ -13,6 +13,67 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const authorizeCLILogin = `-- name: AuthorizeCLILogin :execrows
+UPDATE cli_logins
+SET status = 'authorized', user_id = $2, decided_at = now()
+WHERE code = $1 AND status = 'pending' AND expires_at > now()
+`
+
+type AuthorizeCLILoginParams struct {
+	Code   string
+	UserID pgtype.UUID
+}
+
+func (q *Queries) AuthorizeCLILogin(ctx context.Context, arg AuthorizeCLILoginParams) (int64, error) {
+	result, err := q.db.Exec(ctx, authorizeCLILogin, arg.Code, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const cancelCLILogin = `-- name: CancelCLILogin :execrows
+UPDATE cli_logins
+SET status = 'cancelled', decided_at = now()
+WHERE code = $1 AND status = 'pending' AND expires_at > now()
+`
+
+func (q *Queries) CancelCLILogin(ctx context.Context, code string) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelCLILogin, code)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const consumeCLILogin = `-- name: ConsumeCLILogin :exec
+UPDATE cli_logins
+SET status = 'consumed', token_id = $2
+WHERE id = $1
+`
+
+type ConsumeCLILoginParams struct {
+	ID      uuid.UUID
+	TokenID pgtype.UUID
+}
+
+func (q *Queries) ConsumeCLILogin(ctx context.Context, arg ConsumeCLILoginParams) error {
+	_, err := q.db.Exec(ctx, consumeCLILogin, arg.ID, arg.TokenID)
+	return err
+}
+
+const countPendingCLILogins = `-- name: CountPendingCLILogins :one
+SELECT count(*) FROM cli_logins
+WHERE status = 'pending' AND expires_at > now()
+`
+
+func (q *Queries) CountPendingCLILogins(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingCLILogins)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAPIToken = `-- name: CreateAPIToken :one
 INSERT INTO api_tokens (id, user_id, name, token_hash)
 VALUES ($1, $2, $3, $4)
@@ -36,6 +97,30 @@ func (q *Queries) CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) 
 	var created_at time.Time
 	err := row.Scan(&created_at)
 	return created_at, err
+}
+
+const createCLILogin = `-- name: CreateCLILogin :exec
+INSERT INTO cli_logins (id, code, poll_hash, machine, expires_at)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateCLILoginParams struct {
+	ID        uuid.UUID
+	Code      string
+	PollHash  []byte
+	Machine   string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) CreateCLILogin(ctx context.Context, arg CreateCLILoginParams) error {
+	_, err := q.db.Exec(ctx, createCLILogin,
+		arg.ID,
+		arg.Code,
+		arg.PollHash,
+		arg.Machine,
+		arg.ExpiresAt,
+	)
+	return err
 }
 
 const createInvitation = `-- name: CreateInvitation :one
@@ -146,6 +231,16 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 	return err
 }
 
+const deleteExpiredCLILogins = `-- name: DeleteExpiredCLILogins :exec
+DELETE FROM cli_logins
+WHERE expires_at <= now()
+`
+
+func (q *Queries) DeleteExpiredCLILogins(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredCLILogins)
+	return err
+}
+
 const deleteOtherSessions = `-- name: DeleteOtherSessions :exec
 DELETE FROM sessions
 WHERE user_id = $1 AND id <> $2
@@ -225,6 +320,32 @@ func (q *Queries) EnableUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCLILoginByCode = `-- name: GetCLILoginByCode :one
+SELECT id, code, machine, status, expires_at FROM cli_logins
+WHERE code = $1
+`
+
+type GetCLILoginByCodeRow struct {
+	ID        uuid.UUID
+	Code      string
+	Machine   string
+	Status    string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) GetCLILoginByCode(ctx context.Context, code string) (GetCLILoginByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getCLILoginByCode, code)
+	var i GetCLILoginByCodeRow
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.Machine,
+		&i.Status,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -485,6 +606,33 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCLILoginByPollHash = `-- name: LockCLILoginByPollHash :one
+SELECT id, machine, status, user_id, expires_at FROM cli_logins
+WHERE poll_hash = $1
+FOR UPDATE
+`
+
+type LockCLILoginByPollHashRow struct {
+	ID        uuid.UUID
+	Machine   string
+	Status    string
+	UserID    pgtype.UUID
+	ExpiresAt time.Time
+}
+
+func (q *Queries) LockCLILoginByPollHash(ctx context.Context, pollHash []byte) (LockCLILoginByPollHashRow, error) {
+	row := q.db.QueryRow(ctx, lockCLILoginByPollHash, pollHash)
+	var i LockCLILoginByPollHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.Machine,
+		&i.Status,
+		&i.UserID,
+		&i.ExpiresAt,
+	)
+	return i, err
 }
 
 const lockInvitationByHash = `-- name: LockInvitationByHash :one

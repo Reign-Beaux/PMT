@@ -13,11 +13,14 @@ import { RequireAuth } from '../shell/RequireAuth'
 import { LoginView } from '../views/LoginView'
 import { InvitationView } from '../views/InvitationView'
 import { AccountView } from '../views/AccountView'
+import { CliLoginView } from '../views/CliLoginView'
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginView /> },
   { path: '/invitacion/:token', element: <InvitationView /> },
-  { element: <RequireAuth />, children: [{
+  { element: <RequireAuth />, children: [
+  { path: '/cli', element: <CliLoginView /> },
+  {
   element: <AppShell />,
   children: [
     { path: '/', element: <Navigate to="/projects" replace /> },
