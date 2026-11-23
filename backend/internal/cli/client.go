@@ -100,6 +100,36 @@ func (c client) do(ctx context.Context, method, path string, in, out any) error 
 	return nil
 }
 
+// getText pide un texto (Markdown) con GET.
+func (c client) getText(ctx context.Context, path string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.server+path, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "text/markdown, text/plain")
+	req.Header.Set("User-Agent", c.agent)
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("no se pudo conectar con %s: %w", c.server, unwrapURLError(err))
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", fmt.Errorf("leer respuesta de %s: %w", c.server, err)
+	}
+	if resp.StatusCode >= 300 {
+		var e struct {
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(raw, &e)
+		return "", &apiError{Status: resp.StatusCode, Message: e.Error}
+	}
+	return string(raw), nil
+}
+
 func unwrapURLError(err error) error {
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {

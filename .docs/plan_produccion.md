@@ -85,6 +85,8 @@ Acordado con el usuario el 21 de noviembre de 2026. Resuelve la deuda técnica "
 
 **4a, hecha:** `pmt login`, `logout`, `whoami` y `version`; login por navegador con `/api/cli/login` y la pantalla `/cli`; `pmt-server` sirve `/install.sh` y `/descargas/` desde `cli.dist`; la imagen lleva los cuatro binarios ([arquitectura.md](arquitectura.md#cli-pmt), [operacion.md](operacion.md#cli-pmt)).
 
+**4b, hecha:** `pmt pp` y `pmt pp --configurar`, `.pmt/config.yaml` y `.pmt/entorno.md` ([arquitectura.md](arquitectura.md#pmt-pp), [perfiles.md](perfiles.md#formato-de-pmtconfigyaml), [operacion.md](operacion.md#cli-pmt)). Sin cambios a las decisiones.
+
 ### Fase 5. Despliegue en la Raspberry Pi 5
 - Imagen arm64 con el `Dockerfile` actual.
 - `docker-compose.prod.yml` como el de DBP: PMT y PostgreSQL con su volumen, sin puertos expuestos, y Cloudflare Tunnel hacia `pmt.saulantonio.com`.

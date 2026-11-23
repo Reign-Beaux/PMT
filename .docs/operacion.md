@@ -142,7 +142,7 @@ El status no cambia y queda sin tomar: escribir en ella no la toma. La toma de n
 
 ## CLI pmt
 
-`pmt` inicia sesión en PMT desde la terminal y guarda el token del usuario en `~/.config/pmt/credenciales.yaml` ([arquitectura.md](arquitectura.md#cli-pmt)). Por ahora tiene `login`, `logout`, `whoami` y `version`; `pp` y `equipo` vienen en las fases 4b y 4c del [plan](plan_produccion.md).
+`pmt` inicia sesión en PMT desde la terminal y guarda el token del usuario en `~/.config/pmt/credenciales.yaml` ([arquitectura.md](arquitectura.md#cli-pmt)). Tiene `login`, `logout`, `whoami`, `version` y `pp`; `equipo` y los comandos del equipo vienen en la fase 4c del [plan](plan_produccion.md).
 
 **Compilar los binarios** (Linux y macOS, amd64 y arm64, con `SHA256SUMS`), desde `backend/`:
 
@@ -165,6 +165,22 @@ pmt whoami
 - `pmt login` muestra un código y abre `https://pmt.saulantonio.com/cli?codigo=…`. Sin navegador (por SSH, o con `--sin-navegador`), se abre esa URL en cualquier equipo con sesión en PMT. El código vence en 10 minutos.
 - Al autorizar se crea un token llamado `pmt <máquina>`, que aparece en `/cuenta` y se puede revocar ahí. `pmt logout` lo revoca y borra el archivo.
 - Contra otro servidor: `pmt login --servidor http://127.0.0.1:8080`. Queda guardado.
+
+**Cómo un compañero levanta a PP** (necesita herdr y `claude` o `codex` instalados, y haber hecho `pmt login`):
+
+```bash
+herdr                      # si no está dentro de herdr
+cd ~/ruta/al/proyecto
+pmt pp                     # la primera vez pregunta proyecto de PMT, herramienta, modelo y effort
+pmt pp --configurar        # vuelve a preguntar, con lo actual por omisión
+```
+
+- La primera vez lista sus proyectos de PMT donde es owner o editor, más «Nuevo: lo crea PP». Propone el que se llame como la carpeta, o el nuevo. Herramienta `claude` (modelo `opus`) o `codex` (`gpt-6.1-terra`), effort `medium` o `high`. Lo guarda en `.pmt/config.yaml` y agrega `.pmt/` al `.gitignore` si el proyecto es un repo git.
+- Con «nuevo», en cada `pmt pp` siguiente busca proyectos de los que sea owner creados después; si encuentra, pregunta cuál es y lo guarda. No detiene el arranque.
+- Cada arranque regenera `.pmt/entorno.md`, descarga el perfil a `.pmt/perfiles/pp.md` (si el servidor no responde, usa la copia y avisa), y lanza a PP en la pestaña `pp` del workspace de herdr (por omisión, el nombre de la carpeta; lo crea si falta). Si PP ya corre ahí, no lo relanza: enfoca su pestaña.
+- La primera vez en una carpeta, Claude pregunta si se confía en ella; se responde una vez. Codex no pregunta: `pmt` la marca confiable en esa sesión.
+- Codex usa `~/.codex` salvo que `codex_home` de `.pmt/config.yaml` diga otra carpeta. En esta máquina se pone `codex_home: ~/.codex-flow`, porque `~/.codex` tiene un `pmt` de la v3.
+- MCP extra para PP (por ejemplo DBP): se guarda su token en un archivo dentro de `~/.config/pmt/` (permiso 600) y se declara en `.pmt/config.yaml` ([formato](perfiles.md#formato-de-pmtconfigyaml)).
 
 ## Agentes y tokens
 

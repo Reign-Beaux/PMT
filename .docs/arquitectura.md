@@ -38,7 +38,7 @@ backend/
 ├── scripts/build-cli.sh        compila `pmt` para los cuatro sistemas y escribe SHA256SUMS
 ├── internal/
 │   ├── app/                    armado de features, rutas, arranque y cierre
-│   ├── cli/                    subcomandos del CLI, credenciales y cliente HTTP
+│   ├── cli/                    subcomandos del CLI, credenciales, cliente HTTP, .pmt/ y herdr
 │   ├── kernel/                 Actor, Profile, errores de negocio
 │   ├── platform/
 │   │   ├── rest/               servidor HTTP, autenticación por cookie o Bearer, errores
@@ -182,7 +182,7 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 
 ## CLI pmt
 
-`pmt` es un binario aparte, en `cmd/pmt` sobre `internal/cli`, del mismo módulo. Usa `flag` de la biblioteca estándar: con cuatro subcomandos no hace falta una librería, y `cobra` solo está en el módulo como dependencia indirecta de `sqlc`.
+`pmt` es un binario aparte, en `cmd/pmt` sobre `internal/cli`, del mismo módulo. Usa `flag` de la biblioteca estándar: con pocos subcomandos no hace falta una librería, y `cobra` solo está en el módulo como dependencia indirecta de `sqlc`.
 
 | Comando | Qué hace |
 | --- | --- |
@@ -190,6 +190,7 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 | `pmt logout` | Revoca el token en el servidor (`DELETE /api/tokens/{id}` con el mismo token) y borra el archivo. Sin conexión no borra nada; con el token ya inválido, solo borra |
 | `pmt whoami` | Usuario y servidor, con `GET /api/auth/me` |
 | `pmt version` | Versión incrustada al compilar (`-X pmt/internal/cli.Version=…`), sistema y arquitectura |
+| `pmt pp [--configurar]` | Levanta a PP en herdr para el proyecto de la carpeta actual ([pmt pp](#pmt-pp)) |
 
 **Credenciales:** `~/.config/pmt/credenciales.yaml` con `servidor`, `username`, `token` y `token_id`, permiso 600, carpeta 700. Se escribe a un temporal y se renombra. No usa `~/.config/pmt/tokens/`, que es del kit. El token nunca se imprime.
 
@@ -207,6 +208,30 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 **Descargas.** `platform/downloads` sirve, sin credenciales, `GET /install.sh` (`internal/platform/downloads/install.sh`, incrustado, con `app.public_url` ya puesto) y `GET /descargas/{pmt-linux-amd64|pmt-linux-arm64|pmt-darwin-amd64|pmt-darwin-arm64|SHA256SUMS}` desde `cli.dist`. Cualquier otro nombre responde 404. La carpeta se revisa en cada petición, así que basta compilar los binarios sin reiniciar. Si `cli.dist` está vacío, no existe o no tiene `SHA256SUMS`, el servidor arranca igual con un aviso en el log: `/install.sh` responde un script que dice «este servidor no tiene los binarios del CLI» y sale con error, y `/descargas/` responde 404.
 
 `install.sh` es POSIX `sh`: detecta sistema (`uname -s`) y arquitectura (`uname -m`), descarga con `curl` o `wget`, verifica la suma con `sha256sum` o `shasum -a 256` contra `SHA256SUMS`, instala en `~/.local/bin/pmt` sin `sudo` y avisa si esa carpeta no está en el `PATH`. Si la suma no coincide no instala nada.
+
+### pmt pp
+
+Hace por PP lo que hacían `iniciar.sh` y `lanzar.sh` del kit, sin `.agentes.env`, sin tokens de agente y sin rutas de esta máquina. Archivos: `pp.go` (el flujo y las preguntas), `project.go` (`.pmt/config.yaml`, raíz y `.gitignore`), `entorno.go` (`.pmt/entorno.md`), `launch.go` (argumentos de Claude y Codex y `mcp-<perfil>.json`), `launcher.go` (el lanzador) y `herdr.go` (el comando `herdr`, detrás de una interfaz para las pruebas).
+
+1. **Requisitos:** `HERDR_ENV=1` (si no, dice cómo abrir herdr), credenciales de `pmt login` y la herramienta elegida en el `PATH`.
+2. **Configuración:** raíz = la carpeta actual o la más cercana hacia arriba con `.pmt/`. Sin `.pmt/config.yaml`, o con `--configurar`, pregunta proyecto (`GET /api/projects`, owner o editor, más «nuevo»), herramienta, modelo y effort ([formato](perfiles.md#formato-de-pmtconfigyaml)). Agrega `.pmt/` al `.gitignore` si hay repo git, sin duplicar. Si el proyecto es «nuevo», busca uno del usuario creado después y pregunta si es ese.
+3. **Entorno:** regenera `.pmt/entorno.md` ([formato](perfiles.md#formato-de-pmtentornomd)) y crea `.pmt/para-usuario.md`.
+4. **herdr:** busca el workspace de la config por etiqueta o ID y lo crea si falta (su primera pestaña pasa a llamarse `pp`). El agente se llama `pp`; si otro workspace ya tiene un agente con ese nombre, pone en la config el prefijo `<workspace>-`, como `HERDR_PREFIJO` del kit. Si en el workspace ya corre PP (un agente con su nombre, o la pestaña `pp` con algo en primer plano además del shell, tras esperar hasta 10 s a que un shell nuevo quede libre), no lo relanza y enfoca su pestaña.
+5. **Perfil:** `GET /api/profiles/pp` a `.pmt/perfiles/pp.md`. Si falla y hay copia, usa la copia y avisa; con 401 pide `pmt login`.
+6. **Lanzar:** en la pestaña `pp` (la crea si falta) corre con `herdr pane run` `pmt _lanzar pp <raíz>`. `_lanzar` es un subcomando interno que corre dentro del pane, como `lanzar.sh`: lee el token de las credenciales y los de MCP extra de `~/.config/pmt/`, los pone en el entorno (`PMT_TOKEN`, `MCP_TOKEN_<NOMBRE>`) y se reemplaza (`syscall.Exec`) por Claude o Codex. Luego `pmt pp` espera hasta un minuto a que herdr detecte al agente, lo nombra con `herdr agent rename` y enfoca la pestaña.
+
+**Por qué `pane run` y no `herdr agent start`:** `agent start` lanza el ejecutable canónico de la herramienta con sus argumentos y no tiene forma de pasar variables de entorno; el token tendría que ir en la línea de comandos. `tab create --env` sí las pasa, pero el token quedaría en los argumentos de `herdr` y en el estado de herdr, y no sirve con una pestaña que ya existe. Con `pane run` del lanzador, lo que se escribe en el pane (y queda en su historial) no lleva secretos, y como `_lanzar` hace `exec`, el proceso que herdr ve es `claude` o `codex`, que es como lo detecta.
+
+**El token nunca se escribe** en `.pmt/`, en argumentos (`ps`) ni en el pane: solo vive en el entorno del proceso del agente (y de lo que este lance).
+
+| | Claude | Codex |
+| --- | --- | --- |
+| Perfil | `--append-system-prompt-file .pmt/perfiles/pp.md` | `-c developer_instructions="<texto>"` |
+| MCP de PMT | `.pmt/mcp-pp.json` con `<servidor>/mcp?profile=pp` y `Authorization: Bearer ${PMT_TOKEN:-}`, más `--strict-mcp-config` | `-c mcp_servers.pmt.url=…?profile=pp` y `-c mcp_servers.pmt.bearer_token_env_var="PMT_TOKEN"` |
+| MCP extra | en el mismo JSON, con `${MCP_TOKEN_<NOMBRE>:-}` | `-c mcp_servers.<nombre>.url` y `bearer_token_env_var` |
+| Opciones | `--dangerously-skip-permissions --autocompact 400k --model <m> --effort <e>` | `-m <m>`, `model_reasoning_effort`, `allow_login_shell=false`, `notice.hide_rate_limit_model_nudge=true`, `projects={"<ruta>"={trust_level="trusted"}}`, `CODEX_HOME` de `codex_home` |
+
+Respecto a `lanzar.sh` se quitó `--settings '{"enabledPlugins":{"engram@engram":false}}'` de Claude (el plugin `engram` solo existe en esta máquina) y la ruta fija `~/.codex-flow` de Codex (pasa a `codex_home`). La confianza de Codex va como tabla en línea porque Codex 0.171 no toma la ruta entre comillas dentro de una clave con puntos (`projects."<ruta>".trust_level`), y preguntaba por la carpeta. Claude sí pregunta la primera vez por una carpeta nueva: `pmt` no escribe en `~/.claude.json`.
 
 ## Membresía
 
@@ -317,7 +342,7 @@ El `Dockerfile` de la raíz compila el frontend con pnpm, `./cmd/pmt-server` con
 - `internal/features/profiles/feature_test.go` y `queries/get/handler_test.go`: las instrucciones de los nueve perfiles miden menos de 4 000 caracteres y piden `get_profile` antes que `.pmt/entorno.md`; ninguna sin perfil ni con token de agente; `HandleActor` con y sin perfil.
 - `internal/features/profiles/catalog/catalog_test.go`: los nueve perfiles cargan, el texto servido no deja `{{…}}` ni tramos sin resolver, no nombra scripts del kit, menciona `.pmt/entorno.md`, y lo común abre pidiendo leerlo.
 - `internal/features/auth/feature_test.go`: el recorrido de login, tokens, invitación, desactivación y cambio de contraseña por HTTP, sobre el repositorio en memoria de `auth/authtest`. `clilogin_test.go`: el login del CLI autorizado, cancelado, caducado, autorizado sin sondear a tiempo, uso único, tope de pendientes, perfil declarado, usuario desactivado y entradas inválidas; `domain/clilogin_test.go`, el código y los estados.
-- `internal/cli/cli_test.go`: credenciales con permisos 600 y 700, servidor por omisión, alternativo e inválido, cada respuesta del sondeo, reintento por red, navegador que no abre, logout y whoami con token revocado o sin conexión. `internal/platform/downloads`: con y sin binarios, nombres no permitidos y binarios compilados después de arrancar.
+- `internal/cli/cli_test.go`: credenciales con permisos 600 y 700, servidor por omisión, alternativo e inválido, cada respuesta del sondeo, reintento por red, navegador que no abre, logout y whoami con token revocado o sin conexión. `internal/cli/pp_test.go`: raíz del proyecto, `config.yaml` de ida y vuelta, `.gitignore` sin duplicar, `entorno.md` con datos pendientes y completos, argumentos de Claude y Codex sin tokens, `mcp-pp.json`, MCP extra inválidos, detección de proyecto nuevo, y `pmt pp` con herdr y servidor falsos: primera vez, requisitos, PP que ya corre, proyecto nuevo adoptado, `--configurar`, perfil sin servidor con y sin copia, y prefijo por choque de nombre. `internal/platform/downloads`: con y sin binarios, nombres no permitidos y binarios compilados después de arrancar.
 - Las pruebas de adaptadores REST y MCP de otras features actúan como usuario con `asUser` (`usuario_test.go`) o `platformmcp.ActAs`.
 
 ```bash

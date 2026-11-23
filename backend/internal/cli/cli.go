@@ -1,7 +1,8 @@
-// Package cli es el CLI pmt: inicia sesión en un servidor PMT por el navegador y
-// guarda el token de API del usuario en ~/.config/pmt/credenciales.yaml.
+// Package cli es el CLI pmt: inicia sesión en un servidor PMT por el navegador,
+// guarda el token de API del usuario en ~/.config/pmt/credenciales.yaml y
+// levanta a PP en herdr para el proyecto de la carpeta actual (pmt pp).
 //
-// Usa flag de la biblioteca estándar: con cuatro subcomandos y una opción no
+// Usa flag de la biblioteca estándar: con pocos subcomandos y opciones no
 // hace falta una librería. cobra solo está en el módulo como dependencia
 // indirecta de sqlc y agrandaría el binario.
 package cli
@@ -15,8 +16,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -36,6 +39,18 @@ type App struct {
 	// Sleep espera entre sondeos; termina antes si ctx se cancela.
 	Sleep func(ctx context.Context, d time.Duration) error
 	Now   func() time.Time
+
+	// Para pmt pp y su lanzador.
+	Stdin      io.Reader
+	Getenv     func(string) string
+	Environ    func() []string
+	Getwd      func() (string, error)
+	LookPath   func(string) (string, error)
+	Executable func() (string, error)
+	// Exec reemplaza el proceso por el agente (syscall.Exec).
+	Exec func(bin string, argv, env []string) error
+	// Herdr da acceso a herdr; falla si no está instalado.
+	Herdr func() (herdr, error)
 }
 
 // New crea el CLI real: la carpeta personal del usuario, el navegador del sistema
@@ -54,6 +69,14 @@ func New() (*App, error) {
 		OpenBrowser: openBrowser,
 		Sleep:       sleep,
 		Now:         time.Now,
+		Stdin:       os.Stdin,
+		Getenv:      os.Getenv,
+		Environ:     os.Environ,
+		Getwd:       os.Getwd,
+		LookPath:    exec.LookPath,
+		Executable:  executable,
+		Exec:        syscall.Exec,
+		Herdr:       findHerdr,
 	}, nil
 }
 
@@ -64,6 +87,7 @@ Uso:
   pmt logout                                    revoca el token y cierra la sesión
   pmt whoami                                    muestra tu usuario y el servidor
   pmt version                                   muestra la versión
+  pmt pp [--configurar]                         levanta a PP en herdr para el proyecto de esta carpeta
 
 Por omisión el servidor es ` + DefaultServer + `; el que uses en login queda guardado.
 `
@@ -82,6 +106,10 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		err = noArgs(ctx, "logout", args[1:], a.logout)
 	case "whoami":
 		err = noArgs(ctx, "whoami", args[1:], a.whoami)
+	case "pp":
+		err = a.pp(ctx, args[1:])
+	case launcherCommand:
+		err = a.launch(ctx, args[1:])
 	case "version", "--version", "-v":
 		fmt.Fprintf(a.Stdout, "pmt %s (%s/%s)\n", Version, runtime.GOOS, runtime.GOARCH)
 	case "help", "--help", "-h", "ayuda":
@@ -322,4 +350,30 @@ func sleep(ctx context.Context, d time.Duration) error {
 	case <-t.C:
 		return nil
 	}
+}
+
+// executable es la ruta absoluta del binario, sin enlaces.
+func executable() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		return real, nil
+	}
+	return exe, nil
+}
+
+// findHerdr busca el comando herdr en el PATH o en ~/.local/bin.
+func findHerdr() (herdr, error) {
+	if bin, err := exec.LookPath("herdr"); err == nil {
+		return herdrCLI{bin: bin}, nil
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		bin := filepath.Join(home, ".local", "bin", "herdr")
+		if info, err := os.Stat(bin); err == nil && !info.IsDir() {
+			return herdrCLI{bin: bin}, nil
+		}
+	}
+	return nil, errHerdrMissing
 }
