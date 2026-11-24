@@ -259,6 +259,8 @@ func TestBuildLaunchCodex(t *testing.T) {
 		"-m\ngpt-6.1-terra",
 		`developer_instructions="# PP\nUsa \"comillas\".\n"`,
 		`model_reasoning_effort="high"`,
+		`approval_policy="never"`,
+		`sandbox_mode="danger-full-access"`,
 		"allow_login_shell=false",
 		"notice.hide_rate_limit_model_nudge=true",
 		`mcp_servers.pmt.url="https://pmt.ejemplo.com/mcp?profile=pp"`,
@@ -551,7 +553,9 @@ func newPPHarness(t *testing.T, srv *ppServer) *ppHarness {
 	if err := saveCredentials(h.app.Home, Credentials{Server: srv.srv.URL, Username: "ana", Token: tokenPrueba, TokenID: "id"}); err != nil {
 		t.Fatal(err)
 	}
-	h.app.Stdin = strings.NewReader("")
+	// Enter en las cuatro preguntas de la primera vez: proyecto, herramienta,
+	// modelo y effort. Sin respuestas, la pregunta corta (Ctrl+D).
+	h.app.Stdin = strings.NewReader("\n\n\n\n")
 	h.app.Getenv = func(k string) string { return h.env[k] }
 	h.app.Environ = func() []string { return []string{"PATH=/bin"} }
 	h.app.Getwd = func() (string, error) { return h.root, nil }
@@ -768,5 +772,114 @@ func TestPPPrefijoSiOtroEquipoTienePP(t *testing.T) {
 	entorno, _ := os.ReadFile(filepath.Join(h.root, pmtDir, "entorno.md"))
 	if !strings.Contains(string(entorno), "| demo-pp | ana | PP |") {
 		t.Fatalf("entorno:\n%s", entorno)
+	}
+}
+
+// --- config.toml de Codex con entradas stdio ---
+
+func codexLaunchWithToml(t *testing.T, toml string) (launchSpec, string, error) {
+	t.Helper()
+	home := t.TempDir()
+	writeDBPToken(t, home)
+	if toml != "" {
+		dir := filepath.Join(home, ".codex")
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(toml), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	spec, err := buildLaunch(launchInput{
+		Config: launchConfig("codex"), Root: "/p/demo", Profile: "pp", Server: "https://pmt.ejemplo.com",
+		Token: tokenPrueba, ProfileText: "# PP\n", Home: home,
+	})
+	return spec, home, err
+}
+
+func TestBuildLaunchCodexConfigToml(t *testing.T) {
+	const pmtStdio = "[mcp_servers.pmt]\ncommand = \"/opt/pmt-v3/mcp\"\nargs = [\"stdio\"]\n[mcp_servers.pmt.env]\nDB = \"x\"\n"
+	cases := []struct {
+		name     string
+		toml     string
+		want     []string
+		missing  []string
+		warnings int
+	}{
+		{
+			name:    "sin config.toml",
+			want:    []string{`mcp_servers.pmt.url="https://pmt.ejemplo.com/mcp?profile=pp"`, `mcp_servers.dbp.url=`},
+			missing: []string{"enabled=false", "_cli"},
+		},
+		{
+			name:    "pmt de tipo url",
+			toml:    "model = \"x\"\n[mcp_servers.pmt]\nurl = \"http://localhost:8080/mcp\"\n",
+			want:    []string{`mcp_servers.pmt.url="https://pmt.ejemplo.com/mcp?profile=pp"`},
+			missing: []string{"enabled=false", "_cli"},
+		},
+		{
+			name: "pmt stdio",
+			toml: pmtStdio,
+			want: []string{
+				"mcp_servers.pmt.enabled=false",
+				`mcp_servers.pmt_cli.url="https://pmt.ejemplo.com/mcp?profile=pp"`,
+				`mcp_servers.pmt_cli.bearer_token_env_var="PMT_TOKEN"`,
+				"el MCP de PMT se llama `pmt_cli`",
+				`mcp_servers.dbp.url="https://dbp.ejemplo.com/mcp"`,
+			},
+			missing:  []string{"mcp_servers.pmt.url=", "dbp.enabled", "dbp_cli"},
+			warnings: 1,
+		},
+		{
+			name: "extra que choca",
+			toml: "[mcp_servers.dbp]\ncommand = \"dbp-mcp\"\n[mcp_servers.otro]\ncommand = \"x\"\n",
+			want: []string{
+				`mcp_servers.pmt.url="https://pmt.ejemplo.com/mcp?profile=pp"`,
+				"mcp_servers.dbp.enabled=false",
+				`mcp_servers.dbp_cli.url="https://dbp.ejemplo.com/mcp"`,
+				`mcp_servers.dbp_cli.bearer_token_env_var="MCP_TOKEN_DBP"`,
+			},
+			missing:  []string{"mcp_servers.pmt.enabled", "pmt_cli", "mcp_servers.dbp.url=", "otro"},
+			warnings: 1,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			spec, home, err := codexLaunchWithToml(t, c.toml)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := strings.Join(spec.Args, "\n")
+			for _, w := range c.want {
+				if !strings.Contains(args, w) {
+					t.Fatalf("falta %q en:\n%s", w, args)
+				}
+			}
+			for _, m := range c.missing {
+				if strings.Contains(args, m) {
+					t.Fatalf("sobra %q en:\n%s", m, args)
+				}
+			}
+			assertNoSecrets(t, args)
+			if len(spec.Warnings) != c.warnings {
+				t.Fatalf("avisos = %q", spec.Warnings)
+			}
+			for _, w := range spec.Warnings {
+				if !strings.Contains(w, filepath.Join(home, ".codex", "config.toml")) || !strings.Contains(w, "codex_home") || strings.Contains(w, "\n") {
+					t.Fatalf("aviso = %q", w)
+				}
+				assertNoSecrets(t, w)
+			}
+		})
+	}
+}
+
+func TestBuildLaunchCodexTomlRoto(t *testing.T) {
+	_, home, err := codexLaunchWithToml(t, "[mcp_servers.pmt\ncommand = \n")
+	if err == nil {
+		t.Fatal("debía fallar")
+	}
+	if !strings.Contains(err.Error(), filepath.Join(home, ".codex", "config.toml")) {
+		t.Fatalf("el error no dice la ruta: %v", err)
 	}
 }

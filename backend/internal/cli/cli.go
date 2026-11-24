@@ -56,6 +56,9 @@ type App struct {
 	// Spawn arranca un proceso en segundo plano, desligado de la terminal, con
 	// sus errores en logPath (el vigía).
 	Spawn func(bin string, args []string, dir, logPath string) error
+
+	// codexNoticed recuerda los avisos de config.toml ya dados (archivo y MCP).
+	codexNoticed map[string]bool
 }
 
 // New crea el CLI real: la carpeta personal del usuario, el navegador del sistema
@@ -153,6 +156,15 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	if errors.As(err, &usageErr) {
 		fmt.Fprintf(a.Stderr, "pmt: %s\n", usageErr.msg)
 		return 2
+	}
+	if errors.Is(err, errInterrupted) {
+		// La terminal dejó «^C» tras la pregunta: el mensaje va en su propia línea.
+		fmt.Fprintf(a.Stderr, "\npmt: %s\n", err)
+		return 130
+	}
+	if errors.Is(err, errNoInput) {
+		fmt.Fprintf(a.Stderr, "\npmt: %s\n", err)
+		return 1
 	}
 	if err != nil {
 		fmt.Fprintf(a.Stderr, "pmt: %s\n", err)

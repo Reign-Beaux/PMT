@@ -56,6 +56,9 @@ func (a *App) launch(_ context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	for _, w := range spec.Warnings {
+		fmt.Fprintln(a.Stderr, w)
+	}
 	bin, err := a.LookPath(spec.Tool)
 	if err != nil {
 		return fmt.Errorf("no encuentro %s en el PATH", spec.Tool)

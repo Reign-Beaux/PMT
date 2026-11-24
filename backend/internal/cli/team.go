@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -102,7 +101,7 @@ func (a *App) equipo(ctx context.Context, args []string) error {
 	}
 	root := findRoot(cwd)
 	api := a.client(creds.Server, creds.Token)
-	in := bufio.NewReader(a.Stdin)
+	in := newPrompter(ctx, a.Stdin)
 
 	cfg, err := loadConfig(root)
 	switch {
@@ -148,7 +147,11 @@ func (a *App) equipo(ctx context.Context, args []string) error {
 		}
 	}
 	if cfg.Proyecto.ID == "" && cfg.Proyecto.NuevoDesde != nil {
-		if a.adoptNewProject(ctx, in, api, &cfg) {
+		found, err := a.adoptNewProject(ctx, in, api, &cfg)
+		if err != nil {
+			return err
+		}
+		if found {
 			if err := saveConfig(root, cfg); err != nil {
 				return err
 			}
@@ -239,7 +242,7 @@ func teamIncomplete(c Config) bool {
 
 // askTeam pregunta descripción, base, puertos y los ocho perfiles del equipo.
 // Con all pregunta todo con los valores actuales; si no, solo lo que falta.
-func (a *App) askTeam(ctx context.Context, in *bufio.Reader, api client, cfg Config, all bool) (Config, error) {
+func (a *App) askTeam(ctx context.Context, in *prompter, api client, cfg Config, all bool) (Config, error) {
 	var err error
 	if all || strings.TrimSpace(cfg.Proyecto.Descripcion) == "" {
 		def := cfg.Proyecto.Descripcion
@@ -311,7 +314,10 @@ func (a *App) askTeam(ctx context.Context, in *bufio.Reader, api client, cfg Con
 	if cfg.Perfiles == nil {
 		cfg.Perfiles = map[string]ProfileConfig{}
 	}
-	acceptAll := a.askYes(in, "¿Los dejo así?")
+	acceptAll, err := a.askYes(in, "¿Los dejo así?")
+	if err != nil {
+		return cfg, err
+	}
 	for _, p := range ask {
 		d := plan[p.Session]
 		if !acceptAll {
@@ -344,7 +350,7 @@ func (a *App) askTeam(ctx context.Context, in *bufio.Reader, api client, cfg Con
 
 // askRequired pregunta un texto obligatorio. Con secret no muestra el valor
 // actual: Enter lo conserva. check valida la respuesta.
-func (a *App) askRequired(in *bufio.Reader, label, def string, secret bool, check func(string) error) (string, error) {
+func (a *App) askRequired(in *prompter, label, def string, secret bool, check func(string) error) (string, error) {
 	for range 3 {
 		switch {
 		case def == "":
@@ -354,7 +360,10 @@ func (a *App) askRequired(in *bufio.Reader, label, def string, secret bool, chec
 		default:
 			fmt.Fprintf(a.Stdout, "%s [%s]: ", label, def)
 		}
-		v, more := readLine(in)
+		v, err := in.readLine()
+		if err != nil {
+			return "", err
+		}
 		if v == "" {
 			v = def
 		}
@@ -369,22 +378,22 @@ func (a *App) askRequired(in *bufio.Reader, label, def string, secret bool, chec
 		if v != "" {
 			return v, nil
 		}
-		if !more {
-			break
-		}
 	}
 	return "", fmt.Errorf("falta %s", strings.ToLower(strings.SplitN(label, " (", 2)[0]))
 }
 
 // askPort pregunta un puerto, con el actual o fallback por omisión.
-func (a *App) askPort(in *bufio.Reader, label string, current, fallback int) (int, error) {
+func (a *App) askPort(in *prompter, label string, current, fallback int) (int, error) {
 	def := current
 	if def <= 0 {
 		def = fallback
 	}
 	for range 3 {
 		fmt.Fprintf(a.Stdout, "%s [%d]: ", label, def)
-		v, more := readLine(in)
+		v, err := in.readLine()
+		if err != nil {
+			return 0, err
+		}
 		if v == "" {
 			return def, nil
 		}
@@ -392,9 +401,6 @@ func (a *App) askPort(in *bufio.Reader, label string, current, fallback int) (in
 			return n, nil
 		}
 		fmt.Fprintln(a.Stdout, "Escribe un puerto del 1 al 65535.")
-		if !more {
-			break
-		}
 	}
 	return 0, fmt.Errorf("puerto inválido para %s", strings.ToLower(label))
 }

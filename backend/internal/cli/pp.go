@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -58,7 +57,7 @@ func (a *App) pp(ctx context.Context, args []string) error {
 	}
 	root := findRoot(cwd)
 	api := a.client(creds.Server, creds.Token)
-	in := bufio.NewReader(a.Stdin)
+	in := newPrompter(ctx, a.Stdin)
 
 	cfg, err := loadConfig(root)
 	switch {
@@ -99,7 +98,11 @@ func (a *App) pp(ctx context.Context, args []string) error {
 	}
 
 	if cfg.Proyecto.ID == "" && cfg.Proyecto.NuevoDesde != nil {
-		if found := a.adoptNewProject(ctx, in, api, &cfg); found {
+		found, err := a.adoptNewProject(ctx, in, api, &cfg)
+		if err != nil {
+			return err
+		}
+		if found {
 			if err := saveConfig(root, cfg); err != nil {
 				return err
 			}
@@ -176,7 +179,7 @@ func defaultConfig(root string) Config {
 
 // askConfig pregunta proyecto, herramienta, modelo y effort de PP, con los
 // valores de cfg por omisión.
-func (a *App) askConfig(ctx context.Context, in *bufio.Reader, api client, cfg Config, root string) (Config, error) {
+func (a *App) askConfig(ctx context.Context, in *prompter, api client, cfg Config, root string) (Config, error) {
 	var projects []projectItem
 	if err := api.do(ctx, http.MethodGet, "/api/projects", nil, &projects); err != nil {
 		if isStatus(err, http.StatusUnauthorized) {
@@ -248,25 +251,25 @@ func orDefault(v, def string) string {
 	return v
 }
 
-// readLine lee una respuesta. Sin más entrada devuelve vacío: el valor por omisión.
-func readLine(in *bufio.Reader) (string, bool) {
-	line, err := in.ReadString('\n')
-	return strings.TrimSpace(line), err == nil || line != ""
-}
-
-func (a *App) askText(in *bufio.Reader, label, def string) (string, error) {
+func (a *App) askText(in *prompter, label, def string) (string, error) {
 	fmt.Fprintf(a.Stdout, "%s [%s]: ", label, def)
-	v, _ := readLine(in)
+	v, err := in.readLine()
+	if err != nil {
+		return "", err
+	}
 	if v == "" {
 		return def, nil
 	}
 	return v, nil
 }
 
-func (a *App) askChoice(in *bufio.Reader, label, def string, options []string) (string, error) {
+func (a *App) askChoice(in *prompter, label, def string, options []string) (string, error) {
 	for range 3 {
 		fmt.Fprintf(a.Stdout, "%s [%s]: ", label, def)
-		v, more := readLine(in)
+		v, err := in.readLine()
+		if err != nil {
+			return "", err
+		}
 		if v == "" {
 			return def, nil
 		}
@@ -276,17 +279,17 @@ func (a *App) askChoice(in *bufio.Reader, label, def string, options []string) (
 			}
 		}
 		fmt.Fprintf(a.Stdout, "Usa %s.\n", strings.Join(options, " o "))
-		if !more {
-			break
-		}
 	}
 	return "", fmt.Errorf("respuesta inválida para %s", strings.ToLower(label))
 }
 
-func (a *App) askNumber(in *bufio.Reader, label string, def, max int) (int, error) {
+func (a *App) askNumber(in *prompter, label string, def, max int) (int, error) {
 	for range 3 {
 		fmt.Fprintf(a.Stdout, "%s [%d]: ", label, def)
-		v, more := readLine(in)
+		v, err := in.readLine()
+		if err != nil {
+			return 0, err
+		}
 		if v == "" {
 			return def, nil
 		}
@@ -294,18 +297,18 @@ func (a *App) askNumber(in *bufio.Reader, label string, def, max int) (int, erro
 			return n, nil
 		}
 		fmt.Fprintf(a.Stdout, "Escribe un número del 1 al %d.\n", max)
-		if !more {
-			break
-		}
 	}
 	return 0, errors.New("respuesta inválida")
 }
 
-func (a *App) askYes(in *bufio.Reader, label string) bool {
+func (a *App) askYes(in *prompter, label string) (bool, error) {
 	fmt.Fprintf(a.Stdout, "%s [S/n]: ", label)
-	v, _ := readLine(in)
+	v, err := in.readLine()
+	if err != nil {
+		return false, err
+	}
 	v = strings.ToLower(v)
-	return v == "" || v == "s" || v == "si" || v == "sí" || v == "y" || v == "yes"
+	return v == "" || v == "s" || v == "si" || v == "sí" || v == "y" || v == "yes", nil
 }
 
 // newProjectCandidates son los proyectos de los que el usuario es owner,
@@ -321,20 +324,25 @@ func newProjectCandidates(projects []projectItem, since time.Time) []projectItem
 }
 
 // adoptNewProject busca el proyecto que PP debió crear y, si la persona lo
-// confirma, lo guarda en cfg. Nunca impide el arranque: si algo falla, avisa.
-func (a *App) adoptNewProject(ctx context.Context, in *bufio.Reader, api client, cfg *Config) bool {
+// confirma, lo guarda en cfg. Solo impide el arranque si la persona corta la
+// pregunta (Ctrl+C o Ctrl+D); si algo más falla, avisa.
+func (a *App) adoptNewProject(ctx context.Context, in *prompter, api client, cfg *Config) (bool, error) {
 	var projects []projectItem
 	if err := api.do(ctx, http.MethodGet, "/api/projects", nil, &projects); err != nil {
 		fmt.Fprintf(a.Stderr, "Aviso: no pude revisar si PP ya creó el proyecto: %s\n", err)
-		return false
+		return false, nil
 	}
 	found := newProjectCandidates(projects, *cfg.Proyecto.NuevoDesde)
 	var pick *projectItem
 	switch len(found) {
 	case 0:
-		return false
+		return false, nil
 	case 1:
-		if a.askYes(in, fmt.Sprintf("PP creó el proyecto «%s». ¿Es el de esta carpeta?", found[0].Name)) {
+		yes, err := a.askYes(in, fmt.Sprintf("PP creó el proyecto «%s». ¿Es el de esta carpeta?", found[0].Name))
+		if err != nil {
+			return false, err
+		}
+		if yes {
 			pick = &found[0]
 		}
 	default:
@@ -344,16 +352,19 @@ func (a *App) adoptNewProject(ctx context.Context, in *bufio.Reader, api client,
 		}
 		fmt.Fprintf(a.Stdout, "  %d) Ninguno todavía\n", len(found)+1)
 		n, err := a.askNumber(in, "¿Cuál es el de esta carpeta?", len(found)+1, len(found)+1)
+		if errors.Is(err, errInterrupted) || errors.Is(err, errNoInput) {
+			return false, err
+		}
 		if err == nil && n <= len(found) {
 			pick = &found[n-1]
 		}
 	}
 	if pick == nil {
-		return false
+		return false, nil
 	}
 	cfg.Proyecto.ID, cfg.Proyecto.Nombre, cfg.Proyecto.NuevoDesde = pick.ID, pick.Name, nil
 	fmt.Fprintf(a.Stdout, "Guardé «%s» como el proyecto de esta carpeta.\n", pick.Name)
-	return true
+	return true, nil
 }
 
 // writeEnvironment regenera .pmt/entorno.md y crea .pmt/para-usuario.md si falta.
@@ -427,8 +438,29 @@ func (a *App) prepareLaunch(ctx context.Context, api client, cfg Config, root, s
 			return err
 		}
 	}
-	_, _, err := extraMCP(cfg, session, a.Home)
-	return err
+	extras, _, err := extraMCP(cfg, session, a.Home)
+	if err != nil {
+		return err
+	}
+	if p.Herramienta == "codex" {
+		// El config.toml roto se reporta aquí y no en el pane; el aviso de
+		// entradas stdio va una vez por archivo.
+		stdio, file, err := codexStdioServers(cfg.codexHome(a.Home))
+		if err != nil {
+			return err
+		}
+		for _, name := range append([]string{"pmt"}, extras...) {
+			key := file + "\x00" + name
+			if stdio[name] && !a.codexNoticed[key] {
+				if a.codexNoticed == nil {
+					a.codexNoticed = map[string]bool{}
+				}
+				a.codexNoticed[key] = true
+				fmt.Fprintln(a.Stdout, codexStdioWarning(file, name))
+			}
+		}
+	}
+	return nil
 }
 
 // runLauncher escribe en el pane «pmt _lanzar <perfil> <raíz>». El comando no

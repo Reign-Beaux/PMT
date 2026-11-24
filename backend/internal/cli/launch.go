@@ -2,12 +2,16 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // tokenEnv es la variable con el token de PMT en el proceso del agente.
@@ -22,9 +26,10 @@ func mcpTokenEnv(name string) string { return "MCP_TOKEN_" + strings.ToUpper(nam
 // launchSpec es lo que hace falta para lanzar un perfil: el comando, sus
 // argumentos y las variables de entorno con secretos. Los tokens solo van en Env.
 type launchSpec struct {
-	Tool string
-	Args []string
-	Env  map[string]string
+	Tool     string
+	Args     []string
+	Env      map[string]string
+	Warnings []string // avisos de una línea para el usuario
 }
 
 // launchInput son los datos de un lanzamiento.
@@ -98,28 +103,98 @@ func buildLaunch(in launchInput) (launchSpec, error) {
 			"--append-system-prompt-file", in.ProfileFile,
 		}}, nil
 	case "codex":
-		env["CODEX_HOME"] = in.Config.codexHome(in.Home)
+		home := in.Config.codexHome(in.Home)
+		env["CODEX_HOME"] = home
+		stdio, file, err := codexStdioServers(home)
+		if err != nil {
+			return launchSpec{}, err
+		}
+		// Codex mezcla los -c con la tabla de su config.toml: una entrada stdio
+		// con el mismo nombre queda con command y url, y Codex no arranca. Se
+		// deshabilita esa entrada y el MCP va con otro nombre.
+		var warnings []string
+		rename := func(name string) string {
+			if !stdio[name] {
+				return name
+			}
+			warnings = append(warnings, codexStdioWarning(file, name))
+			return name + codexRenameSuffix
+		}
+		pmtName := rename("pmt")
+		instructions := in.ProfileText
+		if pmtName != "pmt" {
+			instructions += "\n\nEn esta sesión el MCP de PMT se llama `" + pmtName + "`, no `pmt`.\n"
+		}
 		args := []string{
 			"-m", p.Modelo,
-			"-c", "developer_instructions=" + tomlString(in.ProfileText),
+			"-c", "developer_instructions=" + tomlString(instructions),
 			"-c", "model_reasoning_effort=" + tomlString(effort),
+			// Como Claude con --dangerously-skip-permissions: sin preguntar por
+			// comandos ni herramientas MCP, y sin depender del config.toml de quien
+			// lo corra.
+			"-c", `approval_policy="never"`,
+			"-c", `sandbox_mode="danger-full-access"`,
 			"-c", "allow_login_shell=false",
 			"-c", "notice.hide_rate_limit_model_nudge=true",
-			"-c", "mcp_servers.pmt.url=" + tomlString(mcpURL(in.Server, in.Profile)),
-			"-c", "mcp_servers.pmt.bearer_token_env_var=" + tomlString(tokenEnv),
+		}
+		if pmtName != "pmt" {
+			args = append(args, "-c", "mcp_servers.pmt.enabled=false")
+		}
+		args = append(args,
+			"-c", "mcp_servers."+pmtName+".url="+tomlString(mcpURL(in.Server, in.Profile)),
+			"-c", "mcp_servers."+pmtName+".bearer_token_env_var="+tomlString(tokenEnv),
 			// Como tabla en línea: la ruta como segmento entre comillas de una clave
 			// con puntos («projects."/ruta".trust_level») no la toma Codex 0.171.
-			"-c", "projects={" + tomlString(in.Config.projectPath(in.Root)) + "={trust_level=\"trusted\"}}",
-		}
+			"-c", "projects={"+tomlString(in.Config.projectPath(in.Root))+"={trust_level=\"trusted\"}}",
+		)
 		for _, name := range extras {
+			as := rename(name)
+			if as != name {
+				args = append(args, "-c", "mcp_servers."+name+".enabled=false")
+			}
 			args = append(args,
-				"-c", "mcp_servers."+name+".url="+tomlString(in.Config.MCP[name].URL),
-				"-c", "mcp_servers."+name+".bearer_token_env_var="+tomlString(mcpTokenEnv(name)))
+				"-c", "mcp_servers."+as+".url="+tomlString(in.Config.MCP[name].URL),
+				"-c", "mcp_servers."+as+".bearer_token_env_var="+tomlString(mcpTokenEnv(name)))
 		}
-		return launchSpec{Tool: "codex", Env: env, Args: args}, nil
+		return launchSpec{Tool: "codex", Env: env, Args: args, Warnings: warnings}, nil
 	default:
 		return launchSpec{}, fmt.Errorf("herramienta desconocida para %s: %q (usa claude o codex)", in.Profile, p.Herramienta)
 	}
+}
+
+// codexRenameSuffix va tras el nombre de un MCP que choca con una entrada
+// stdio del config.toml de Codex.
+const codexRenameSuffix = "_cli"
+
+// codexStdioWarning es el aviso de una línea por una entrada stdio que choca.
+func codexStdioWarning(file, name string) string {
+	return fmt.Sprintf("aviso: %s tiene un MCP %q de tipo stdio; Codex lo tendrá deshabilitado y usará %q. Quita esa entrada vieja o usa codex_home en .pmt/config.yaml", file, name, name+codexRenameSuffix)
+}
+
+// codexStdioServers lee <CODEX_HOME>/config.toml y devuelve los nombres de
+// mcp_servers de tipo stdio (con command). Sin archivo, ninguno.
+func codexStdioServers(codexHome string) (map[string]bool, string, error) {
+	file := filepath.Join(codexHome, "config.toml")
+	raw, err := os.ReadFile(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, file, nil
+	}
+	if err != nil {
+		return nil, file, fmt.Errorf("no puedo leer %s: %w", file, err)
+	}
+	var conf struct {
+		MCPServers map[string]map[string]any `toml:"mcp_servers"`
+	}
+	if err := toml.Unmarshal(raw, &conf); err != nil {
+		return nil, file, fmt.Errorf("no puedo leer %s como TOML: %v", file, err)
+	}
+	stdio := map[string]bool{}
+	for name, server := range conf.MCPServers {
+		if _, ok := server["command"]; ok {
+			stdio[name] = true
+		}
+	}
+	return stdio, file, nil
 }
 
 // tomlString es un texto como cadena TOML básica, que es la sintaxis de una
