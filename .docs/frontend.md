@@ -20,7 +20,8 @@ Sin sesión, toda ruta lleva a `/login` y vuelve a la pedida al entrar. La sesi�
 | `/login` | Correo y contraseña. Avisa si el usuario está desactivado |
 | `/invitacion/:token` | Aceptar una invitación: nombre, `username` (no cambia) y contraseña. Abre la sesión al crear la cuenta |
 | `/cli?codigo=ABCD-1234` | Autorizar el inicio de sesión del CLI `pmt` ([arquitectura.md](arquitectura.md#cli-pmt)): el código en grande para compararlo con la terminal, la máquina y el nombre del token que se crea, con «Autorizar» y «Cancelar». Sin sesión pasa por `/login` y vuelve con el código. Después dice «Listo», «Inicio de sesión cancelado» o «El código caducó»; un código que no existe o falta, «Código no encontrado». Va dentro de `RequireAuth` pero fuera del marco de la app, con la tarjeta de login |
-| `/cuenta` | Mis tokens de API (crear, ver el token una sola vez, revocar), cambiar la contraseña y cerrar sesión. El dueño ve además Invitaciones (crear y copiar el enlace, lista con estado) y Usuarios (desactivar y reactivar) |
+| `/conectar` | Tokens de API (crear, copiar una sola vez y revocar), instalación del CLI, comandos MCP y guía de agentes y perfiles |
+| `/cuenta` | Cambiar la contraseña y cerrar sesión. El dueño ve además Invitaciones (crear y copiar el enlace, lista con estado) y Usuarios (desactivar y reactivar) |
 | `/` | Redirige a `/projects` |
 | `/dashboard` | Indicadores calculados de proyectos, etapas, tareas y bugs |
 | `/projects` | Catálogo de proyectos, con mi rol en cada uno. Si perdí el acceso a uno mientras lo veía, llego aquí con un aviso |

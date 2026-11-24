@@ -178,7 +178,7 @@ Un `username` no puede coincidir con el nombre de un agente, revocado o no, ni a
 
 **Cookie.** `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` según `auth.cookie_secure`. Cambiar la contraseña cierra las demás sesiones del usuario; desactivarlo borra todas y revoca sus tokens.
 
-**Tokens de agente.** Viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`. Un token de usuario se crea en la pantalla Cuenta del frontend y se usa igual, con `?profile=` en la URL del MCP ([operacion.md](operacion.md#usuarios-y-acceso)).
+**Tokens de agente.** Viven en `~/.config/pmt/tokens/<nombre>`, con permiso 600. Los clientes MCP mandan `Authorization: Bearer ${PMT_TOKEN}`. Un token de usuario se crea en la pantalla Conectar del frontend y se usa igual, con `?profile=` en la URL del MCP ([operacion.md](operacion.md#usuarios-y-acceso)).
 
 ## CLI pmt
 

@@ -11,7 +11,7 @@ Cómo se corre PMT en esta máquina. Los comandos de Go se ejecutan desde `backe
 | Configuración | `backend/config/config.dev.yaml`, fuera de git ([arquitectura.md](arquitectura.md#configuración)) |
 | Frontend | `frontend/dist`, servido por `pmt-server` |
 | Binarios del CLI `pmt` | `dist/cli/` en la raíz del repo, fuera de git, servidos por `pmt-server` en `/install.sh` y `/descargas/` |
-| Tokens | De agente: `~/.config/pmt/tokens/<agente>`, permiso 600. De usuario: se crean en la pantalla Cuenta |
+| Tokens | De agente: `~/.config/pmt/tokens/<agente>`, permiso 600. De usuario: se crean en la pantalla Conectar |
 | Respaldos viejos | `~/Respaldos/pmt/` (`pg_dump` de octubre y noviembre de 2026) |
 | Base de pruebas del frontend | `pmt_frontend_test`, en el mismo contenedor |
 
@@ -67,7 +67,7 @@ PMT no tiene acceso anónimo: el navegador entra con login y los clientes MCP co
 
 **Invitar.** El dueño entra a `/cuenta`, escribe el correo en Invitaciones y copia el enlace (`app.public_url` + `/invitacion/<token>`); PMT no envía correos. El invitado abre el enlace, elige nombre, `username` y contraseña y queda con sesión. La invitación vence en 7 días y sirve una vez.
 
-**Tokens de usuario.** Cada usuario los crea en `/cuenta` con un nombre (por ejemplo «laptop»). Empiezan con `pmt_` y se muestran una sola vez. Para el MCP:
+**Tokens de usuario.** Cada usuario los crea en `/conectar` con un nombre (por ejemplo «laptop»). Empiezan con `pmt_` y se muestran una sola vez. Para el MCP:
 
 ```bash
 install -m 600 /dev/null ~/.config/pmt/tokens/<usuario>   # pega ahí el token
@@ -163,7 +163,7 @@ pmt whoami
 
 - `install.sh` verifica la suma SHA-256 y avisa si `~/.local/bin` no está en el `PATH`. Para actualizar, se corre otra vez.
 - `pmt login` muestra un código y abre `https://pmt.saulantonio.com/cli?codigo=…`. Sin navegador (por SSH, o con `--sin-navegador`), se abre esa URL en cualquier equipo con sesión en PMT. El código vence en 10 minutos.
-- Al autorizar se crea un token llamado `pmt <máquina>`, que aparece en `/cuenta` y se puede revocar ahí. `pmt logout` lo revoca y borra el archivo.
+- Al autorizar se crea un token llamado `pmt <máquina>`, que aparece en `/conectar` y se puede revocar ahí. `pmt logout` lo revoca y borra el archivo.
 - Contra otro servidor: `pmt login --servidor http://127.0.0.1:8080`. Queda guardado.
 
 **Cómo un compañero levanta a PP** (necesita herdr y `claude` o `codex` instalados, y haber hecho `pmt login`):

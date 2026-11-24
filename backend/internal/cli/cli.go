@@ -250,7 +250,7 @@ func (a *App) login(ctx context.Context, args []string) error {
 	if previous.Token != "" && previous.TokenID != "" && previous.TokenID != poll.TokenID {
 		old := a.client(previous.Server, previous.Token)
 		if err := old.do(ctx, http.MethodDelete, "/api/tokens/"+previous.TokenID, nil, nil); err != nil && !isStatus(err, http.StatusUnauthorized) && !isStatus(err, http.StatusNotFound) {
-			fmt.Fprintf(a.Stderr, "Aviso: no se pudo revocar el token anterior en %s: %s. Revócalo en la página Cuenta.\n", previous.Server, err)
+			fmt.Fprintf(a.Stderr, "Aviso: no se pudo revocar el token anterior en %s: %s. Revócalo en la página Conectar.\n", previous.Server, err)
 		}
 	}
 	return nil

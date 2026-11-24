@@ -74,7 +74,7 @@ Tras subir los cambios a `main`, **Redeploy** en Coolify (o su webhook). Las mig
 
 1. `curl -s -o /dev/null -w '%{http_code}\n' https://pmt.saulantonio.com/readyz` → `200`.
 2. Abrir `https://pmt.saulantonio.com` y entrar con el usuario dueño. Abrir el mismo proyecto en dos pestañas, cambiar algo en una y ver el aviso en la otra (WebSocket).
-3. MCP: en `/cuenta`, crear un token y probar
+3. MCP: en `/conectar`, crear un token y probar
    ```sh
    claude mcp add --transport http pmt https://pmt.saulantonio.com/mcp --header "Authorization: Bearer <token>"
    ```
@@ -164,7 +164,7 @@ La base de la máquina de desarrollo (contenedor `postgresql`, base `pmt`, Postg
 | `sessions` | Borrar. Son las sesiones del navegador en `127.0.0.1:8080`; la cookie no sirve en otro dominio |
 | `cli_logins` | Borrar. Son inicios de sesión del CLI ya consumidos o vencidos |
 | `invitations` sin aceptar | Borrar. Sus enlaces llevan la `public_url` de desarrollo; se invita de nuevo desde `/cuenta` |
-| `api_tokens` | Se pueden conservar: solo se guarda el hash, y los tokens en texto viven en `~/.config/pmt/` de la máquina de origen. Siguen sirviendo contra la Raspberry. Los de prueba o de la `pmt <máquina>` de desarrollo se revocan en `/cuenta` cuando ya no se usen |
+| `api_tokens` | Se pueden conservar: solo se guarda el hash, y los tokens en texto viven en `~/.config/pmt/` de la máquina de origen. Siguen sirviendo contra la Raspberry. Los de prueba o de la `pmt <máquina>` de desarrollo se revocan en `/conectar` cuando ya no se usen |
 | `agents` | Igual que los tokens: los del kit siguen sirviendo si el kit apunta a la Raspberry. `dev` y `dummy-*` son de pruebas del MCP; conviene revocarlos si no se van a usar allá: `docker exec <contenedor de pmt> /app/pmt-server agent revoke --name <nombre>` ([operacion.md](operacion.md#agentes-y-tokens)) |
 
 ## Problemas comunes

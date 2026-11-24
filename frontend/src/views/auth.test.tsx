@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RequireAuth } from '../shell/RequireAuth'
+import { ConnectView } from './ConnectView'
+import { AppShell } from '../shell/AppShell'
+import { matchRoutes } from 'react-router'
+import { routes } from '../routes/routes'
 import { AccountView } from './AccountView'
 import { InvitationView } from './InvitationView'
 import { LoginView } from './LoginView'
@@ -30,7 +34,10 @@ function renderAt(path: string) {
     { path: '/invitacion/:token', element: <InvitationView /> },
     { element: <RequireAuth />, children: [
       { path: '/projects', element: <p>proyectos</p> },
-      { path: '/cuenta', element: <AccountView /> },
+      { element: <AppShell />, children: [
+        { path: '/cuenta', element: <AccountView /> },
+        { path: '/conectar', element: <ConnectView /> },
+      ] },
     ] },
   ], { initialEntries: [path] })
   render(<RouterProvider router={router} />)
@@ -118,7 +125,7 @@ describe('InvitationView', () => {
   })
 })
 
-describe('AccountView', () => {
+describe('ConnectView', () => {
   it('muestra el token nuevo una sola vez y lo quita de la vista al confirmarlo', async () => {
     const tokens: { id: string; name: string; created_at: string; last_used_at: null }[] = []
     stubApi((method, path, body) => {
@@ -131,23 +138,35 @@ describe('AccountView', () => {
       if (path === '/tokens') return [200, tokens]
       return [200, []]
     })
-    renderAt('/cuenta')
+    renderAt('/conectar')
     const user = userEvent.setup()
     await screen.findByRole('heading', { name: 'Tokens de API' })
-    expect(screen.getByRole('heading', { name: 'Invitaciones' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Usuarios' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Conectar' }).getAttribute('href')).toBe('/conectar')
+    expect(matchRoutes(routes, '/conectar')?.at(-1)?.route.path).toBe('/conectar')
     await user.type(screen.getByLabelText('Nombre'), 'laptop')
     await user.click(screen.getByRole('button', { name: 'Crear token' }))
     expect((await screen.findByLabelText('Token nuevo')).textContent).toBe('pmt_secreto')
     await screen.findByRole('button', { name: 'Revocar laptop' })
+    expect(screen.getByLabelText('conectar Claude Code').textContent).toContain('pmt_secreto')
+    expect(screen.getByLabelText('guardar PMT_TOKEN en bashrc').textContent).toContain('pmt_secreto')
     await user.click(screen.getByRole('button', { name: 'Ya lo copié' }))
     expect(screen.queryByText('pmt_secreto')).toBeNull()
+    expect(screen.getByLabelText('conectar Claude Code').textContent).toContain('<tu-token>')
+    expect(screen.getByLabelText('guardar PMT_TOKEN en bashrc').textContent).toContain('<tu-token>')
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await user.click(screen.getByRole('button', { name: 'Revocar laptop' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/tokens/t1', expect.objectContaining({ method: 'DELETE' })))
+    vi.restoreAllMocks()
   })
 
+})
+
+describe('AccountView', () => {
   it('un usuario que no es dueño no ve invitaciones ni usuarios', async () => {
     stubApi((_method, path) => path === '/auth/me' ? [200, { ...owner, is_instance_owner: false }] : [200, []])
     renderAt('/cuenta')
-    await screen.findByText('No tienes tokens.')
+    await screen.findByRole('heading', { name: 'Contraseña' })
+    expect(screen.queryByRole('heading', { name: 'Tokens de API' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Invitaciones' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Usuarios' })).toBeNull()
   })

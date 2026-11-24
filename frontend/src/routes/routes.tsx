@@ -12,6 +12,7 @@ import { ComponentsDemoView } from '../views/ComponentsDemoView'
 import { RequireAuth } from '../shell/RequireAuth'
 import { LoginView } from '../views/LoginView'
 import { InvitationView } from '../views/InvitationView'
+import { ConnectView } from '../views/ConnectView'
 import { AccountView } from '../views/AccountView'
 import { CliLoginView } from '../views/CliLoginView'
 
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
       { path: 'members', element: <MembersView /> },
       { path: 'stages/:stageId', element: <StageView /> },
     ] },
+    { path: '/conectar', element: <ConnectView /> },
     { path: '/cuenta', element: <AccountView /> },
     ...(import.meta.env.DEV ? [{ path: '/dev/componentes', element: <ComponentsDemoView /> }] : []),
     { path: '*', element: <NotFoundView /> },
